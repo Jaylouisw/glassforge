@@ -4,28 +4,35 @@
  *
  * Three topologies, built from the same demand, then scored against each other:
  *
- *   pon                head-end ── feeder tree ── splitters ── star of drops ── ONTs
+ *   pon                head-end ── feeder tree ── splitters ── distribution tree ── ONTs
  *   active-tree        head-end ── one cable tree with closures ── ONTs on dedicated fibres
  *   active-home-run    head-end ── one dedicated cable per ONT
  *
- * Every candidate is a real plant: it goes through `network.validate`, every ONT on it gets its own
+ * **Every build is a tree over a routing provider**, and there are two providers:
+ *
+ *   euclid   minimum spanning tree over straight-line distances x `routeFactor` (default 1.2)
+ *   street   union of shortest paths over an imported street/duct graph (`engine/street.js`)
+ *
+ * Supplying `opts.network` switches the provider, and every response says which one measured the
+ * runs (`routeMethod`, and per run in `runs[]`). With a street graph the geometry is carried on the
+ * span as `route`, so a drawing follows the streets and the BOM follows the drawing.
+ *
+ * Each candidate is a real plant: it goes through `network.validate`, every ONT on it gets its own
  * budget, and a candidate that fails either is reported with the reason and its numbers rather than
- * dropped from the comparison. The winner is the cheapest feasible candidate by cable metres (or by
- * money, when a cost model is supplied), with splices then closures as tie-breaks.
+ * dropped from the comparison. The winner is the cheapest feasible candidate by fibre-metres (or by
+ * money, when a cost model is supplied), with cable metres, splices, closures and optic speed as
+ * tie-breaks.
  *
- * **Geometry is straight-line times `routeFactor`** (default 1.2) and every result says so. Routing
- * along a real street or duct graph is its own piece of work; inventing a street network here would
- * make the numbers look more authoritative than they are.
- *
- * Nothing in here is random. Centres, tie-breaks and iteration order are all in index order, so the
- * same demand and options always produce the same design - which is what makes the tests worth having
- * and a re-run comparable.
+ * Nothing here is random. Centres, tie-breaks and iteration order are all in index order, so the same
+ * demand and options always produce the same design - which is what makes the tests worth having and
+ * a re-run comparable.
  */
 
 const geo = require('./geo');
 const network = require('./network');
 const demandModule = require('./demand');
 const lengthModule = require('./length');
+const street = require('./street');
 
 const DEFAULT_LADDER = [
   'g652d-loose-144', 'g652d-loose-96', 'g652d-loose-48', 'g652d-loose-24', 'g652d-loose-12',
@@ -36,6 +43,9 @@ const DEFAULTS = {
   technology: 'auto',
   routeFactor: 1.2,
   marginDb: 3,
+  network: null,
+  maxSnapM: street.DEFAULT_MAX_SNAP_M,
+  joinToleranceM: street.DEFAULT_JOIN_M,
   pon: {
     ratios: [8, 16, 32],
     olt: 'gpon-c-plus-8',
@@ -45,9 +55,6 @@ const DEFAULTS = {
   active: {
     headEndOptic: 'sfp-plus-10g-lr-10km',
     cpeOptic: 'sfp-plus-10g-lr-10km',
-    // Every optic pair is tried, because the cheapest optic that closes the budget is a different
-    // answer at 2 km and at 30 km - and a candidate that only offered 10GBASE-LR would report a
-    // "failure" that a 1 Gb/s LX optic on the same cable would have solved.
     optics: [
       { headEndOptic: 'sfp-1g-lx-10km', cpeOptic: 'sfp-1g-lx-10km' },
       { headEndOptic: 'sfp-plus-10g-lr-10km', cpeOptic: 'sfp-plus-10g-lr-10km' },
@@ -64,6 +71,7 @@ function round(n, places) {
   const f = Math.pow(10, places === undefined ? 1 : places);
   return Math.round(n * f) / f;
 }
+function cmpIds(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
 
 function options(input) {
   const o = input || {};
@@ -72,6 +80,9 @@ function options(input) {
     routeFactor: isNum(o.routeFactor) && o.routeFactor >= 1 ? o.routeFactor : DEFAULTS.routeFactor,
     marginDb: isNum(o.marginDb) ? o.marginDb : DEFAULTS.marginDb,
     headEnd: o.headEnd,
+    network: o.network || null,
+    maxSnapM: isNum(o.maxSnapM) ? o.maxSnapM : DEFAULTS.maxSnapM,
+    joinToleranceM: isNum(o.joinToleranceM) ? o.joinToleranceM : DEFAULTS.joinToleranceM,
     pon: Object.assign({}, DEFAULTS.pon, o.pon || {}),
     active: Object.assign({}, DEFAULTS.active, o.active || {}),
     ladder: Array.isArray(o.ladder) && o.ladder.length ? o.ladder : DEFAULTS.ladder,
@@ -88,26 +99,18 @@ function distanceM(a, b, factor) {
   return geo.distanceM(a, b) * factor;
 }
 
-function cmpIds(a, b) {
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
 /**
  * Minimum spanning tree over `nodes` (Kruskal, sorted by length then by id).
  *
  * Kruskal rather than Prim because the sort makes the tie-break explicit: two equal-length edges are
- * ordered by node id, so the tree does not depend on the order the points arrived in beyond that. A
- * synthesised design that changes when the CSV is re-sorted is not a design.
+ * ordered by node id, so the tree does not depend on the order the points arrived in. A synthesised
+ * design that changes when the CSV is re-sorted is not a design.
  */
 function minimumSpanningTree(nodes, factor) {
   const pairs = [];
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
-      pairs.push({
-        a: nodes[i].id,
-        b: nodes[j].id,
-        lengthM: distanceM(nodes[i], nodes[j], factor)
-      });
+      pairs.push({ a: nodes[i].id, b: nodes[j].id, lengthM: distanceM(nodes[i], nodes[j], factor) });
     }
   }
   pairs.sort(function (x, y) {
@@ -171,7 +174,6 @@ function orient(edges, rootId) {
   return { parent: parent, order: order };
 }
 
-/** Which end of an edge is the child: the end whose BFS parent is the other end. */
 function orientEdge(edge, parent) {
   if (parent.get(edge.a) === edge.b) return { child: edge.a, parent: edge.b };
   if (parent.get(edge.b) === edge.a) return { child: edge.b, parent: edge.a };
@@ -196,9 +198,9 @@ function subtreeWeights(edges, rootId, nodeIds, weightOf) {
 /**
  * The SMALLEST cable in the ladder that carries `requiredFibres`.
  *
- * The first version returned the first entry that fit, and the ladder is ordered richest-first, so
- * every two-fibre branch was designed on 144-fibre cable: a bill of materials that was wrong by a
- * factor of seventy and a design nobody could pull. Order in the ladder is a preference, not a match.
+ * It used to return the first entry that fit, and the ladder is ordered richest-first, so every
+ * two-fibre branch was designed on 144-fibre cable: a bill of materials wrong by a factor of seventy
+ * and a design nobody could pull. Order in the ladder is a preference, not a match.
  */
 function cableFor(requiredFibres, ladder, registry) {
   let best = null;
@@ -214,8 +216,6 @@ function cableFor(requiredFibres, ladder, registry) {
     }
   }
   if (best) return best;
-  // Nothing is big enough: use the largest and let the caller report how many run in parallel, rather
-  // than silently designing a cable that cannot carry the demand.
   if (!largest) throw new Error('the cable ladder names no cable this catalogue has: ' + ladder.join(', '));
   return largest;
 }
@@ -243,6 +243,9 @@ function strandList(count, fiberCount) {
  * member is 900 m away is a drop that will not budget. Rather than letting k-means produce either,
  * the cluster count rises until both constraints hold - at the limit every point is its own splitter,
  * which is the honest answer for a demand spread over a valley.
+ *
+ * Distances here are straight-line on purpose even when the runs are street-routed: grouping is a
+ * coverage question, and the lengths that end up in the budget are measured by the router.
  */
 function clusterPoints(points, headEnd, ratio, maxDropM, factor, maxIterations) {
   let k = Math.max(1, Math.ceil(points.length / ratio));
@@ -259,8 +262,6 @@ function clusterPoints(points, headEnd, ratio, maxDropM, factor, maxIterations) 
 
 function kmeans(points, headEnd, k, factor, maxIterations) {
   const centres = [];
-  // Farthest-first from the head-end: the site nearest the head-end first, then each point that is
-  // farthest from everything chosen so far. Deterministic, and it spreads the splitters out.
   let first = points[0];
   for (const point of points) {
     if (distanceM(headEnd, point, factor) < distanceM(headEnd, first, factor)) first = point;
@@ -273,7 +274,8 @@ function kmeans(points, headEnd, k, factor, maxIterations) {
     for (const point of points) {
       let nearest = Infinity;
       for (const centre of centres) nearest = Math.min(nearest, distanceM(point, centre, factor));
-      if (nearest > bestDistance + 1e-6 || (Math.abs(nearest - bestDistance) <= 1e-6 && best && cmpIds(point.id, best.id) < 0)) {
+      if (nearest > bestDistance + 1e-6 ||
+          (Math.abs(nearest - bestDistance) <= 1e-6 && best && cmpIds(point.id, best.id) < 0)) {
         best = point;
         bestDistance = nearest;
       }
@@ -285,8 +287,6 @@ function kmeans(points, headEnd, k, factor, maxIterations) {
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     const next = new Array(points.length).fill(-1);
     const counts = new Array(centres.length).fill(0);
-
-    // Nearest centre first ...
     for (let i = 0; i < points.length; i++) {
       let chosen = -1;
       let bestDistance = Infinity;
@@ -297,11 +297,10 @@ function kmeans(points, headEnd, k, factor, maxIterations) {
       next[i] = chosen;
       counts[chosen] += 1;
     }
-    // ... then move the overflow to the nearest centre with room, farthest-first so the point that
-    // suffers least from being moved goes first.
+    const cap = Math.ceil(points.length / Math.max(1, centres.length));
     const overflow = [];
     for (let i = 0; i < points.length; i++) {
-      if (counts[next[i]] <= Math.ceil(points.length / Math.max(1, centres.length))) continue;
+      if (counts[next[i]] <= cap) continue;
       overflow.push(i);
     }
     overflow.sort(function (x, y) {
@@ -310,7 +309,6 @@ function kmeans(points, headEnd, k, factor, maxIterations) {
       if (Math.abs(dx - dy) > 1e-6) return dy - dx;
       return cmpIds(points[x].id, points[y].id);
     });
-    const cap = Math.ceil(points.length / Math.max(1, centres.length));
     for (const i of overflow) {
       let chosen = next[i];
       let bestDistance = Infinity;
@@ -330,8 +328,6 @@ function kmeans(points, headEnd, k, factor, maxIterations) {
     assignment = next;
     if (stable && iteration > 0) break;
 
-    // Recompute each centre as the medoid of its members: a real point, so the splitter sits
-    // somewhere a box can actually be placed.
     for (let c = 0; c < centres.length; c++) {
       const members = points.filter(function (_, i) { return assignment[i] === c; });
       if (!members.length) continue;
@@ -346,14 +342,126 @@ function kmeans(points, headEnd, k, factor, maxIterations) {
     }
   }
 
-  const clusters = centres.map(function (centre, c) {
+  return centres.map(function (centre, c) {
     const members = points.filter(function (_, i) { return assignment[i] === c; });
     let maxDistM = 0;
     for (const member of members) maxDistM = Math.max(maxDistM, distanceM(centre, member, factor));
     return { centre: centre, members: members, maxDistM: maxDistM };
   }).filter(function (c) { return c.members.length > 0; });
+}
 
-  return clusters;
+// ---------------------------------------------------------------- routing providers
+
+/**
+ * The straight-line provider: an MST over the root and the points.
+ *
+ * Every point is a terminal, edges carry the number of terminals below them, and each span's geometry
+ * is the straight line between its ends.
+ */
+function euclidTree(rootPoint, points, factor) {
+  const nodes = [{ id: 'root', lat: rootPoint.lat, lon: rootPoint.lon }].concat(points.map(function (p) {
+    return { id: p.id, lat: p.lat, lon: p.lon };
+  }));
+  const mstEdges = minimumSpanningTree(nodes, factor);
+  const weights = subtreeWeights(mstEdges, 'root', nodes.map(function (n) { return n.id; }), function (id) {
+    return id === 'root' ? 0 : 1;
+  });
+  const oriented = orient(mstEdges, 'root');
+  const byId = new Map(nodes.map(function (n) { return [n.id, n]; }));
+
+  const degree = new Map();
+  for (const edge of mstEdges) {
+    degree.set(edge.a, (degree.get(edge.a) || 0) + 1);
+    degree.set(edge.b, (degree.get(edge.b) || 0) + 1);
+  }
+
+  const treeNodes = nodes.map(function (node) {
+    return {
+      key: node.id,
+      lat: node.lat,
+      lon: node.lon,
+      terminals: node.id === 'root' ? 0 : 1,
+      degree: degree.get(node.id) || 0,
+      attachTerminals: node.id === 'root' ? [] : [node.id],
+      isRoot: node.id === 'root'
+    };
+  });
+
+  const edges = mstEdges.map(function (edge) {
+    const side = orientEdge(edge, oriented.parent);
+    const a = byId.get(side.parent);
+    const b = byId.get(side.child);
+    return {
+      from: side.parent,
+      to: side.child,
+      // A cluster's medoid sits exactly on the splitter site, so its tree edge measures 0 m - which is
+      // not a span this model accepts. One metre is the shortest drop that can physically exist.
+      lengthM: Math.max(1, round(edge.lengthM, 1)),
+      route: [{ lat: a.lat, lon: a.lon }, { lat: b.lat, lon: b.lon }],
+      terminals: weights.totals.get(side.child) || 0
+    };
+  });
+
+  const spurs = new Map();
+  for (const point of points) spurs.set(point.id, 0);
+
+  return { rootId: 'root', nodes: treeNodes, edges: edges, spurs: spurs, unresolved: [], totalM: round(edges.reduce(function (n, e) { return n + e.lengthM; }, 0), 2) };
+}
+
+/**
+ * The street provider: snap every terminal, then take the union of shortest paths from the root.
+ *
+ * Anything the graph cannot reach comes back in `unresolved` rather than being connected by a straight
+ * line: an address two kilometres from the nearest street is a design problem, and the caller turns it
+ * into an infeasible candidate with that reason.
+ */
+function streetTree(graph, root, points, opts) {
+  const rootSnap = street.snap(graph, root, { maxSnapM: opts.maxSnapM });
+  if (!rootSnap) throw new Error('the head-end is more than ' + opts.maxSnapM + ' m from the street network');
+
+  const terminals = [];
+  const unresolved = [];
+  const spurs = new Map();
+  for (const point of points) {
+    const snapped = street.snap(graph, point, { maxSnapM: opts.maxSnapM });
+    if (!snapped) { unresolved.push(point.id); continue; }
+    terminals.push({ id: point.id, nodeId: snapped.nodeId, spurM: snapped.spurM });
+    spurs.set(point.id, snapped.spurM);
+  }
+
+  const routed = street.routedTree(graph, rootSnap.nodeId, terminals, {});
+  const treeNodes = routed.nodes.map(function (node) {
+    return {
+      key: node.key,
+      lat: node.lat,
+      lon: node.lon,
+      terminals: node.terminals,
+      degree: node.degree,
+      attachTerminals: node.attachTerminals,
+      isRoot: node.isRoot
+    };
+  });
+
+  return {
+    rootId: routed.rootId,
+    rootLat: rootSnap.at.lat,
+    rootLon: rootSnap.at.lon,
+    rootSpurM: rootSnap.spurM,
+    nodes: treeNodes,
+    edges: routed.edges,
+    spurs: spurs,
+    unresolved: unresolved.concat(routed.unresolved),
+    totalM: routed.totalM
+  };
+}
+
+// ---------------------------------------------------------------- key names
+
+function clusterCentre(members) {
+  // The site is a real property (the medoid the cluster was built around), so it has real coordinates
+  // and, when routing, a real snap onto the street.
+  const first = members[0];
+  return { lat: first.lat, lon: first.lon };
 }
 
 function opticSpeed(model, registry) {
@@ -367,7 +475,121 @@ function opticLabel(model, registry) {
     ' ' + optic.model.replace(/^sfp(28|\+)?-/, '').toUpperCase();
 }
 
+function closureModelFor(degree) {
+  return degree <= 8 ? 'nap-8' : degree <= 16 ? 'nap-16' : 'mufa-inline-24';
+}
+
 // ---------------------------------------------------------------- plant builders
+
+/** A customer-facing tree: active Ethernet, or a PON's distribution. */
+function emitTerminalTree(plant, tree, cfg, registry) {
+  const idOf = new Map();
+  idOf.set(tree.rootId, cfg.rootPlantId);
+
+  for (const node of tree.nodes) {
+    if (node.isRoot) continue;
+    if (node.degree >= 2 || node.attachTerminals.length) {
+      const id = cfg.prefix + 'c-' + node.key;
+      plant.nodes.push({
+        id: id, type: 'closure', model: closureModelFor(node.degree),
+        name: (node.attachTerminals.length ? node.attachTerminals[0] + ' ' : '') + 'closure ',
+        lat: node.lat, lon: node.lon
+      });
+      idOf.set(node.key, id);
+    } else {
+      idOf.set(node.key, cfg.rootPlantId);
+    }
+  }
+
+  for (const node of tree.nodes) {
+    for (const terminalId of node.attachTerminals) {
+      const point = cfg.pointById.get(terminalId);
+      if (!point) continue;
+      const ontId = cfg.prefix + 'ont-' + terminalId;
+      plant.nodes.push({
+        id: ontId, type: 'ont', model: cfg.terminalModel,
+        name: point.label, lat: point.lat, lon: point.lon
+      });
+      const spur = tree.spurs.get(terminalId) || 0;
+      plant.spans.push({
+        id: cfg.prefix + 'drop-' + terminalId,
+        from: idOf.get(node.key), to: ontId,
+        cable: cfg.terminalCable,
+        lengthM: Math.max(1, round(spur, 1)),
+        strands: cfg.terminalFibres === 1 ? [1] : [1, 2],
+        purpose: cfg.dropPurpose,
+        feedsOnts: 1,
+        route: spur > 0 ? [{ lat: node.lat, lon: node.lon }, { lat: point.lat, lon: point.lon }] : null
+      });
+    }
+  }
+
+  for (const edge of tree.edges) {
+    const fibres = Math.max(cfg.minFibres, edge.terminals * cfg.fibresPerTerminal);
+    const cable = cfg.distribution
+      ? cableForDistribution(fibres, cfg.ladder, registry)
+      : cableFor(fibres, cfg.ladder, registry);
+    const bundles = Math.max(1, Math.ceil(fibres / cable.fiberCount));
+    plant.spans.push({
+      id: cfg.prefix + 's-' + edge.from + '-' + edge.to,
+      from: idOf.get(edge.from), to: idOf.get(edge.to),
+      cable: cable.model,
+      lengthM: edge.lengthM,
+      strands: strandList(fibres, cable.fiberCount),
+      bundles: bundles,
+      purpose: cfg.purpose,
+      feedsOnts: edge.terminals,
+      route: edge.route
+    });
+  }
+}
+
+/** The PON feeder: a tree to the splitter sites, each splitter on a short tail off its own closure. */
+function emitFeederTree(plant, tree, cfg, registry) {
+  const idOf = new Map();
+  const closureOf = new Map();
+  idOf.set(tree.rootId, cfg.rootPlantId);
+
+  for (const node of tree.nodes) {
+    if (node.isRoot) continue;
+    const closureId = cfg.prefix + 'fc-' + node.key;
+    plant.nodes.push({
+      id: closureId, type: 'closure', model: closureModelFor(node.degree),
+      name: 'Feeder closure', lat: node.lat, lon: node.lon
+    });
+    closureOf.set(node.key, closureId);
+    idOf.set(node.key, closureId);
+    if (node.attachTerminals.length) {
+      const splitterId = cfg.prefix + 'spl-' + node.key;
+      plant.nodes.push({
+        id: splitterId, type: 'splitter', model: cfg.splitterModel,
+        name: cfg.splitterName, lat: node.lat, lon: node.lon
+      });
+      plant.spans.push({
+        id: cfg.prefix + 'tail-' + node.key, from: closureId, to: splitterId,
+        cable: 'g657a2-drop-1', lengthM: 1, strands: [1], purpose: 'splitter-tail', feedsOnts: 0
+      });
+      cfg.splitterPlantId.set(node.attachTerminals[0], splitterId);
+    }
+  }
+
+  for (const edge of tree.edges) {
+    const fibres = Math.max(12, edge.terminals);
+    const cable = cableFor(fibres, cfg.ladder, registry);
+    const bundles = Math.max(1, Math.ceil(fibres / cable.fiberCount));
+    plant.spans.push({
+      id: cfg.prefix + 'f-' + edge.from + '-' + edge.to,
+      from: idOf.get(edge.from), to: idOf.get(edge.to),
+      cable: cable.model,
+      lengthM: edge.lengthM,
+      strands: strandList(fibres, cable.fiberCount),
+      bundles: bundles,
+      purpose: 'feeder',
+      feedsSplitters: edge.terminals,
+      route: edge.route
+    });
+  }
+}
 
 function headEndNode(opts, technology, opticModel) {
   const pon = technology === 'pon';
@@ -381,118 +603,85 @@ function headEndNode(opts, technology, opticModel) {
   };
 }
 
-/**
- * Active network: one cable tree, a closure wherever the tree branches, and a dedicated fibre pair
- * per customer.
- *
- * A demand point that the tree passes *through* becomes a closure with a 2 m drop to its own ONT -
- * the cable runs past the property, which is what happens on a street, and pretending the route goes
- * through the living room would be worse.
- */
-function buildActiveTree(demand, opts, registry, optic) {
+function buildActiveTree(demand, opts, registry, optic, graph) {
   const active = Object.assign({}, opts.active, optic);
-  const factor = opts.routeFactor;
-  const root = { id: 'root', lat: opts.headEnd.lat, lon: opts.headEnd.lon };
-  const nodes = [root].concat(demand.points.map(function (p) {
-    return { id: p.id, lat: p.lat, lon: p.lon, label: p.label };
-  }));
-  const edges = minimumSpanningTree(nodes, factor);
-  const adj = adjacencyOf(edges);
-  const byId = new Map(nodes.map(function (n) { return [n.id, n]; }));
-  const pointById = new Map(demand.points.map(function (p) { return [p.id, p]; }));
+  const plant = { name: 'Active tree', nodes: [headEndNode(opts, 'active', active.headEndOptic)], spans: [] };
+  const tree = graph
+    ? streetTree(graph, opts.headEnd, demand.points, opts)
+    : euclidTree(opts.headEnd, demand.points, opts.routeFactor);
 
-  const weights = subtreeWeights(edges, 'root', nodes.map(function (n) { return n.id; }), function (id) {
-    return id === 'root' ? 0 : 1;
-  });
-
-  const plant = { name: 'Active tree', nodes: [], spans: [] };
-  const headEnd = headEndNode(opts, 'active', active.headEndOptic);
-  plant.nodes.push(headEnd);
-
-  const structuralId = new Map();
-  for (const node of nodes) {
-    if (node.id === 'root') { structuralId.set(node.id, headEnd.id); continue; }
-    const degree = (adj.get(node.id) || []).length;
-    const point = pointById.get(node.id);
-    if (degree >= 2) {
-      // The cable tree passes the property, so the point becomes a closure with a 2 m drop to its
-      // own ONT. Routing the trunk through the house would be worse than a short drop.
-      const closureId = 'n-c-' + node.id;
-      const ontId = 'n-c-ont-' + node.id;
-      const closureModel = degree <= 8 ? 'nap-8' : degree <= 16 ? 'nap-16' : 'mufa-inline-24';
-      plant.nodes.push({
-        id: closureId, type: 'closure', model: closureModel,
-        name: (point ? point.label : 'joint') + ' closure', lat: node.lat, lon: node.lon
-      });
-      plant.nodes.push({
-        id: ontId, type: 'ont', model: active.cpeOptic,
-        name: point ? point.label : 'ONU', lat: node.lat, lon: node.lon
-      });
-      plant.spans.push({
-        id: 's-drop-' + node.id, from: closureId, to: ontId,
-        cable: 'g657a2-drop-2', lengthM: 2, strands: [1, 2], purpose: 'drop', feedsOnts: 1
-      });
-      structuralId.set(node.id, closureId);
-    } else {
-      plant.nodes.push({
-        id: 'n-ont-' + node.id, type: 'ont', model: active.cpeOptic,
-        name: point ? point.label : 'ONU', lat: node.lat, lon: node.lon
-      });
-      structuralId.set(node.id, 'n-ont-' + node.id);
-    }
-  }
-
-  const oriented = orient(edges, 'root');
-  let spanIndex = 0;
-  for (const edge of edges) {
-    const side = orientEdge(edge, oriented.parent);
-    const count = weights.totals.get(side.child) || 1;
-    const required = Math.max(2, count * 2);
-    const cable = cableFor(required, opts.ladder, registry);
-    const bundles = Math.max(1, Math.ceil(required / cable.fiberCount));
-    spanIndex += 1;
-    plant.spans.push({
-      id: 's-' + spanIndex,
-      from: structuralId.get(side.parent),
-      to: structuralId.get(side.child),
-      cable: cable.model,
-      lengthM: round(edge.lengthM, 1),
-      strands: strandList(required, cable.fiberCount),
-      bundles: bundles,
-      purpose: 'tree',
-      feedsOnts: count
-    });
-  }
+  emitTerminalTree(plant, tree, {
+    rootPlantId: 'n-headend',
+    prefix: '',
+    pointById: new Map(demand.points.map(function (p) { return [p.id, p]; })),
+    terminalModel: active.cpeOptic,
+    terminalCable: 'g657a2-drop-2',
+    terminalFibres: 2,
+    fibresPerTerminal: 2,
+    minFibres: 2,
+    distribution: false,
+    purpose: 'tree',
+    dropPurpose: 'drop',
+    ladder: opts.ladder
+  }, registry);
 
   return finalise(plant, opts, registry, 'active-tree', {
     label: 'Active Ethernet over a shared cable tree, ' + opticLabel(active.cpeOptic, registry),
-    settings: { optic: active.cpeOptic, headEndOptic: active.headEndOptic, speedMbps: opticSpeed(active.cpeOptic, registry) }
+    settings: { optic: active.cpeOptic, headEndOptic: active.headEndOptic, speedMbps: opticSpeed(active.cpeOptic, registry) },
+    unresolved: tree.unresolved
   });
 }
 
-function buildActiveHomeRun(demand, opts, registry, optic) {
+function buildActiveHomeRun(demand, opts, registry, optic, graph) {
   const active = Object.assign({}, opts.active, optic);
-  const plant = { name: 'Active home-run', nodes: [headEndNode(opts, 'active', active.headEndOptic)] };
-  plant.spans = [];
-  demand.points.forEach(function (p, i) {
-    const lengthM = Math.max(1, round(distanceM(opts.headEnd, p, opts.routeFactor), 1));
-    const cable = lengthM > 300 ? 'g652d-loose-12' : 'g657a2-drop-2';
-    plant.nodes.push({
-      id: 'n-ont-' + p.id, type: 'ont', model: active.cpeOptic,
-      name: p.label, lat: p.lat, lon: p.lon
+  const plant = { name: 'Active home-run', nodes: [headEndNode(opts, 'active', active.headEndOptic)], spans: [] };
+  const unresolved = [];
+
+  if (graph) {
+    const rootSnap = street.snap(graph, opts.headEnd, { maxSnapM: opts.maxSnapM });
+    if (!rootSnap) throw new Error('the head-end is more than ' + opts.maxSnapM + ' m from the street network');
+    const spt = street.dijkstra(graph, rootSnap.nodeId);
+    demand.points.forEach(function (point, i) {
+      const snapped = street.snap(graph, point, { maxSnapM: opts.maxSnapM });
+      if (!snapped) { unresolved.push(point.id); return; }
+      const path = street.routePath(graph, rootSnap.nodeId, snapped.nodeId, spt);
+      if (!path) { unresolved.push(point.id); return; }
+      plant.nodes.push({
+        id: 'n-ont-' + point.id, type: 'ont', model: active.cpeOptic,
+        name: point.label, lat: point.lat, lon: point.lon
+      });
+      const lengthM = Math.max(1, round(path.lengthM + snapped.spurM, 1));
+      plant.spans.push({
+        id: 's-' + (i + 1), from: 'n-headend', to: 'n-ont-' + point.id,
+        cable: lengthM > 300 ? 'g652d-loose-12' : 'g657a2-drop-2',
+        lengthM: lengthM, strands: [1, 2], purpose: 'home-run', feedsOnts: 1,
+        route: path.route.concat([{ lat: point.lat, lon: point.lon }])
+      });
     });
-    plant.spans.push({
-      id: 's-' + (i + 1), from: 'n-headend', to: 'n-ont-' + p.id,
-      cable: cable, lengthM: lengthM, strands: [1, 2], purpose: 'home-run', feedsOnts: 1
+  } else {
+    demand.points.forEach(function (point, i) {
+      const lengthM = Math.max(1, round(distanceM(opts.headEnd, point, opts.routeFactor), 1));
+      plant.nodes.push({
+        id: 'n-ont-' + point.id, type: 'ont', model: active.cpeOptic,
+        name: point.label, lat: point.lat, lon: point.lon
+      });
+      plant.spans.push({
+        id: 's-' + (i + 1), from: 'n-headend', to: 'n-ont-' + point.id,
+        cable: lengthM > 300 ? 'g652d-loose-12' : 'g657a2-drop-2',
+        lengthM: lengthM, strands: [1, 2], purpose: 'home-run', feedsOnts: 1,
+        route: [{ lat: opts.headEnd.lat, lon: opts.headEnd.lon }, { lat: point.lat, lon: point.lon }]
+      });
     });
-  });
+  }
+
   return finalise(plant, opts, registry, 'active-home-run', {
     label: 'Active Ethernet, one cable per customer, ' + opticLabel(active.cpeOptic, registry),
-    settings: { optic: active.cpeOptic, headEndOptic: active.headEndOptic, speedMbps: opticSpeed(active.cpeOptic, registry) }
+    settings: { optic: active.cpeOptic, headEndOptic: active.headEndOptic, speedMbps: opticSpeed(active.cpeOptic, registry) },
+    unresolved: unresolved
   });
 }
 
-function buildPon(demand, opts, registry, ratio) {
+function buildPon(demand, opts, registry, ratio, graph) {
   const splitterModel = 'plc-1x' + ratio + '-sca';
   if (!registry.has('splitter', splitterModel)) return null;
 
@@ -501,129 +690,73 @@ function buildPon(demand, opts, registry, ratio) {
   const clusters = clustered.clusters;
 
   const plant = { name: 'PON 1:' + ratio, nodes: [headEndNode(opts, 'pon')], spans: [] };
-  const sites = [];
+  const splitterPlantId = new Map();
+  const unresolved = [];
+  const pointById = new Map(demand.points.map(function (p) { return [p.id, p]; }));
+  const sitePoints = clusters.map(function (cluster, i) {
+    const centre = cluster.centre;
+    return { id: 'site-' + (i + 1), label: 'Splitter site ' + (i + 1), lat: centre.lat, lon: centre.lon };
+  });
+
+  // Feeder: head-end to a closure at every splitter site, each splitter on a 1 m tail.
+  const feeder = graph
+    ? streetTree(graph, opts.headEnd, sitePoints, opts)
+    : euclidTree(opts.headEnd, sitePoints, factor);
+  // A site that cannot be reached means the *houses it serves* cannot be served, so report those:
+  // telling a planner "site-2 is unresolved" when they typed forty addresses names the wrong thing.
+  for (const id of feeder.unresolved) {
+    const index = sitePoints.findIndex(function (site) { return site.id === id; });
+    if (index >= 0) clusters[index].members.forEach(function (member) { unresolved.push(member.id); });
+    else unresolved.push(id);
+  }
+
+  emitFeederTree(plant, feeder, {
+    rootPlantId: 'n-headend',
+    prefix: '',
+    splitterModel: splitterModel,
+    splitterName: 'Splitter 1:' + ratio,
+    splitterPlantId: splitterPlantId,
+    ladder: opts.ladder
+  }, registry);
+
+  // Distribution: one tree per cluster, rooted at its splitter.
   clusters.forEach(function (cluster, i) {
-    const siteId = 'n-spl-' + (i + 1);
-    const closureId = 'n-fc-' + (i + 1);
-    // Every splitter site gets its own closure on the feeder, and the splitter hangs off it on a 1 m
-    // tail. Without this the feeder tree would pass *through* splitter nodes, so a path to the third
-    // site would be charged three splitter losses - a 1:512 cascade that exists only in the drawing.
-    plant.nodes.push({
-      id: closureId, type: 'closure', model: 'nap-8',
-      name: 'Feeder closure ' + (i + 1), lat: cluster.centre.lat, lon: cluster.centre.lon
-    });
-    plant.nodes.push({
-      id: siteId, type: 'splitter', model: splitterModel,
-      name: 'Splitter 1:' + ratio + ' #' + (i + 1), lat: cluster.centre.lat, lon: cluster.centre.lon
-    });
-    plant.spans.push({
-      id: 's-tail-' + (i + 1), from: closureId, to: siteId,
-      cable: 'g657a2-drop-1', lengthM: 1, strands: [1], purpose: 'splitter-tail', feedsOnts: 0
-    });
-    sites.push({ id: closureId, splitterId: siteId, lat: cluster.centre.lat, lon: cluster.centre.lon, cluster: cluster });
-    if (!cluster.members.length) return;
-
-    // Distribution is a cable TREE from the splitter past the houses, one fibre per ONT - not a star
-    // of twelve home-runs back to a cabinet. That is how the cable is actually built, and it is what
-    // makes a PON's cable metreage comparable with the active tree's.
+    const sitePoint = sitePoints[i];
     const members = cluster.members;
-    const site = { id: siteId, lat: cluster.centre.lat, lon: cluster.centre.lon };
-    const treeNodes = [site].concat(members.map(function (m) {
-      return { id: m.id, lat: m.lat, lon: m.lon, label: m.label };
-    }));
-    const distEdges = minimumSpanningTree(treeNodes, factor);
-    const distWeights = subtreeWeights(distEdges, siteId, treeNodes.map(function (n) { return n.id; }), function (id) {
-      return id === siteId ? 0 : 1;
-    });
-    const distOriented = orient(distEdges, siteId);
+    if (!members.length) return;
 
-    const degree = new Map();
-    for (const edge of distEdges) {
-      degree.set(edge.a, (degree.get(edge.a) || 0) + 1);
-      degree.set(edge.b, (degree.get(edge.b) || 0) + 1);
+    let rootPlantId = splitterPlantId.get(sitePoint.id);
+    if (!rootPlantId) {
+      // The site did not resolve (no street within reach): name the houses it was meant to serve.
+      members.forEach(function (member) { unresolved.push(member.id); });
+      return;
     }
 
-    const structural = new Map();
-    structural.set(siteId, siteId);
-    for (const member of members) {
-      const d = degree.get(member.id) || 0;
-      if (d >= 2) {
-        // The distribution cable passes this property: a closure here, and a short drop to the ONT.
-        const closureId = 'n-dc-' + member.id;
-        const ontId = 'n-dc-ont-' + member.id;
-        plant.nodes.push({
-          id: closureId, type: 'closure', model: d <= 8 ? 'nap-8' : 'nap-16',
-          name: (member.label || member.id) + ' closure', lat: member.lat, lon: member.lon
-        });
-        plant.nodes.push({
-          id: ontId, type: 'ont', model: opts.pon.ont,
-          name: member.label, lat: member.lat, lon: member.lon
-        });
-        plant.spans.push({
-          id: 's-drop-' + member.id, from: closureId, to: ontId,
-          cable: 'g657a2-drop-1', lengthM: 2, strands: [1], purpose: 'drop', feedsOnts: 1
-        });
-        structural.set(member.id, closureId);
-      } else {
-        plant.nodes.push({
-          id: 'n-ont-' + member.id, type: 'ont', model: opts.pon.ont,
-          name: member.label, lat: member.lat, lon: member.lon
-        });
-        structural.set(member.id, 'n-ont-' + member.id);
-      }
-    }
+    const tree = graph
+      ? streetTree(graph, sitePoint, members, opts)
+      : euclidTree(sitePoint, members, factor);
+    unresolved.push.apply(unresolved, tree.unresolved);
 
-    distEdges.forEach(function (edge, j) {
-      const side = orientEdge(edge, distOriented.parent);
-      const fibres = distWeights.totals.get(side.child) || 1;
-      const cable = cableForDistribution(fibres, opts.ladder, registry);
-      const bundles = Math.max(1, Math.ceil(fibres / cable.fiberCount));
-      plant.spans.push({
-        id: 's-dist-' + (i + 1) + '-' + (j + 1),
-        from: side.parent === siteId ? siteId : structural.get(side.parent),
-        to: structural.get(side.child),
-        cable: cable.model,
-        lengthM: Math.max(1, round(edge.lengthM, 1)),
-        strands: strandList(fibres, cable.fiberCount),
-        bundles: bundles,
-        purpose: 'distribution',
-        feedsOnts: fibres
-      });
-    });
-  });
-
-  // Feeder: a tree from the head-end through the splitter sites, one fibre per splitter below each
-  // edge (with a 12-fibre floor, because nobody pulls a 4-fibre feeder).
-  const feederNodes = [{ id: 'root', lat: opts.headEnd.lat, lon: opts.headEnd.lon }].concat(sites.map(function (s) {
-    return { id: s.id, lat: s.lat, lon: s.lon };
-  }));
-  const edges = feederNodes.length > 1 ? minimumSpanningTree(feederNodes, factor) : [];
-  const weights = subtreeWeights(edges, 'root', feederNodes.map(function (n) { return n.id; }), function (id) {
-    return id === 'root' ? 0 : 1;
-  });
-  const oriented = orient(edges, 'root');
-  edges.forEach(function (edge, i) {
-    const side = orientEdge(edge, oriented.parent);
-    const splitters = weights.totals.get(side.child) || 1;
-    const required = Math.max(12, splitters);
-    const cable = cableFor(required, opts.ladder, registry);
-    const bundles = Math.max(1, Math.ceil(required / cable.fiberCount));
-    plant.spans.push({
-      id: 's-feed-' + (i + 1),
-      from: side.parent === 'root' ? 'n-headend' : side.parent,
-      to: side.child,
-      cable: cable.model,
-      lengthM: round(edge.lengthM, 1),
-      strands: strandList(required, cable.fiberCount),
-      bundles: bundles,
-      purpose: 'feeder',
-      feedsSplitters: splitters
-    });
+    emitTerminalTree(plant, tree, {
+      rootPlantId: rootPlantId,
+      prefix: 'd' + (i + 1) + '-',
+      pointById: pointById,
+      terminalModel: opts.pon.ont,
+      terminalCable: 'g657a2-drop-1',
+      terminalFibres: 1,
+      fibresPerTerminal: 1,
+      minFibres: 1,
+      distribution: true,
+      purpose: 'distribution',
+      dropPurpose: 'drop',
+      ladder: opts.ladder
+    }, registry);
   });
 
   return finalise(plant, opts, registry, 'pon', {
     label: 'PON 1:' + ratio + ' with ' + clusters.length + ' splitter site(s)',
-    settings: { ratio: ratio, splitters: clusters.length, maxDropM: opts.pon.maxDropM }
+    settings: { ratio: ratio, splitters: clusters.length, maxDropM: opts.pon.maxDropM },
+    unresolved: unresolved
   });
 }
 
@@ -663,10 +796,7 @@ function bomOf(plant, registry, opts) {
 
 function evaluate(plant, opts, registry, meta) {
   const structural = network.validate(plant, registry);
-  const budgets = network.allOntBudgets(plant, registry, {
-    marginDb: opts.marginDb,
-    direction: 'down'
-  });
+  const budgets = network.allOntBudgets(plant, registry, { marginDb: opts.marginDb, direction: 'down' });
 
   const failures = budgets.filter(function (b) { return b.error || (b.result && b.result.verdict === 'fail'); });
   const headrooms = budgets.filter(function (b) { return b.result && isNum(b.result.headroomDb); })
@@ -683,6 +813,11 @@ function evaluate(plant, opts, registry, meta) {
   }, 0);
 
   const reasons = [];
+  const unresolved = meta.unresolved || [];
+  if (unresolved.length) {
+    reasons.push(unresolved.length + ' address(es) are not on the street network or not reachable along it: ' +
+      unresolved.slice(0, 5).join(', ') + (unresolved.length > 5 ? ', ...' : ''));
+  }
   if (!structural.ok) Array.prototype.push.apply(reasons, structural.errors);
   failures.slice(0, 5).forEach(function (f) {
     reasons.push((f.name || f.ont) + ': ' + (f.error || (f.result && f.result.reasons.join('; '))));
@@ -745,7 +880,9 @@ function finalise(plant, opts, registry, technology, meta) {
   return evaluate(plant, opts, registry, {
     technology: technology,
     label: meta.label,
-    settings: meta.settings
+    settings: meta.settings,
+    // One address can be reported by several trees (a PON feeder and its own distribution, say).
+    unresolved: Array.from(new Set(meta.unresolved || []))
   });
 }
 
@@ -772,7 +909,7 @@ function compareCandidates(a, b, opts) {
   return cmpIds(String(sa[sa.length - 1]), String(sb[sb.length - 1]));
 }
 
-function runsOf(plant) {
+function runsOf(plant, routeMethod) {
   return plant.spans.map(function (span) {
     return {
       id: span.id,
@@ -783,7 +920,9 @@ function runsOf(plant) {
       bundles: span.bundles || 1,
       strands: span.strands ? span.strands.length : 0,
       purpose: span.purpose || 'tree',
-      feedsOnts: span.feedsOnts || (span.purpose === 'drop' ? 1 : null)
+      feedsOnts: span.feedsOnts || (span.purpose === 'drop' ? 1 : null),
+      method: routeMethod,
+      route: span.route || null
     };
   });
 }
@@ -801,15 +940,17 @@ function describe(candidate) {
  * `opts`:
  *   headEnd      { lat, lon, name? }                       required
  *   technology   'auto' | 'pon' | 'active'                 (default 'auto')
- *   routeFactor  straight-line multiplier                  (default 1.2)
+ *   network      street/duct geometry: KML text, an array of polylines, or { edges: [...] }
+ *   maxSnapM     how far a property may sit from the network (default 250 m)
+ *   routeFactor  straight-line multiplier, used only without a network (default 1.2)
  *   marginDb     optical design margin                     (default 3)
  *   pon          { ratios, olt, ont, maxDropM }
- *   active       { headEndOptic, cpeOptic }
+ *   active       { headEndOptic, cpeOptic, optics }
  *   ladder       cable models, richest first
  *   costs        { cablePerM: { model: n }, splice, closure, splitter }   optional
  *
- * Returns `{ ok, demand, headEnd, routeMethod, candidates, best, plant, runs, rationale, notes }`.
- * With `ok: false` there is no best, and every candidate carries the reasons it was refused.
+ * Returns `{ ok, demand, headEnd, routeMethod, objective, candidates, best, plant, runs, rationale,
+ * notes }`. With `ok: false` there is no best, and every candidate carries the reasons it was refused.
  */
 function synthesise(demandInput, userOptions, registry) {
   if (!registry) throw new TypeError('synthesise needs a parts registry');
@@ -823,12 +964,27 @@ function synthesise(demandInput, userOptions, registry) {
   const notes = [];
   const candidates = [];
 
+  let graph = null;
+  let routeMethod = 'straight-line x' + opts.routeFactor;
+  if (opts.network) {
+    graph = street.buildGraph(opts.network, {
+      joinToleranceM: opts.joinToleranceM,
+      precision: street.VERTEX_PRECISION
+    });
+    const stats = graph.stats();
+    routeMethod = 'street-graph (' + stats.edges + ' edges, ' + stats.lengthKm + ' km)';
+    notes.push('Routed along ' + stats.edges + ' street edges (' + stats.lengthKm + ' km of network); ' +
+      'addresses farther than ' + opts.maxSnapM + ' m from a street are reported as unresolved.');
+  } else {
+    notes.push('No street network supplied: runs are straight-line x' + opts.routeFactor + '.');
+  }
+
   const wantsPon = opts.technology === 'auto' || opts.technology === 'pon';
   const wantsActive = opts.technology === 'auto' || opts.technology === 'active';
 
   if (wantsPon) {
     for (const ratio of opts.pon.ratios) {
-      const candidate = buildPon(demand, opts, registry, ratio);
+      const candidate = buildPon(demand, opts, registry, ratio, graph);
       if (candidate) candidates.push(candidate);
       else notes.push('PON 1:' + ratio + ' skipped: no splitter part "plc-1x' + ratio + '-sca" in the catalogue');
     }
@@ -839,8 +995,8 @@ function synthesise(demandInput, userOptions, registry) {
       ? opts.active.optics
       : [{ headEndOptic: opts.active.headEndOptic, cpeOptic: opts.active.cpeOptic }];
     for (const optic of optics) {
-      candidates.push(buildActiveTree(demand, opts, registry, optic));
-      candidates.push(buildActiveHomeRun(demand, opts, registry, optic));
+      candidates.push(buildActiveTree(demand, opts, registry, optic, graph));
+      candidates.push(buildActiveHomeRun(demand, opts, registry, optic, graph));
     }
   }
   if (!candidates.length) throw new Error('no candidate topology could be built for technology "' + opts.technology + '"');
@@ -902,7 +1058,7 @@ function synthesise(demandInput, userOptions, registry) {
     }
   }
 
-  const output = {
+  return {
     ok: !!best,
     demand: {
       points: demand.points.length,
@@ -912,7 +1068,7 @@ function synthesise(demandInput, userOptions, registry) {
       bbox: demand.bbox
     },
     headEnd: opts.headEnd,
-    routeMethod: 'straight-line x' + opts.routeFactor,
+    routeMethod: routeMethod,
     objective: opts.costs ? 'cost' : 'fibre-metres',
     technology: best ? best.technology : null,
     best: best ? {
@@ -937,11 +1093,10 @@ function synthesise(demandInput, userOptions, registry) {
       };
     }),
     plant: best ? best.plant : null,
-    runs: best ? runsOf(best.plant) : [],
+    runs: best ? runsOf(best.plant, routeMethod) : [],
     rationale: rationale,
     notes: notes
   };
-  return output;
 }
 
 module.exports = {

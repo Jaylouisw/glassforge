@@ -41,6 +41,11 @@
         <input id="he-lon" placeholder="head-end lon" inputmode="decimal">
       </div>
       <div class="row">
+        <label class="filebtn">Street network (KML/KMZ)<input id="network-file" type="file" accept=".kml,.kmz,.json" hidden></label>
+        <button id="network-clear" title="Route by straight-line factor again">Clear</button>
+      </div>
+      <p class="hint" id="network-status">network: none (straight-line x1.2)</p>
+      <div class="row">
         <select id="auto-tech">
           <option value="auto">Compare all topologies</option>
           <option value="pon">PON only</option>

@@ -114,6 +114,30 @@
     };
   }
 
+  /**
+   * Project arbitrary points with the transform `project()` produced.
+   *
+   * A routed span carries its street geometry, so the drawing has to place points that are not nodes.
+   * Sharing the transform is the only way a polyline and the node it ends on agree.
+   */
+  function projectPoints(points, transform) {
+    const t = transform || {};
+    const width = t.width || 800;
+    const height = t.height || 480;
+    const scale = t.scale || 1;
+    const centre = t.centre || { lat: 0, lon: 0 };
+    const mPerDegLat = 111132.95;
+    const mPerDegLon = 111319.49 * Math.cos((centre.lat * Math.PI) / 180) || 1;
+    return (points || []).map(function (point) {
+      const dx = (point.lon - centre.lon) * mPerDegLon;
+      const dy = (point.lat - centre.lat) * mPerDegLat;
+      return {
+        x: Math.round((width / 2 + dx * scale) * 10) / 10,
+        y: Math.round((height / 2 - dy * scale) * 10) / 10
+      };
+    });
+  }
+
   const COLOURS = { olt: '#7b3fa0', closure: '#4a5568', splitter: '#f07f13', ont: '#2e9e4f' };
 
   function nodeColour(node) {
@@ -135,6 +159,7 @@
     distanceM: distanceM,
     bounds: bounds,
     project: project,
+    projectPoints: projectPoints,
     unproject: unproject,
     nodeColour: nodeColour,
     nodeLabel: nodeLabel,

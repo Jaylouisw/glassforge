@@ -31,6 +31,7 @@ Node 18 or newer. No `npm install`, because there is nothing to install: the ser
 | **Plant** | A tree with one head-end: OLT → feeder → closures and splitters → drop → ONT for a PON, or head-end → cable tree → ONTs for active Ethernet. Duplicate ids, unknown models, over-split PONs and unmeasured spans are refused; a dangling node is a warning, not a wall. |
 | **Optical budget** | Worst-case loss both ways: fibre by the metre, splices, connectors, splitters. Two verdicts — receiver headroom against a design margin, and the plant's own budget (a PON class, or the optic pair's launch-minus-sensitivity for an active link). |
 | **Auto-design** | Paste addresses plus a head-end and it builds PON (at each splitter ratio), active-over-a-tree and active home-run, validates and budgets every one, and ranks them by fibre-metres or by your cost model. Winners are applicable to the project in one undoable step. |
+| **Street routing** | Import the street or duct network (KML/KMZ) and every run is measured along it and drawn along it: snaps each property to the nearest edge, routes the union of shortest paths, keeps the polyline on the span. Anything the network cannot reach is refused by address, not connected by a straight line. |
 | **Cable to buy** | Route length + 3% overlength + 30 m per splice + 20 m per closure, itemised, rounded up to whole drums **per cable model**. |
 | **Splice diagram** | TIA-598 colours and `T03-F07` addresses, from the same table the engine uses, with per-span strand usage and overbooking detection. |
 | **KML / KMZ import** | Bring in a route drawn in Google Earth. Reports routes, points, duplicates skipped, and what it did not understand. |
@@ -57,9 +58,10 @@ Rejected Active Ethernet over a shared cable tree, 1 Gb/s 1G-LX-10KM: feasible b
         of cable and 58969.6 fibre-metres (2.19x)
 ```
 
-Every length is **straight-line × `routeFactor`** (default 1.2) and every response says so; routing
-along a real street graph is [issue #7](https://git.jayw.uk/jaylouisw/glassforge/issues/7). Details,
-algorithms and the modelling choices: [docs/AUTO-DESIGN.md](docs/AUTO-DESIGN.md).
+Supply a street or duct network and the runs are **routed along it**; without one they are
+straight-line × `routeFactor` (default 1.2). Every response says which it used (`routeMethod`), and
+each run carries its `route` polyline when it was routed. Details, algorithms and the modelling
+choices: [docs/AUTO-DESIGN.md](docs/AUTO-DESIGN.md).
 
 ## What it does not do yet
 
@@ -67,9 +69,9 @@ Being explicit, because a planner that quietly lacks a feature is worse than one
 
 - **No basemap.** The canvas projects your coordinates and keeps the aspect ratio, but there are no
   street or satellite tiles: an offline-capable tile layer is a separate decision (and a cache).
-- **No street-graph routing.** Auto-design measures straight-line distance times a stated factor, not
-  a route along roads or ducts.
-- **No geocoding.** Addresses need coordinates in the input; the server makes no outbound requests.
+- **No map download.** Street routing works on geometry you import; the server makes no outbound
+  requests, so there is no built-in OSM/Google fetch.
+- **No geocoding.** Addresses need coordinates in the input, for the same reason.
 - **No active-equipment sizing.** Active designs count fibres and optics, not switch ports or uplinks.
 - **No accounts, roles or multi-user editing.** One machine, one user, one file per project.
 - **No OLT integration.** SmartOLT-style ONU synchronisation is not implemented and is not faked.

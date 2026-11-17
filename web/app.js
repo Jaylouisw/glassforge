@@ -6,6 +6,7 @@
     registry: { counts: null, parts: {} },
     project: null,
     tool: 'select',
+    network: null,
     connectFrom: null,
     selected: null,
     tab: 'signal',
@@ -155,11 +156,20 @@
       const a = byId.get(span.from);
       const b = byId.get(span.to);
       if (!a || !b) continue;
-      const line = el('line', {
-        x1: a.x, y1: a.y, x2: b.x, y2: b.y,
-        stroke: '#3d4b5a', 'stroke-width': 2.5, 'stroke-linecap': 'round'
-      });
-      spansLayer.appendChild(line);
+      if (Array.isArray(span.route) && span.route.length > 2) {
+        // A routed span follows the street: draw the geometry, not a chord across the block.
+        const projected = GFScene.projectPoints(span.route, { width: width, height: height, scale: scene.scale, centre: scene.centre });
+        const points = projected.map(function (p) { return p.x + ',' + p.y; }).join(' ');
+        spansLayer.appendChild(el('polyline', {
+          points: points, fill: 'none', stroke: '#3d4b5a', 'stroke-width': 2.5,
+          'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+        }));
+      } else {
+        spansLayer.appendChild(el('line', {
+          x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+          stroke: '#3d4b5a', 'stroke-width': 2.5, 'stroke-linecap': 'round'
+        }));
+      }
       const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - 4 };
       spansLayer.appendChild(el('text', {
         x: mid.x, y: mid.y, fill: '#93a1b0', 'font-size': '10', 'text-anchor': 'middle',
@@ -436,11 +446,40 @@
     if (!isFinite(lat) || !isFinite(lon) || $('#he-lat').value === '' || $('#he-lon').value === '') {
       throw new Error('the head-end needs a latitude and a longitude');
     }
-    return {
+    const payload = {
       demand: text,
       headEnd: { lat: lat, lon: lon, name: 'Head-end' },
       technology: $('#auto-tech').value
     };
+    if (state.network) payload.network = state.network;
+    return payload;
+  }
+
+  function importNetwork(file) {
+    const isKmz = /\.kmz$/i.test(file.name);
+    const reader = new FileReader();
+    reader.onload = function () {
+      fetch('/api/import/network', {
+        method: 'POST',
+        headers: { 'Content-Type': isKmz ? 'application/vnd.google-earth.kmz' : 'application/vnd.google-earth.kml+xml' },
+        body: reader.result
+      }).then(function (res) {
+        return res.json().then(function (body) {
+          if (!res.ok) throw new Error(body.error || ('HTTP ' + res.status));
+          return body;
+        });
+      }).then(function (result) {
+        state.network = { edges: result.edges };
+        $('#network-status').textContent = 'network: ' + result.stats.edges + ' edges, ' + result.stats.lengthKm + ' km';
+        banner('Street network loaded: ' + result.stats.edges + ' edges over ' + result.stats.lengthKm + ' km.', 'ok');
+      }).catch(function (err) {
+        state.network = null;
+        $('#network-status').textContent = 'network: not loaded';
+        banner('Street network import failed: ' + err.message);
+      });
+    };
+    if (isKmz) reader.readAsArrayBuffer(file);
+    else reader.readAsText(file);
   }
 
   function runAutoDesign() {
@@ -617,6 +656,13 @@
     $('#undo').addEventListener('click', undo);
     $('#new-project').addEventListener('click', newProject);
     $('#auto-run').addEventListener('click', runAutoDesign);
+    $('#network-file').addEventListener('change', function (event) {
+      if (event.target.files && event.target.files[0]) importNetwork(event.target.files[0]);
+    });
+    $('#network-clear').addEventListener('click', function () {
+      state.network = null;
+      $('#network-status').textContent = 'network: none (straight-line x1.2)';
+    });
     $('#kml-file').addEventListener('change', function (event) {
       if (event.target.files && event.target.files[0]) importKml(event.target.files[0]);
     });

@@ -3,6 +3,37 @@
 All notable changes to Glassforge. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-11-17
+
+Street routing: runs are measured, and drawn, along the streets instead of a detour factor.
+
+### Added
+
+- **`engine/street.js`** — a street/duct graph from KML, KMZ or JSON polylines: vertices merged within
+  a tolerance, properties snapped onto the nearest edge (splitting it, and keeping the gap as the
+  drop), Dijkstra, and the union of shortest paths from the root pruned to the edges that serve a
+  terminal and contracted between the points a planner marks.
+- **`design.synthesise` routing provider** — supplying `network` switches every candidate from
+  straight-line × `routeFactor` to the graph. Spans carry their street geometry as `route`, runs
+  report the method they were measured with, and the canvas draws routed spans as polylines.
+- **`POST /api/import/network`** — build a graph from KML/KMZ/JSON and get its stats and edges back.
+- **UI** — a street-network file input beside the auto-design controls, with the edge count and
+  network length it loaded.
+- **Refusals that name the address**: a property more than `maxSnapM` (default 250 m) from the network,
+  or disconnected from the head-end, makes the candidate infeasible with the address ids listed.
+- 18 test suites / 153 assertions (was 16 / 141).
+
+### Changed
+
+- The synthesiser is now a set of builders over a **routing provider** (straight-line or street), so
+  both paths share the tree, the cable taper, the budget and the ranking.
+- `runs[]` gained `method` and `route`; `routeMethod` reports the network it routed on.
+
+### Fixed
+
+- A cluster's medoid sits exactly on its splitter site, so its tree edge measured 0 m and the model
+  refused the span. It is now the 1 m shortest real drop.
+
 ## [0.2.0] — 2026-11-17
 
 Active optical networks, and auto-design from a list of addresses.

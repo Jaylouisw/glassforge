@@ -58,8 +58,13 @@ A refused operation returns `400` with the reason and leaves the saved project u
 ```
 POST /api/design/synthesise
   { demand, headEnd: { lat, lon, name? }, technology?, routeFactor?, marginDb?,
+    network?, maxSnapM?, joinToleranceM?,
     pon?: { ratios, olt, ont, maxDropM }, active?: { optics }, costs?, applyToProject? }
   → { ok, objective, routeMethod, technology, best, candidates, plant, runs, rationale, notes, applied? }
+
+POST /api/import/network
+  body: KML text, a KMZ buffer, or { edges: [{ coords }] }
+  → { stats: { nodes, edges, lengthM, lengthKm }, edges: [{ id, lengthM, coords }] }
 
 POST /api/import/demand
   { demand: "label,lat,lon\n..." }            (or an array of rows)
@@ -67,7 +72,9 @@ POST /api/import/demand
 ```
 
 `demand` is CSV text or an array of `{ label?, address?, lat, lon }`. Rows without coordinates are
-refused by row number — geocoding is off by default. `applyToProject` replaces the project's plant in
+refused by row number — geocoding is off by default. `network` switches the router from the
+straight-line factor to a street/duct graph; `/api/import/network` builds that graph and hands it back
+so the caller can preview it (and send it as `network` unchanged). `applyToProject` replaces the project's plant in
 one operation (one undo step) *after* validating it; without it, the design is returned and nothing is
 written. Candidates that fail are returned with `feasible: false` and their reasons, never dropped.
 See [AUTO-DESIGN.md](AUTO-DESIGN.md).

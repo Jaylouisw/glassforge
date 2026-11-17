@@ -51,9 +51,17 @@ three describe different networks.
 
 `design.synthesise(demand, opts, registry)` builds PON, active-tree and active-home-run candidates from
 a list of coordinates, validates and budgets each, and ranks the survivors by fibre-metres (or by a
-supplied cost model). The algorithms, the clustering, the cable taper and the modelling choices are in
-[AUTO-DESIGN.md](AUTO-DESIGN.md). Nothing in it is random, so the same demand always produces the same
-design.
+supplied cost model). Every build is a tree over a **routing provider**:
+
+- **straight line** — minimum spanning tree over `distance × routeFactor`;
+- **street graph** — `opts.network` (KML, polylines or `{ edges }`): each terminal is snapped to the
+  nearest edge, the tree is the union of shortest paths from the root, and every span carries its
+  street geometry as `route`.
+
+The provider is named in `routeMethod`, and a terminal the graph cannot reach within `maxSnapM` makes
+that candidate infeasible with the address named. The algorithms, the clustering, the cable taper and
+the modelling choices are in [AUTO-DESIGN.md](AUTO-DESIGN.md). Nothing in it is random, so the same
+demand always produces the same design.
 
 ## 3. A path becomes a budget
 

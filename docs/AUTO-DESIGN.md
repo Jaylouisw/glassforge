@@ -88,13 +88,64 @@ Kruskal sorted by length and then by node id; the ranking has a total order. The
 options produce byte-identical JSON, which is what makes the tests worth having and a re-run
 comparable.
 
+## Routing: street graph or straight line
+
+Two providers, chosen by whether `network` is supplied. Both produce the same tree shape, so the
+builders, the cable taper and the ranking are shared.
+
+### street-graph
+
+```
+KML / KMZ / { edges }  →  graph (vertices merged within 1.5 m)
+                       →  snap every property onto the nearest edge, splitting it
+                       →  Dijkstra from the root
+                       →  union of shortest paths to every terminal, pruned
+                       →  contract degree-2 junctions, keep the polyline
+```
+
+- **A property is snapped to the nearest edge, and the gap is a real length.** A house is not on the
+  centreline: the distance from the property to the point it joins the street is the drop, carried as
+  `spurM` and emitted as a drop span. It is not rounded away and it is not a 2 m placeholder.
+- **The tree is the union of shortest paths, not the sum of pairwise routes.** Walking 40 shortest
+  paths and adding them up counts the shared trunk once per house; the union counts it once. It is not
+  the optimal Steiner tree — that is a much larger piece of work — but it is deterministic, it is the
+  tree a planner actually draws, and its length is the true sum of street edges.
+- **Degree-2 junctions with nothing attached are contracted.** A street polyline with forty vertices is
+  one cable run, not forty spans: the geometry survives as `route` on the span, the length as one
+  number.
+- **A property the graph cannot reach is refused by name.** More than `maxSnapM` (default 250 m) from
+  the nearest edge, or disconnected from the head-end, and the candidate is infeasible with
+  `"2 address(es) are not on the street network or not reachable along it: d7, d19"`. Connecting it
+  with a straight line would be the one number in the design nobody could defend.
+- **The head-end must be on the network too.** A PoP 2 km from the nearest street is a data problem,
+  and it is reported as one rather than snapped from afar.
+
+### straight-line
+
+`distance × routeFactor` (default 1.2) between every pair, minimum spanning tree. This is what you get
+with no network imported, and it is honest about being an estimate: `routeMethod` says
+`straight-line x1.2` and every run carries no `route` beyond its two ends.
+
+### What the response tells you
+
+```
+routeMethod: "street-graph (30 edges, 0.361 km)"
+runs: [{ id: "s-feed-1", purpose: "feeder", lengthM: 158.18, method: "street-graph (...)", route: [15 points] }]
+```
+
+`runs[].method` is repeated per run so a stored design can be audited later, and `runs[].route` is the
+street geometry — the canvas draws it, so the drawing and the BOM describe the same cable.
+
+A worked comparison on a 10-house cul-de-sac off a main road: 507 m straight-line (×1.2) against
+577 m routed along the streets, with two feeder spans carrying 15 and 6 points of geometry. The
+difference is almost exactly the detour to the junction, which is the whole point.
+
 ## What it does not do
 
-- **No street or duct routing.** Every length is straight-line × `routeFactor`, and every response
-  says so in `routeMethod`. Routing along imported geometry is its own piece of work; a synthesised
-  street network would make the numbers look more authoritative than they are.
-- **No geocoding.** The server makes no outbound requests, so an address without coordinates is
-  refused rather than looked up. A CSV needs `lat`/`lon` columns.
+- **No map download.** The graph is whatever was imported; the server makes no outbound requests, so
+  there is no built-in OSM fetch.
+- **No geocoding.** An address without coordinates is refused rather than looked up. A CSV needs
+  `lat`/`lon` columns.
 - **No active-equipment sizing.** An active design counts fibres and optics, not switch ports, uplinks
   or chassis. `capacity()` says so: an active plant reports `ports: null` rather than inventing a
   ceiling.

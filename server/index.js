@@ -319,6 +319,9 @@ async function handle(req, res, ctx) {
         technology: body.technology,
         routeFactor: body.routeFactor,
         marginDb: body.marginDb,
+        network: body.network,
+        maxSnapM: body.maxSnapM,
+        joinToleranceM: body.joinToleranceM,
         pon: body.pon,
         active: body.active,
         costs: body.costs
@@ -391,6 +394,37 @@ async function handle(req, res, ctx) {
     const ratio = Number(url.searchParams.get('ratio') || 8);
     const ideal = 10 * Math.log10(ratio);
     return sendJson(req, res, 200, { ratio: ratio, idealSplitLossDb: Math.round(ideal * 100) / 100 });
+  }
+
+  if (pathname === '/api/import/network' && method === 'POST') {
+    // Street/duct geometry for the router. Accepts KML, KMZ or JSON edges, and answers with the graph
+    // it built so the caller can see what it is about to design on - and hand it back unchanged.
+    const buf = await readBody(req, MAX_UPLOAD_BYTES);
+    const type = String(req.headers['content-type'] || '');
+    const isKmz = /kmz/.test(type) || (buf.length > 4 && buf.readUInt32LE(0) === 0x04034b50);
+    const isJson = /json/.test(type);
+    let input;
+    if (isKmz) input = engine.kml.kmzToKml(buf);
+    else if (isJson) {
+      try {
+        input = JSON.parse(buf.toString('utf8'));
+      } catch (err) {
+        return fail(req, res, 400, 'invalid JSON body: ' + err.message);
+      }
+    } else input = buf.toString('utf8');
+
+    let graph;
+    try {
+      graph = engine.street.buildGraph(input, {});
+    } catch (err) {
+      throw asBadRequest(err);
+    }
+    const edges = Array.from(graph.edges.values())
+      .sort(function (a, b) { return a.id < b.id ? -1 : 1; })
+      .map(function (edge) {
+        return { id: edge.id, lengthM: Math.round(edge.lengthM * 10) / 10, coords: edge.geometry };
+      });
+    return sendJson(req, res, 200, { stats: graph.stats(), edges: edges });
   }
 
   if (pathname === '/api/import/kml' && method === 'POST') {

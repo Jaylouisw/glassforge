@@ -201,6 +201,33 @@ async function main() {
     assert.ok(badDemand.body.error.indexOf('latitude') !== -1, badDemand.body.error);
   });
 
+  const streetJson = {
+    edges: [
+      { id: 'main', coords: [{ lat: 51.5, lon: -0.1010 }, { lat: 51.5, lon: -0.0990 }] },
+      { id: 'side', coords: [{ lat: 51.5, lon: -0.1000 }, { lat: 51.5020, lon: -0.1000 }] }
+    ]
+  };
+  const importedNetwork = await request('POST', '/api/import/network', streetJson);
+  test('a street network is built and handed back with its edges', function () {
+    assert.strictEqual(importedNetwork.status, 200);
+    assert.ok(importedNetwork.body.stats.edges >= 2);
+    assert.ok(importedNetwork.body.stats.lengthKm > 0.1);
+    assert.ok(Array.isArray(importedNetwork.body.edges[0].coords));
+  });
+
+  const routedDesign = await request('POST', '/api/design/synthesise', {
+    demand: 'label,lat,lon\nA,51.5004,-0.0998\nB,51.5008,-0.0998',
+    headEnd: { lat: 51.5, lon: -0.1010, name: 'PoP' },
+    network: { edges: importedNetwork.body.edges }
+  });
+  test('a design on a street network reports the router and keeps the geometry', function () {
+    assert.strictEqual(routedDesign.status, 200);
+    assert.strictEqual(routedDesign.body.ok, true, JSON.stringify(routedDesign.body.notes));
+    assert.ok(routedDesign.body.routeMethod.indexOf('street-graph') === 0, routedDesign.body.routeMethod);
+    const withRoute = routedDesign.body.plant.spans.filter(function (s) { return Array.isArray(s.route) && s.route.length > 2; });
+    assert.ok(withRoute.length > 0, 'routed spans carry their street geometry');
+  });
+
   const unknown = await request('GET', '/api/nope');
   test('an unknown endpoint answers JSON, not an HTML error page', function () {
     assert.strictEqual(unknown.status, 404);
