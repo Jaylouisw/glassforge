@@ -87,15 +87,21 @@ jobs:
         # COPY source present, entrypoint exists - and the build below runs where a daemon exists.
         run: node scripts/check-dockerfile.js
 
-      - name: Install Docker CLI
-        run: sudo apt-get update && sudo apt-get install -y docker.io
-
-      - name: Build image (only where a docker daemon is available)
+      - name: Build the image where a docker daemon can be reached
+        # This job must not be red because the runner has no daemon. The static checks above are the
+        # gate; a real build is the bonus, and it is attempted rather than skipped so a runner that
+        # *can* build does build. `sudo` was the first version's mistake: the job image has no sudo,
+        # and the install failure turned the whole job red for a reason that was not about the code.
         run: |
+          if ! command -v docker >/dev/null 2>&1; then
+            echo "docker CLI absent - trying to install it (no sudo: the job runs as root in its image)"
+            apt-get update >/dev/null 2>&1 && apt-get install -y docker.io >/dev/null 2>&1 \
+              || echo "could not install the docker CLI in this job image"
+          fi
           if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
             echo "docker daemon found - building the image for real"
             docker build -t glassforge:ci .
           else
-            echo "No docker daemon in this job image."
+            echo "No docker daemon reachable from this job image."
             echo "The Dockerfile passed the static checks above; the build is verified where a daemon exists."
           fi
