@@ -102,6 +102,30 @@ test('an infeasible candidate is reported with reasons, not dropped', function (
   assert.strictEqual(out.plant, null);
 });
 
+test('a long two-fibre span is a cable run, not a drop', function () {
+  // Two fibres over 1.2 km is not a drop: drop cable is not what gets pulled between buildings, and
+  // designing it that way produces a BOM nobody can buy.
+  const long = engine.design.cableForSpan(2, 1200, engine.design.DEFAULT_LADDER, registry);
+  assert.ok(long.fiberCount >= 12, 'a 1.2 km two-fibre span chose ' + long.model);
+
+  const short = engine.design.cableForSpan(2, 120, engine.design.DEFAULT_LADDER, registry);
+  assert.strictEqual(short.fiberCount, 2, 'a 120 m two-fibre span should stay drop cable, got ' + short.model);
+
+  const oneFibre = engine.design.cableForSpan(1, 50, engine.design.DEFAULT_LADDER, registry);
+  assert.strictEqual(oneFibre.fiberCount, 1, 'a short single-fibre drop is drop-1, got ' + oneFibre.model);
+
+  // And through a real design: two points 1.2 km apart, one tree edge.
+  const far = engine.design.synthesise([
+    { label: 'Near', lat: 51.5000, lon: -0.1 },
+    { label: 'Far', lat: 51.5108, lon: -0.1 }
+  ], { headEnd: { lat: 51.4995, lon: -0.1 }, technology: 'active' }, registry);
+  for (const span of far.plant.spans) {
+    if (span.purpose === 'drop' || span.lengthM <= engine.design.DROP_CABLE_MAX_M) continue;
+    const cable = registry.get('cable', span.cable);
+    assert.ok(cable.fiberCount >= 12, span.id + ' is ' + span.lengthM + ' m on ' + cable.model);
+  }
+});
+
 test('the runs carry a purpose, a cable and a positive length', function () {
   const out = engine.design.synthesise(street(10, 0.0004), { headEnd: HEAD_END }, registry);
   assert.ok(out.runs.length > 0);
@@ -130,15 +154,21 @@ test('a PON feeder does not cascade splitters that sit side by side', function (
   }
 });
 
-test('cable is tapered: no span uses a cable bigger than its fibres need', function () {
+test('cable is tapered, and a long span is never a drop cable', function () {
   const out = engine.design.synthesise(street(20, 0.0005), { headEnd: HEAD_END, technology: 'active' }, registry);
   for (const span of out.plant.spans) {
     const cable = registry.get('cable', span.cable);
     const required = span.strands ? span.strands.length : 1;
     assert.ok(cable.fiberCount >= required, span.id + ' uses ' + cable.model + ' for ' + required + ' fibres');
-    // the smallest cable in the catalogue that fits, or a drop cable when a drop cable fits
-    const smaller = registry.all('cable').filter(function (c) { return c.fiberCount >= required && c.fiberCount < cable.fiberCount; });
-    assert.strictEqual(smaller.length, 0, span.id + ' could have used a smaller cable than ' + cable.model);
+    if (span.lengthM > engine.design.DROP_CABLE_MAX_M && span.purpose !== 'drop') {
+      // A 1.2 km two-fibre run is a cable run, not a drop: drop cable is not what gets pulled there.
+      assert.ok(cable.fiberCount >= 12, span.id + ' is ' + span.lengthM + ' m on ' + cable.model);
+    } else if (span.purpose !== 'drop') {
+      const smaller = registry.all('cable').filter(function (c) {
+        return c.fiberCount >= required && c.fiberCount < cable.fiberCount && c.fiberCount >= 12;
+      });
+      assert.strictEqual(smaller.length, 0, span.id + ' could have used a smaller cable than ' + cable.model);
+    }
   }
 });
 

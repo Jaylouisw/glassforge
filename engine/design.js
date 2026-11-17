@@ -227,6 +227,23 @@ function cableForDistribution(requiredFibres, ladder, registry) {
   return cableFor(Math.max(12, requiredFibres), ladder, registry);
 }
 
+/** Above this, a span is a cable run, not a drop - and drop cable is the wrong product for it. */
+const DROP_CABLE_MAX_M = 300;
+
+/**
+ * The cable for a span that carries `fibres` over `lengthM`.
+ *
+ * Two fibres over 1.2 km is not a drop: it is a two-fibre cable run, and designing it as drop cable
+ * produces a bill of materials nobody can buy (drop cable is not pulled between buildings or between
+ * two data centres). Short two-fibre runs keep the drop cable, everything else goes to the ladder.
+ */
+function cableForSpan(fibres, lengthM, ladder, registry) {
+  if (lengthM <= DROP_CABLE_MAX_M && fibres <= 2) {
+    return cableForDistribution(fibres, ladder, registry);
+  }
+  return cableFor(Math.max(12, fibres), ladder, registry);
+}
+
 function strandList(count, fiberCount) {
   const n = Math.min(count, fiberCount);
   const out = [];
@@ -526,9 +543,7 @@ function emitTerminalTree(plant, tree, cfg, registry) {
 
   for (const edge of tree.edges) {
     const fibres = Math.max(cfg.minFibres, edge.terminals * cfg.fibresPerTerminal);
-    const cable = cfg.distribution
-      ? cableForDistribution(fibres, cfg.ladder, registry)
-      : cableFor(fibres, cfg.ladder, registry);
+    const cable = cableForSpan(fibres, edge.lengthM, cfg.ladder, registry);
     const bundles = Math.max(1, Math.ceil(fibres / cable.fiberCount));
     plant.spans.push({
       id: cfg.prefix + 's-' + edge.from + '-' + edge.to,
@@ -1106,5 +1121,7 @@ module.exports = {
   minimumSpanningTree: minimumSpanningTree,
   clusterPoints: clusterPoints,
   cableFor: cableFor,
+  cableForSpan: cableForSpan,
+  DROP_CABLE_MAX_M: DROP_CABLE_MAX_M,
   runsOf: runsOf
 };
