@@ -162,6 +162,45 @@ async function main() {
     assert.ok(imported.body.routeM > 50);
   });
 
+  const demandCsv = 'label,lat,lon\nCasa 1,51.5000,-0.1000\nCasa 2,51.5005,-0.0998\nCasa 3,51.5010,-0.0996\nCasa 4,51.5015,-0.0994';
+  const parsedDemand = await request('POST', '/api/import/demand', { demand: demandCsv });
+  test('a demand list is parsed and reported before anything is designed', function () {
+    assert.strictEqual(parsedDemand.status, 200);
+    assert.strictEqual(parsedDemand.body.points.length, 4);
+    assert.deepStrictEqual(parsedDemand.body.rejected, []);
+  });
+
+  const synthesis = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv,
+    headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' }
+  });
+  test('auto-design returns a ranked comparison and a buildable plant', function () {
+    assert.strictEqual(synthesis.status, 200);
+    assert.strictEqual(synthesis.body.ok, true, JSON.stringify(synthesis.body.notes));
+    assert.ok(synthesis.body.candidates.length >= 4);
+    assert.ok(synthesis.body.plant.nodes.length >= 5);
+    assert.ok(synthesis.body.rationale[0].indexOf('Chosen:') === 0);
+    const validation = require('../engine').network.validate(synthesis.body.plant, require('../engine').createRegistry());
+    assert.deepStrictEqual(validation.errors, []);
+  });
+
+  const applied = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv,
+    headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' },
+    applyToProject: id
+  });
+  test('a design can be applied to a project, and the project validates afterwards', function () {
+    assert.strictEqual(applied.status, 200);
+    assert.ok(applied.body.applied.nodes >= 5);
+    assert.strictEqual(applied.body.applied.projectId, id);
+  });
+
+  const badDemand = await request('POST', '/api/import/demand', { demand: 'address,postcode\nCalle 3,28001' });
+  test('a demand list with no coordinates is a 400 with the reason', function () {
+    assert.strictEqual(badDemand.status, 400);
+    assert.ok(badDemand.body.error.indexOf('latitude') !== -1, badDemand.body.error);
+  });
+
   const unknown = await request('GET', '/api/nope');
   test('an unknown endpoint answers JSON, not an HTML error page', function () {
     assert.strictEqual(unknown.status, 404);

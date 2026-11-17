@@ -3,7 +3,7 @@
 What a design *is* in Glassforge, and which decisions the engine makes for you. Read this before
 changing behaviour; the tests assert what is written here.
 
-## 1. The plant is a tree
+## 1. The plant is a tree, and its head-end decides the technology
 
 ```js
 {
@@ -22,9 +22,20 @@ changing behaviour; the tests assert what is written here.
 }
 ```
 
+A plant has exactly one **root**, and the root's type is the technology:
+
+| Root | Technology | Customer end | Budget used |
+|---|---|---|---|
+| `olt` | PON | `ont` model | class budget (`opticalBudget`) |
+| `headend` | active optical | `transceiver` model | the optic pair's launch − sensitivity (`pointToPoint`) |
+
+A PON may contain splitters; an active plant may not. Both are the same node types otherwise — a
+closure is a closure, a drop is a drop — which is what makes the cable side of the planner shared
+between the two.
+
 Rules the engine enforces:
 
-- **Exactly one `olt` node.** Every ONT has exactly one path back to it.
+- **Exactly one root** (`olt` or `headend`, never both). Every ONT has exactly one path back to it.
 - **Every span names a cable model and a measured length in metres.** A span with no length is
   refused, because the bill of materials is a number somebody spends money against.
 - **Nodes and spans have unique ids.** The project layer generates `n1`, `n2`, `s1`, …; the API
@@ -36,7 +47,15 @@ Why a tree and not a general graph: every number the planner produces — budget
 order — is derived from the path between the OLT and one ONT. A general graph would let two of those
 three describe different networks.
 
-## 2. A path becomes a budget
+## 2. Auto-design
+
+`design.synthesise(demand, opts, registry)` builds PON, active-tree and active-home-run candidates from
+a list of coordinates, validates and budgets each, and ranks the survivors by fibre-metres (or by a
+supplied cost model). The algorithms, the clustering, the cable taper and the modelling choices are in
+[AUTO-DESIGN.md](AUTO-DESIGN.md). Nothing in it is random, so the same demand always produces the same
+design.
+
+## 3. A path becomes a budget
 
 `network.designForOnt(plant, ontId, registry)` traces the path and applies these modelling choices:
 
@@ -53,14 +72,16 @@ That table is the whole model, and it is deliberately explicit: a design where s
 connectorised is 0.6 dB worse than the same design with cassettes, and the planner should say so
 rather than average it away.
 
-## 3. Two verdicts, not one
+## 4. Two verdicts, not one
 
 A design passes only if **both** hold:
 
 1. **Receiver headroom.** `rxPower − sensitivity ≥ marginDb` (default 3 dB), and `rxPower` is not above
    the receiver's overload point.
-2. **PON class budget.** `ODN loss ≤ class budget` for the OLT's PON and class (GPON B+ 28 dB, C+ 32,
-   C++ 35; XGS-PON N1 29, N2 31, E1 33, E2 35).
+2. **The plant's own budget.** For a PON, `ODN loss ≤ class budget` (GPON B+ 28 dB, C+ 32, C++ 35;
+   XGS-PON N1 29, N2 31, E1 33, E2 35). For an active link, `ODN loss ≤ launch(min) − sensitivity` for
+   the optic pair, and the route must be inside the optic's reach — a link can be 3 dB inside its
+   budget and still be 60 km down a 10 km optic.
 
 They fail independently. A link can hear fine and still be outside what the OLT vendor supports —
 `test/budget-optics.test.js` has exactly that case. Verdicts are `ok`, `marginal` (passes, but with
@@ -69,7 +90,7 @@ under 2 dB above the margin or under 1 dB of class headroom) and `fail`.
 Every budget returns its `breakdown`: one line per fibre span, splice group, connector group and
 splitter, each with a `db` value. A verdict without its arithmetic is not reviewable.
 
-## 4. Length is not the line on the map
+## 5. Length is not the line on the map
 
 ```
 design length = route + overlength% + (splices × 30 m) + (closures × 20 m) + extra reserve
@@ -86,7 +107,7 @@ purchase      = ceil(design length / drum) × drum
 The BOM is per cable model, with `designM`, `drums`, `purchaseM` and `spareM`, plus a per-span line so
 the total can be traced back to the map.
 
-## 5. Strands are addressed the way the tray is
+## 6. Strands are addressed the way the tray is
 
 `fiber.addressFor(31)` → `{ tube: 3, fiber: 7, label: 'T03-F07', fiberColor: red, tubeColor: green }`,
 because that is what is written on the tray in a closure. `fiber.parseAddress` accepts `T03-F07`,
@@ -98,7 +119,7 @@ somebody cannot splice, not a cosmetic warning.
 
 An absent `strands` array means *nothing in use* — spare capacity, not zero capacity.
 
-## 6. Projects and undo
+## 7. Projects and undo
 
 `engine/project.js` is pure data in, pure data out: `apply(project, op)` returns a **new** project and
 never mutates its input, and refused edits return `{ error }` with a reason and no project.
@@ -107,10 +128,12 @@ History keeps the last **50** states. `undo(project)` pops one and returns the p
 fifty-first edit is the one that becomes permanent. The server persists projects as JSON under
 `GF_DATA/projects/<id>.json`, written to a temp file and renamed.
 
-## 7. What the engine refuses to guess
+## 8. What the engine refuses to guess
 
 - A cable with no attenuation figure at the requested wavelength → **error**, never zero.
 - A GPON OLT with an XGS-PON ONT → **error**; they cannot share a PON.
+- Two optics of different rates or wavelengths → **error**; they cannot form a link.
+- A splitter in an active plant, or a transceiver at the customer end of a PON → **error**.
 - An unknown part model → **error** naming the models that do exist.
 - A split ratio beyond the OLT's `maxSplitRatio` → **error**.
 - A span with no measured length → **error** at BOM time.

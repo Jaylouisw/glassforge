@@ -1,0 +1,20 @@
+{
+  "kind": "transceiver",
+  "model": "sfp-1g-zx-80km",
+  "vendor": "generic",
+  "label": "SFP 1000BASE-ZX 80 km",
+  "speedMbps": 1000,
+  "wavelengthNm": 1550,
+  "reachM": 80000,
+  "txPowerDbmMin": 0,
+  "txPowerDbmMax": 5,
+  "rxSensitivityDbm": -24,
+  "rxOverloadDbm": -3,
+  "polish": "upc",
+  "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
+  "notes": "1000BASE-ZX class figures: launch 0..5 dBm at 1550 nm, sensitivity -24 dBm (24 dB of budget, enough for 80 km at 0.25 dB/km plus splices). A long rural span, or a link that needs 13 dB more than LX.",
+  "tags": [
+    "1000",
+    "1550nm"
+  ]
+}

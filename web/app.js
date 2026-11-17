@@ -72,6 +72,11 @@
       state.derived = project.derived;
       state.budgets = null; state.bom = null; state.strands = null;
       $('#project-name').value = project.name;
+      const root = (project.nodes || []).find(function (n) { return n.type === 'olt' || n.type === 'headend'; });
+      if (root && typeof root.lat === 'number' && typeof root.lon === 'number') {
+        if (!$('#he-lat').value) $('#he-lat').value = root.lat;
+        if (!$('#he-lon').value) $('#he-lon').value = root.lon;
+      }
       localStorage.setItem('gf:lastProject', id);
       renderAll();
       return loadProjects();
@@ -182,6 +187,7 @@
   function renderRight() {
     const body = $('#tab-body');
     body.textContent = '';
+    if (state.tab === 'auto') return renderAuto(body);
     if (!state.project) { body.appendChild(el('p', { class: 'muted', text: 'No project open.' })); return; }
     if (state.tab === 'signal') return renderSignal(body);
     if (state.tab === 'cable') return renderCable(body);
@@ -343,6 +349,133 @@
     body.appendChild(card);
   }
 
+  function renderAuto(body) {
+    if (!state.auto) {
+      body.appendChild(el('p', { class: 'muted', text: 'Paste a demand list on the left, give the head-end coordinates, and press Design.' }));
+      return;
+    }
+    const result = state.auto;
+    const card = el('div', { class: 'card' });
+    card.appendChild(el('h3', { text: result.ok ? result.best.label : 'No feasible design' }));
+    card.appendChild(el('p', {
+      class: 'muted',
+      text: result.demand.points + ' point(s) · ' + result.routeMethod + ' · ranked by ' + result.objective
+    }));
+    const rationale = el('ul', {});
+    for (const line of result.rationale) rationale.appendChild(el('li', { text: line }));
+    card.appendChild(rationale);
+    if (result.notes && result.notes.length) {
+      const notes = el('ul', { class: 'muted' });
+      for (const note of result.notes) notes.appendChild(el('li', { text: note }));
+      card.appendChild(notes);
+    }
+    if (result.ok) {
+      const apply = el('button', { text: 'Apply to this project' });
+      apply.addEventListener('click', applyAutoDesign);
+      card.appendChild(apply);
+    }
+    body.appendChild(card);
+
+    const table = el('table', {});
+    const head = el('tr', {});
+    ['Topology', 'Feasible', 'Cable m', 'Fibre-m', 'ONT', 'SPL', 'Closure', 'Worst dB']
+      .forEach(function (h) { head.appendChild(el('th', { text: h })); });
+    table.appendChild(head);
+    for (const candidate of result.candidates) {
+      const tr = el('tr', {});
+      tr.appendChild(el('td', { text: candidate.label }));
+      tr.appendChild(el('td', { text: candidate.feasible ? 'yes' : 'no' }));
+      tr.appendChild(el('td', { class: 'num', text: String(candidate.metrics.cableM) }));
+      tr.appendChild(el('td', { class: 'num', text: String(candidate.metrics.fibreMetres) }));
+      tr.appendChild(el('td', { class: 'num', text: String(candidate.metrics.onts) }));
+      tr.appendChild(el('td', { class: 'num', text: String(candidate.metrics.splitters) }));
+      tr.appendChild(el('td', { class: 'num', text: String(candidate.metrics.closures) }));
+      tr.appendChild(el('td', {
+        class: 'num' + (candidate.feasible ? '' : ' err'),
+        text: candidate.metrics.worstHeadroomDb === null ? '—' : String(candidate.metrics.worstHeadroomDb)
+      }));
+      table.appendChild(tr);
+      if (!candidate.feasible) {
+        const reason = el('tr', {});
+        const cell = el('td', { class: 'err', colspan: '8', text: candidate.reasons[0] || 'infeasible' });
+        reason.appendChild(cell);
+        table.appendChild(reason);
+      }
+    }
+    const compare = el('div', { class: 'card' });
+    compare.appendChild(el('h3', { text: 'Candidates' }));
+    compare.appendChild(table);
+    body.appendChild(compare);
+
+    if (result.plant) {
+      const runs = el('div', { class: 'card' });
+      runs.appendChild(el('h3', { text: 'Runs (' + result.runs.length + ')' }));
+      const rt = el('table', {});
+      const rh = el('tr', {});
+      ['Run', 'Purpose', 'Cable', 'm'].forEach(function (h) { rh.appendChild(el('th', { text: h })); });
+      rt.appendChild(rh);
+      for (const run of result.runs.slice(0, 40)) {
+        const tr = el('tr', {});
+        tr.appendChild(el('td', { text: run.id }));
+        tr.appendChild(el('td', { text: run.purpose }));
+        tr.appendChild(el('td', { text: run.cable }));
+        tr.appendChild(el('td', { class: 'num', text: String(run.lengthM) }));
+        rt.appendChild(tr);
+      }
+      runs.appendChild(rt);
+      if (result.runs.length > 40) runs.appendChild(el('p', { class: 'muted', text: '…and ' + (result.runs.length - 40) + ' more' }));
+      body.appendChild(runs);
+    }
+  }
+
+  function autoPayload() {
+    const text = $('#demand-input').value.trim();
+    if (!text) throw new Error('paste a demand list first (label,lat,lon per line)');
+    const lat = Number($('#he-lat').value);
+    const lon = Number($('#he-lon').value);
+    if (!isFinite(lat) || !isFinite(lon) || $('#he-lat').value === '' || $('#he-lon').value === '') {
+      throw new Error('the head-end needs a latitude and a longitude');
+    }
+    return {
+      demand: text,
+      headEnd: { lat: lat, lon: lon, name: 'Head-end' },
+      technology: $('#auto-tech').value
+    };
+  }
+
+  function runAutoDesign() {
+    let payload;
+    try { payload = autoPayload(); } catch (err) { $('#auto-status').textContent = err.message; return; }
+    $('#auto-status').textContent = 'Designing…';
+    api('/api/design/synthesise', { method: 'POST', body: JSON.stringify(payload) })
+      .then(function (result) {
+        state.auto = result;
+        state.autoPayload = payload;
+        state.tab = 'auto';
+        syncTabs();
+        $('#auto-status').textContent = result.ok
+          ? result.technology + ' wins: ' + result.best.metrics.fibreMetres + ' fibre-metres'
+          : 'no feasible design — see the reasons';
+        renderRight();
+      })
+      .catch(function (err) {
+        $('#auto-status').textContent = err.message;
+        banner('Auto-design failed: ' + err.message);
+      });
+  }
+
+  function applyAutoDesign() {
+    if (!state.project || !state.autoPayload) return;
+    const payload = Object.assign({}, state.autoPayload, { applyToProject: state.project.id });
+    api('/api/design/synthesise', { method: 'POST', body: JSON.stringify(payload) })
+      .then(function (result) {
+        state.auto = result;
+        banner('Applied ' + result.best.label + ' to the project (' + result.applied.nodes + ' nodes, ' + result.applied.spans + ' spans).', 'ok');
+        return openProject(state.project.id);
+      })
+      .catch(function (err) { banner('Apply failed: ' + err.message); });
+  }
+
   function renderChecks(body) {
     const derived = state.derived || {};
     const card = el('div', { class: 'card' });
@@ -483,6 +616,7 @@
     $('#canvas').addEventListener('click', onCanvasClick);
     $('#undo').addEventListener('click', undo);
     $('#new-project').addEventListener('click', newProject);
+    $('#auto-run').addEventListener('click', runAutoDesign);
     $('#kml-file').addEventListener('change', function (event) {
       if (event.target.files && event.target.files[0]) importKml(event.target.files[0]);
     });

@@ -1,6 +1,6 @@
 {
   "name": "glassforge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Glassforge \u2014 an open-source FTTH/GPON network planner: map routes, splice thread diagrams, optical power budget, and the cable to buy. Zero runtime dependencies.",
   "main": "engine/index.js",
   "type": "commonjs",

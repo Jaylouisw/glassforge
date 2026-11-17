@@ -75,6 +75,18 @@ function sendJson(req, res, status, value, extraHeaders) {
   res.end(body);
 }
 
+/**
+ * A refusal caused by what the client sent is a 400, not a 500.
+ *
+ * demand/design throw plain Errors and TypeErrors for bad input ("needs a header naming a latitude
+ * column", "headEnd is required"); letting those reach the generic handler turned a helpful sentence
+ * into "internal error" and told the caller the server was broken when their CSV was.
+ */
+function asBadRequest(err) {
+  if (err && !err.status) err.status = 400;
+  return err;
+}
+
 function fail(req, res, status, message, extra) {
   sendJson(req, res, status, Object.assign({ error: message }, extra || {}));
 }
@@ -295,6 +307,73 @@ async function handle(req, res, ctx) {
     }
 
     return fail(req, res, 405, 'method not allowed on ' + pathname);
+  }
+
+  if (pathname === '/api/design/synthesise' && method === 'POST') {
+    const body = await readJsonBody(req, MAX_UPLOAD_BYTES);
+    if (body.demand === undefined) return fail(req, res, 400, 'demand is required: a CSV string or an array of { lat, lon } rows');
+    let result;
+    try {
+      result = engine.design.synthesise(body.demand, {
+        headEnd: body.headEnd,
+        technology: body.technology,
+        routeFactor: body.routeFactor,
+        marginDb: body.marginDb,
+        pon: body.pon,
+        active: body.active,
+        costs: body.costs
+      }, registry);
+    } catch (err) {
+      throw asBadRequest(err);
+    }
+
+    if (!body.applyToProject) return sendJson(req, res, 200, result);
+
+    // Applying a design is a separate, explicit step: the caller asked for a design, and a design
+    // that silently overwrote their project would be the worst kind of helpful.
+    if (!result.ok) {
+      return fail(req, res, 400, 'the design produced no feasible plant to apply', {
+        candidates: result.candidates.map(function (c) {
+          return { label: c.label, feasible: c.feasible, reasons: c.reasons };
+        })
+      });
+    }
+    let project;
+    try {
+      project = store.readProject(body.applyToProject, ctx.dataRoot);
+    } catch (err) {
+      return fail(req, res, 404, err.message);
+    }
+    const replaced = engine.project.replacePlant(project, result.plant, {});
+    if (replaced.error) return fail(req, res, 400, replaced.error);
+    const candidate = replaced.project;
+    candidate.updatedAt = new Date().toISOString();
+    const check = engine.project.check(candidate, registry);
+    if (!check.ok) return fail(req, res, 400, 'the designed plant does not validate', { errors: check.errors });
+    store.writeProject(candidate, ctx.dataRoot);
+    return sendJson(req, res, 200, Object.assign(result, {
+      applied: { projectId: candidate.id, nodes: candidate.nodes.length, spans: candidate.spans.length, warnings: check.warnings }
+    }));
+  }
+
+  if (pathname === '/api/import/demand' && method === 'POST') {
+    // Parse and report only: the caller sees which rows were rejected before anything is designed.
+    const body = await readJsonBody(req, MAX_UPLOAD_BYTES);
+    const input = body.demand !== undefined ? body.demand : (body.csv !== undefined ? body.csv : body.text);
+    if (input === undefined) return fail(req, res, 400, 'demand is required: a CSV string or an array of rows');
+    let parsed;
+    try {
+      parsed = engine.demand.prepare(input, {});
+    } catch (err) {
+      throw asBadRequest(err);
+    }
+    return sendJson(req, res, 200, {
+      points: parsed.points,
+      rejected: parsed.rejected,
+      duplicates: parsed.duplicates,
+      meta: parsed.meta,
+      bbox: parsed.bbox
+    });
   }
 
   if (pathname === '/api/design/budget' && method === 'POST') {

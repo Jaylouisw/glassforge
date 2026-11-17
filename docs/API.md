@@ -53,6 +53,25 @@ Operations for `/ops`:
 
 A refused operation returns `400` with the reason and leaves the saved project untouched.
 
+## Auto-design
+
+```
+POST /api/design/synthesise
+  { demand, headEnd: { lat, lon, name? }, technology?, routeFactor?, marginDb?,
+    pon?: { ratios, olt, ont, maxDropM }, active?: { optics }, costs?, applyToProject? }
+  → { ok, objective, routeMethod, technology, best, candidates, plant, runs, rationale, notes, applied? }
+
+POST /api/import/demand
+  { demand: "label,lat,lon\n..." }            (or an array of rows)
+  → { points, rejected, duplicates, meta, bbox }
+```
+
+`demand` is CSV text or an array of `{ label?, address?, lat, lon }`. Rows without coordinates are
+refused by row number — geocoding is off by default. `applyToProject` replaces the project's plant in
+one operation (one undo step) *after* validating it; without it, the design is returned and nothing is
+written. Candidates that fail are returned with `feasible: false` and their reasons, never dropped.
+See [AUTO-DESIGN.md](AUTO-DESIGN.md).
+
 ## Design calculations
 
 ```
@@ -63,6 +82,7 @@ GET  /api/projects/:id/bom       → { lines: [...per span], byCable: [...per mo
 GET  /api/projects/:id/strands   → { rows: [...per span], totalStrands, totalUsed, utilisation, overbooked }
 
 POST /api/design/budget          { design: { olt, ont, spans, splitters, splices, connectors, ... } }
+                                 or { design: { headEnd: { model }, cpe: { model }, spans, ... } } for an active link
 POST /api/design/length          { routeM, overlengthPct?, splices?, closures?, drumM? }
                                  or { points: [{lat, lon}, ...], ... }
 GET  /api/design/splitter?ratio=8 → { ratio, idealSplitLossDb }

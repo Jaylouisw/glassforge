@@ -1,0 +1,20 @@
+{
+  "kind": "transceiver",
+  "model": "sfp28-25g-lr-10km",
+  "vendor": "generic",
+  "label": "SFP28 25GBASE-LR 10 km",
+  "speedMbps": 25000,
+  "wavelengthNm": 1310,
+  "reachM": 10000,
+  "txPowerDbmMin": -4.5,
+  "txPowerDbmMax": 2.0,
+  "rxSensitivityDbm": -11.4,
+  "rxOverloadDbm": 2.4,
+  "polish": "upc",
+  "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
+  "notes": "25GBASE-LR class figures: launch -4.5..2.0 dBm, sensitivity -11.4 dBm, overload 2.4 dBm (6.9 dB). Check the module datasheet before designing to the edge of it.",
+  "tags": [
+    "25000",
+    "1310nm"
+  ]
+}

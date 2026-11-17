@@ -94,8 +94,11 @@ function apply(project, operation, opts) {
     case 'add-node': {
       const input = operation.node || {};
       if (NODE_TYPES.indexOf(input.type) === -1) return fail('node.type must be one of ' + NODE_TYPES.join(', '));
-      if (input.type === 'olt' && next.nodes.some(function (n) { return n.type === 'olt'; })) {
-        return fail('this project already has an OLT node');
+      const rootTypes = ['olt', 'headend'];
+      if (rootTypes.indexOf(input.type) !== -1 && next.nodes.some(function (n) { return rootTypes.indexOf(n.type) !== -1; })) {
+        return fail(input.type === 'olt'
+          ? 'this project already has an OLT node'
+          : 'this project already has a head-end node');
       }
       const node = {
         id: input.id || nextId(next.nodes, 'n'),
@@ -195,6 +198,32 @@ function apply(project, operation, opts) {
   }
 }
 
+/**
+ * Replace the whole plant, as one edit with one undo step.
+ *
+ * Auto-design produces nodes and spans wholesale; applying them through `add-node` fifty times would
+ * fill the undo history with the machinery and leave the user pressing undo for a minute to get back
+ * to the design they had. One operation, one step.
+ */
+function replacePlant(project, plant, opts) {
+  const o = opts || {};
+  if (!project) return { error: 'no project' };
+  if (!plant || !Array.isArray(plant.nodes) || !Array.isArray(plant.spans)) {
+    return { error: 'replacePlant needs a plant with nodes and spans' };
+  }
+  const next = {
+    id: project.id,
+    name: project.name,
+    createdAt: project.createdAt,
+    updatedAt: nowIso(o.now),
+    nodes: JSON.parse(JSON.stringify(plant.nodes)),
+    spans: JSON.parse(JSON.stringify(plant.spans)),
+    history: snapshot(project, 'replace-plant', o.now),
+    version: project.version || 1
+  };
+  return { project: next };
+}
+
 /** Take back the last edit. Returns `{ project, undone }`; the oldest state falls off at 50. */
 function undo(project) {
   const history = (project.history || []).slice();
@@ -240,6 +269,7 @@ module.exports = {
   MAX_HISTORY: MAX_HISTORY,
   createProject: createProject,
   apply: apply,
+  replacePlant: replacePlant,
   undo: undo,
   check: check,
   summary: summary,

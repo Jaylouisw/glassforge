@@ -15,8 +15,26 @@
 
 const budget = require('./budget');
 
-const NODE_TYPES = ['olt', 'closure', 'splitter', 'ont'];
-const MODEL_KIND = { olt: 'olt', ont: 'ont', splitter: 'splitter', closure: 'closure' };
+const NODE_TYPES = ['olt', 'headend', 'closure', 'splitter', 'ont'];
+
+// The root of the plant: a PON's OLT, or the aggregation point of an active network. Exactly one,
+// and its type decides how every path under it is budgeted.
+const ROOT_TYPES = ['olt', 'headend'];
+
+/**
+ * Which catalogue kinds a node's `model` may name.
+ *
+ * A customer endpoint is an `ont` on a PON and a `transceiver` on an active network - same node type,
+ * different hardware - because "the thing at the house" is one concept in the plant and two kinds in
+ * the catalogue. Resolution goes by what the model actually is, never by assuming the type implies it.
+ */
+const MODEL_KINDS = {
+  olt: ['olt'],
+  headend: ['transceiver'],
+  splitter: ['splitter'],
+  ont: ['ont', 'transceiver'],
+  closure: ['closure']
+};
 
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 
@@ -48,8 +66,11 @@ function trace(plant, ontId) {
   if (!target) throw new Error('no node with id "' + ontId + '"');
   if (target.type !== 'ont') throw new Error('node "' + ontId + '" is a ' + target.type + ', not an ont');
 
-  const olts = plant.nodes.filter(function (n) { return n.type === 'olt'; });
-  if (olts.length !== 1) throw new Error('a plant needs exactly one olt node, found ' + olts.length);
+  const roots = plant.nodes.filter(function (n) { return ROOT_TYPES.indexOf(n.type) !== -1; });
+  if (roots.length !== 1) {
+    throw new Error('a plant needs exactly one olt (or headend) node, found ' + roots.length);
+  }
+  const root = roots[0];
 
   const adj = adjacency(plant);
   const visited = new Set();
@@ -67,11 +88,11 @@ function trace(plant, ontId) {
     return false;
   }
 
-  if (!walk(olts[0].id)) throw new Error('ont "' + ontId + '" is not connected to the olt');
+  if (!walk(root.id)) throw new Error('ont "' + ontId + '" is not connected to the head-end');
 
-  const nodes = [olts[0]];
+  const nodes = [root];
   const spans = [];
-  let cursor = olts[0].id;
+  let cursor = root.id;
   for (const edge of trail) {
     spans.push(edge.span);
     const next = nodeById(plant, edge.to);
@@ -120,13 +141,12 @@ function designForOnt(plant, ontId, registry, opts) {
     }
   }
 
-  const design = {
+  const root = path.nodes[0];
+  const endNode = nodeById(plant, ontId);
+  const common = {
     direction: o.direction || 'down',
     wavelength: o.wavelength,
-    olt: { model: nodeById(plant, path.nodes[0].id).model },
-    ont: { model: nodeById(plant, ontId).model },
     spans: spans,
-    splitters: splitters,
     splices: splices,
     connectors: connectors,
     connectorModel: o.connectorModel,
@@ -134,10 +154,32 @@ function designForOnt(plant, ontId, registry, opts) {
     allowanceDb: o.allowanceDb,
     marginDb: o.marginDb
   };
-  if (!design.olt.model) throw new Error('the olt node has no model');
-  if (!design.ont.model) throw new Error('ont "' + ontId + '" has no model');
 
-  const result = budget.opticalBudget(design, registry);
+  let result;
+  if (root.type === 'headend') {
+    // Active network: the customer end is an optic, not an ONT, and there are no splitters on the
+    // path (validate refuses them). The budget is the optic pair's, not a PON class.
+    if (!root.model) throw new Error('the headend node has no model');
+    if (!endNode.model) throw new Error('ont "' + ontId + '" has no model');
+    if (!registry.has('transceiver', endNode.model)) {
+      throw new Error('ont "' + ontId + '" is a ' + endNode.model + ', which is not a transceiver - an active network needs optics at both ends');
+    }
+    const design = Object.assign({}, common, {
+      headEnd: { model: root.model },
+      cpe: { model: endNode.model }
+    });
+    result = budget.pointToPoint(design, registry);
+  } else {
+    const design = Object.assign({}, common, {
+      olt: { model: root.model },
+      ont: { model: endNode.model },
+      splitters: splitters
+    });
+    if (!design.olt.model) throw new Error('the olt node has no model');
+    if (!design.ont.model) throw new Error('ont "' + ontId + '" has no model');
+    result = budget.opticalBudget(design, registry);
+  }
+
   result.path = path.nodes.map(function (n) { return { id: n.id, type: n.type, name: n.name }; });
   result.notes = notes;
   return result;
@@ -202,12 +244,52 @@ function capacity(plant, registry) {
   const onts = (plant.nodes || []).filter(function (n) { return n.type === 'ont'; });
   const splitters = (plant.nodes || []).filter(function (n) { return n.type === 'splitter'; });
   const oltNode = (plant.nodes || []).find(function (n) { return n.type === 'olt'; });
+  const headendNode = (plant.nodes || []).find(function (n) { return n.type === 'headend'; });
+
+  if (!oltNode && headendNode) {
+    // An active network's limit is the aggregation switch's port count and its uplink budget, neither
+    // of which this model carries: a transceiver is an optic, not a chassis. Say so rather than
+    // inventing a ceiling of one.
+    return {
+      technology: 'active',
+      headend: headendNode.model || null,
+      ports: null,
+      maxSplitRatio: null,
+      onts: onts.length,
+      splitters: 0,
+      splitterCascade: 1,
+      theoreticalMaxOnts: null,
+      problems: []
+    };
+  }
+
   const olt = oltNode && oltNode.model && registry.has('olt', oltNode.model) ? registry.get('olt', oltNode.model) : null;
 
+  // The deepest cascade is the worst *path*, not the product of every splitter in the plant.
+  // Multiplying them all turned six 1:8 splitters at six different sites into a 1:262144 cascade that
+  // no ONT was actually behind - and refused a perfectly good PON design.
   let maxCascade = 1;
-  for (const node of splitters) {
-    if (!node.model || !registry.has('splitter', node.model)) continue;
-    maxCascade *= registry.get('splitter', node.model).ratio;
+  {
+    const adj = adjacency(plant);
+    const oltOrHead = (plant.nodes || []).find(function (n) {
+      return n.type === 'olt' || n.type === 'headend';
+    });
+    const stack = oltOrHead ? [{ id: oltOrHead.id, ratio: 1, seen: new Set([oltOrHead.id]) }] : [];
+    while (stack.length) {
+      const step = stack.pop();
+      const node = (plant.nodes || []).find(function (n) { return n.id === step.id; });
+      let ratio = step.ratio;
+      if (node && node.type === 'splitter' && node.model && registry.has('splitter', node.model)) {
+        ratio *= registry.get('splitter', node.model).ratio;
+        if (ratio > maxCascade) maxCascade = ratio;
+      }
+      for (const edge of adj.get(step.id) || []) {
+        if (step.seen.has(edge.to)) continue;
+        const next = new Set(step.seen);
+        next.add(edge.to);
+        stack.push({ id: edge.to, ratio: ratio, seen: next });
+      }
+    }
   }
 
   const ports = olt ? olt.ports : null;
@@ -223,6 +305,7 @@ function capacity(plant, registry) {
   }
 
   return {
+    technology: 'pon',
     olt: olt ? olt.model : null,
     ports: ports,
     maxSplitRatio: limitRatio,
@@ -255,12 +338,15 @@ function validate(plant, registry) {
       errors.push('node "' + node.id + '" has unknown type "' + node.type + '"');
       continue;
     }
-    const kind = MODEL_KIND[node.type];
-    if (kind === 'olt' || kind === 'ont' || kind === 'splitter') {
-      if (!node.model) errors.push(node.type + ' node "' + node.id + '" has no model');
-      else if (!registry.has(kind, node.model)) errors.push('node "' + node.id + '" uses unknown ' + kind + ' model "' + node.model + '"');
-    } else if (node.model && !registry.has('closure', node.model)) {
-      warnings.push('closure "' + node.id + '" uses unknown closure model "' + node.model + '"');
+    const allowed = MODEL_KINDS[node.type] || [];
+    if (allowed.length) {
+      if (!node.model) {
+        if (node.type !== 'closure') errors.push(node.type + ' node "' + node.id + '" has no model');
+      } else if (!allowed.some(function (k) { return registry.has(k, node.model); })) {
+        const message = 'node "' + node.id + '" uses unknown ' + allowed.join('/') + ' model "' + node.model + '"';
+        if (node.type === 'closure') warnings.push(message);
+        else errors.push(message);
+      }
     }
     // `null` means "not placed on a map yet", which is a legitimate state for a node added from the
     // palette. Only a present-but-wrong value is an error.
@@ -272,8 +358,20 @@ function validate(plant, registry) {
     }
   }
 
-  const olts = nodes.filter(function (n) { return n && n.type === 'olt'; });
-  if (olts.length !== 1) errors.push('exactly one olt node is required, found ' + olts.length);
+  const roots = nodes.filter(function (n) { return n && ROOT_TYPES.indexOf(n.type) !== -1; });
+  if (roots.length !== 1) {
+    errors.push('exactly one olt or headend node is required, found ' + roots.length);
+  } else {
+    const active = roots[0].type === 'headend';
+    if (active && nodes.some(function (n) { return n.type === 'splitter'; })) {
+      errors.push('an active network (headend root) cannot contain a splitter - splitters are a PON element');
+    }
+    if (!active && nodes.some(function (n) {
+      return n.type === 'ont' && n.model && registry.has('transceiver', n.model) && !registry.has('ont', n.model);
+    })) {
+      errors.push('a PON plant needs ONT models at the customer end, not transceivers');
+    }
+  }
 
   const spanIds = new Set();
   for (const span of spans) {
@@ -293,7 +391,7 @@ function validate(plant, registry) {
     // Connectivity and cycles, from the OLT outward.
     const adj = adjacency(plant);
     const seen = new Set();
-    let stack = olts.map(function (n) { return n.id; });
+    let stack = roots.map(function (n) { return n.id; });
     while (stack.length) {
       const id = stack.pop();
       if (seen.has(id)) continue;
@@ -301,7 +399,7 @@ function validate(plant, registry) {
       for (const edge of adj.get(id) || []) stack.push(edge.to);
     }
     for (const node of nodes) {
-      if (!seen.has(node.id)) warnings.push('node "' + node.id + '" is not connected to the olt');
+      if (!seen.has(node.id)) warnings.push('node "' + node.id + '" is not connected to the head-end');
     }
     const edges = spans.reduce(function (n, s) { return n + 1; }, 0);
     if (edges !== Math.max(0, nodes.length - 1)) {

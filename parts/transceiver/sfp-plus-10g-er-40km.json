@@ -1,0 +1,20 @@
+{
+  "kind": "transceiver",
+  "model": "sfp-plus-10g-er-40km",
+  "vendor": "generic",
+  "label": "SFP+ 10GBASE-ER 40 km",
+  "speedMbps": 10000,
+  "wavelengthNm": 1550,
+  "reachM": 40000,
+  "txPowerDbmMin": -4.7,
+  "txPowerDbmMax": 4,
+  "rxSensitivityDbm": -15.8,
+  "rxOverloadDbm": -1,
+  "polish": "upc",
+  "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
+  "notes": "IEEE 802.3 10GBASE-ER: launch -4.7..4 dBm at 1550 nm, receiver sensitivity -15.8 dBm, overload -1.0 dBm - an 11.1 dB budget for a 40 km span.",
+  "tags": [
+    "10000",
+    "1550nm"
+  ]
+}

@@ -32,6 +32,24 @@
       <input id="part-search" type="search" placeholder="Search cables, splitters, OLTs…">
       <div id="palette" class="palette"></div>
     </section>
+    <section class="auto">
+      <h2>Auto-design <span class="hint">list → topology</span></h2>
+      <textarea id="demand-input" rows="7" spellcheck="false"
+        placeholder="label,lat,lon&#10;House 1,51.5000,-0.1000&#10;House 2,51.5004,-0.0998"></textarea>
+      <div class="row">
+        <input id="he-lat" placeholder="head-end lat" inputmode="decimal">
+        <input id="he-lon" placeholder="head-end lon" inputmode="decimal">
+      </div>
+      <div class="row">
+        <select id="auto-tech">
+          <option value="auto">Compare all topologies</option>
+          <option value="pon">PON only</option>
+          <option value="active">Active only</option>
+        </select>
+        <button id="auto-run">Design</button>
+      </div>
+      <p class="hint" id="auto-status"></p>
+    </section>
     <section>
       <h2>Projects</h2>
       <ul id="project-list" class="projects"></ul>
@@ -58,6 +76,7 @@
       <button data-tab="cable" class="tab">Cable</button>
       <button data-tab="strands" class="tab">Strands</button>
       <button data-tab="splice" class="tab">Splice</button>
+      <button data-tab="auto" class="tab">Auto</button>
       <button data-tab="checks" class="tab">Checks</button>
     </nav>
     <div id="tab-body" class="tab-body"></div>

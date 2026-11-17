@@ -45,6 +45,14 @@ button.active, button.tool.active { background: var(--accent); color: #06181b; b
 .hint { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
 .panel input[type="search"] { width: 100%; padding: 6px 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; }
 
+textarea {
+  width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+  color: var(--text); padding: 6px 8px; font-family: ui-monospace, "Cascadia Code", monospace; font-size: 12px;
+  resize: vertical;
+}
+.row { display: flex; gap: 6px; margin-top: 6px; }
+.row input, .row select { flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; }
+.auto textarea { margin-bottom: 4px; }
 .palette { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; max-height: 340px; overflow: auto; }
 .palette .part { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); cursor: pointer; }
 .palette .part:hover { border-color: var(--accent); }

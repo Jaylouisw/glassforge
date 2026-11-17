@@ -1,0 +1,20 @@
+{
+  "kind": "transceiver",
+  "model": "sfp-plus-10g-lr-10km",
+  "vendor": "generic",
+  "label": "SFP+ 10GBASE-LR 10 km",
+  "speedMbps": 10000,
+  "wavelengthNm": 1310,
+  "reachM": 10000,
+  "txPowerDbmMin": -8.2,
+  "txPowerDbmMax": 0.5,
+  "rxSensitivityDbm": -14.4,
+  "rxOverloadDbm": 0.5,
+  "polish": "upc",
+  "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
+  "notes": "IEEE 802.3 10GBASE-LR: launch -8.2..0.5 dBm, receiver sensitivity -14.4 dBm, overload 0.5 dBm - a 6.2 dB link budget, which is what 10 km of G.652 at 0.35 dB/km plus a few splices actually needs. The default active optic in this catalogue.",
+  "tags": [
+    "10000",
+    "1310nm"
+  ]
+}

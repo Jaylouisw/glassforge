@@ -1,8 +1,9 @@
 # Glassforge
 
-**An open-source FTTH/GPON network planner.** Draw a fibre route, document every splice, check the
-optical power budget, and get the cable to buy — in one project, on your own machine, with no account
-and no subscription.
+**An open-source fibre network planner — PON and active optical.** Draw a fibre route, document every
+splice, check the optical power budget, and get the cable to buy. Or paste a list of addresses and let
+it design the topology: PON with splitters, or active Ethernet over a shared cable tree. One project,
+on your own machine, with no account and no subscription.
 
 [![CI](https://git.jayw.uk/jaylouisw/glassforge/badges/workflows/ci.yml/badge.svg)](https://git.jayw.uk/jaylouisw/glassforge/actions?workflow=ci.yml)
 
@@ -20,19 +21,45 @@ Node 18 or newer. No `npm install`, because there is nothing to install: the ser
 `fs`, the UI is one HTML file and two scripts, and the engine is plain CommonJS.
 
 <!-- parts:start -->
-**32 parts across 7 kinds** — 8 cables, 6 splitters, 5 OLTs, 3 ONTs, 5 closures, 3 connectors, 2 splices.
+**37 parts across 8 kinds** — 8 cables, 6 splitters, 5 OLTs, 3 ONTs, 5 transceiver, 5 closures, 3 connectors, 2 splices.
 <!-- parts:end -->
 
 ## What it does today
 
 | Piece | Behaviour |
 |---|---|
-| **Plant** | OLT → feeder → closures and splitters → drop → ONT, as a tree. Duplicate ids, unknown models, over-split PONs and unmeasured spans are refused; a dangling node is a warning, not a wall. |
-| **Optical budget** | Worst-case downstream (1490 nm) and upstream (1310 nm) loss: fibre by the metre, splices, connectors, splitters. Two verdicts — receiver headroom against a design margin, and ODN loss against the PON class budget. |
+| **Plant** | A tree with one head-end: OLT → feeder → closures and splitters → drop → ONT for a PON, or head-end → cable tree → ONTs for active Ethernet. Duplicate ids, unknown models, over-split PONs and unmeasured spans are refused; a dangling node is a warning, not a wall. |
+| **Optical budget** | Worst-case loss both ways: fibre by the metre, splices, connectors, splitters. Two verdicts — receiver headroom against a design margin, and the plant's own budget (a PON class, or the optic pair's launch-minus-sensitivity for an active link). |
+| **Auto-design** | Paste addresses plus a head-end and it builds PON (at each splitter ratio), active-over-a-tree and active home-run, validates and budgets every one, and ranks them by fibre-metres or by your cost model. Winners are applicable to the project in one undoable step. |
 | **Cable to buy** | Route length + 3% overlength + 30 m per splice + 20 m per closure, itemised, rounded up to whole drums **per cable model**. |
 | **Splice diagram** | TIA-598 colours and `T03-F07` addresses, from the same table the engine uses, with per-span strand usage and overbooking detection. |
 | **KML / KMZ import** | Bring in a route drawn in Google Earth. Reports routes, points, duplicates skipped, and what it did not understand. |
 | **Projects** | Saved as JSON under `data/`, with 50 steps of undo. Nothing leaves the machine. |
+
+## Design from a list of addresses
+
+```bash
+curl -s http://127.0.0.1:8000/api/design/synthesise -H 'Content-Type: application/json' -d '{
+  "demand": "label,lat,lon\nCasa 1,51.5000,-0.1000\nCasa 2,51.5005,-0.0998\nCasa 3,51.5010,-0.0996",
+  "headEnd": { "lat": 51.4985, "lon": -0.1004, "name": "PoP" }
+}'
+```
+
+It returns every candidate with its metrics and the reason it lost, the winner's plant and runs, and a
+`rationale` quoting the numbers the ranking used:
+
+```
+Chosen: PON 1:8 with 3 splitter site(s): 24 ONT(s), 2987.7 m of cable (26987.7 fibre-metres),
+        3 splitter(s), 21 closure(s), worst headroom 20.7 dB.
+Rejected PON 1:16 with 2 splitter site(s): feasible but needs 2857.2 m of cable and 28188.9
+        fibre-metres (1.04x)
+Rejected Active Ethernet over a shared cable tree, 1 Gb/s 1G-LX-10KM: feasible but needs 1788.5 m
+        of cable and 58969.6 fibre-metres (2.19x)
+```
+
+Every length is **straight-line × `routeFactor`** (default 1.2) and every response says so; routing
+along a real street graph is [issue #7](https://git.jayw.uk/jaylouisw/glassforge/issues/7). Details,
+algorithms and the modelling choices: [docs/AUTO-DESIGN.md](docs/AUTO-DESIGN.md).
 
 ## What it does not do yet
 
@@ -40,6 +67,10 @@ Being explicit, because a planner that quietly lacks a feature is worse than one
 
 - **No basemap.** The canvas projects your coordinates and keeps the aspect ratio, but there are no
   street or satellite tiles: an offline-capable tile layer is a separate decision (and a cache).
+- **No street-graph routing.** Auto-design measures straight-line distance times a stated factor, not
+  a route along roads or ducts.
+- **No geocoding.** Addresses need coordinates in the input; the server makes no outbound requests.
+- **No active-equipment sizing.** Active designs count fibres and optics, not switch ports or uplinks.
 - **No accounts, roles or multi-user editing.** One machine, one user, one file per project.
 - **No OLT integration.** SmartOLT-style ONU synchronisation is not implemented and is not faked.
 - **No PDF/PNG plan export.** The BOM and the splice table are on screen and in the API.
@@ -53,14 +84,15 @@ parts/      the catalogue, one JSON file per part (add a model = drop a file, no
 server/     HTTP surface and project storage: http + fs, nothing else
 web/        the UI: index.html, app.js, scene.js, style.css — no framework, no build step
 test/       one suite per behaviour, discovered by scripts/run-tests.js
-docs/       SPEC.md (the model), OPTICAL.md (the numbers), PARTS.md, FIBRE-COLOURS.md, API.md
+docs/       SPEC.md (the model), AUTO-DESIGN.md (topology synthesis), OPTICAL.md (the numbers),
+            PARTS.md, FIBRE-COLOURS.md, API.md
 ```
 
 The engine has no HTTP, no disk and no clock in it. That is what lets the whole planning model be
 exercised in milliseconds, and it is why `server/` is the only file that knows what a port is.
 
-Read [docs/SPEC.md](docs/SPEC.md) before changing behaviour, and [docs/OPTICAL.md](docs/OPTICAL.md)
-before changing a loss figure.
+Read [docs/SPEC.md](docs/SPEC.md) before changing behaviour, [docs/AUTO-DESIGN.md](docs/AUTO-DESIGN.md)
+before touching the synthesiser, and [docs/OPTICAL.md](docs/OPTICAL.md) before changing a loss figure.
 
 ## The parts catalogue
 

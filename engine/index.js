@@ -14,6 +14,8 @@ const length = require('./length');
 const network = require('./network');
 const kml = require('./kml');
 const project = require('./project');
+const demand = require('./demand');
+const design = require('./design');
 
 module.exports = {
   fiber: fiber,
@@ -24,6 +26,8 @@ module.exports = {
   network: network,
   kml: kml,
   project: project,
+  demand: demand,
+  design: design,
   createRegistry: parts.createRegistry,
   version: require('../package.json').version
 };

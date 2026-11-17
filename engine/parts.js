@@ -22,7 +22,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const DEFAULT_PARTS_DIR = path.join(ROOT, 'parts');
 
-const KINDS = ['cable', 'splitter', 'olt', 'ont', 'closure', 'connector', 'splice'];
+const KINDS = ['cable', 'splitter', 'olt', 'ont', 'transceiver', 'closure', 'connector', 'splice'];
 const WAVELENGTHS = ['1310', '1490', '1550'];
 const PON_TYPES = ['gpon', 'xg-pon', 'xgs-pon'];
 const POLISHES = ['pc', 'upc', 'apc'];
@@ -183,6 +183,35 @@ function validatePon(spec, issues, isOlt) {
   }
 }
 
+/** An optic: the two ends of an active (point-to-point) link, and the figures its budget needs. */
+function validateTransceiver(spec, issues) {
+  if (!isPosInt(spec.speedMbps) || spec.speedMbps > 1600000) {
+    pushIssue(issues, 'error', 'speedMbps', 'speedMbps must be a positive integer (1000, 10000, 25000, 100000, ...)');
+  }
+  if (!isNum(spec.wavelengthNm) || spec.wavelengthNm < 1260 || spec.wavelengthNm > 1675) {
+    pushIssue(issues, 'error', 'wavelengthNm', 'wavelengthNm must be a number in [1260, 1675] - the usable window of single-mode fibre');
+  }
+  if (!isPosInt(spec.reachM) || spec.reachM > 200000) {
+    pushIssue(issues, 'error', 'reachM', 'reachM must be a positive integer no more than 200 km');
+  }
+  if (!isNum(spec.txPowerDbmMin) || !isNum(spec.txPowerDbmMax)) {
+    pushIssue(issues, 'error', 'txPowerDbmMin/txPowerDbmMax', 'both launch power bounds are required');
+  } else if (spec.txPowerDbmMin > spec.txPowerDbmMax) {
+    pushIssue(issues, 'error', 'txPowerDbmMin', 'txPowerDbmMin must not exceed txPowerDbmMax');
+  }
+  if (!isNum(spec.rxSensitivityDbm)) pushIssue(issues, 'error', 'rxSensitivityDbm', 'rxSensitivityDbm is required');
+  if (!isNum(spec.rxOverloadDbm)) pushIssue(issues, 'error', 'rxOverloadDbm', 'rxOverloadDbm is required');
+  if (isNum(spec.rxSensitivityDbm) && isNum(spec.rxOverloadDbm) && spec.rxSensitivityDbm >= spec.rxOverloadDbm) {
+    pushIssue(issues, 'error', 'rxSensitivityDbm', 'sensitivity must be below overload');
+  }
+  if (spec.polish !== undefined && POLISHES.indexOf(spec.polish) === -1) {
+    pushIssue(issues, 'error', 'polish', 'polish must be one of ' + POLISHES.join(', '));
+  }
+  if (!isNonEmptyString(spec.sourceUrl)) {
+    pushIssue(issues, 'error', 'sourceUrl', 'sourceUrl is required: launch power and sensitivity are datasheet figures');
+  }
+}
+
 function validateClosure(spec, issues) {
   if (!isPosInt(spec.ports)) pushIssue(issues, 'error', 'ports', 'ports must be a positive integer');
   if (!isInt(spec.spliceCapacity) || spec.spliceCapacity < 0) pushIssue(issues, 'error', 'spliceCapacity', 'spliceCapacity must be a non-negative integer');
@@ -216,6 +245,7 @@ function validateSpec(spec) {
     case 'olt': validatePon(spec, issues, true); break;
     case 'ont': validatePon(spec, issues, false); break;
     case 'closure': validateClosure(spec, issues); break;
+    case 'transceiver': validateTransceiver(spec, issues); break;
     case 'connector':
     case 'splice': validateLossPart(spec, issues, spec.kind); break;
     default: break;

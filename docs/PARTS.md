@@ -10,7 +10,7 @@ invalid part.
 
 | Field | Required | Meaning |
 |---|---|---|
-| `kind` | yes | `cable`, `splitter`, `olt`, `ont`, `closure`, `connector`, `splice` |
+| `kind` | yes | `cable`, `splitter`, `olt`, `ont`, `transceiver`, `closure`, `connector`, `splice` |
 | `model` | yes | lowercase slug, unique, equal to the filename |
 | `label` | yes | what a user picks from a list |
 | `vendor` | no | `generic` for a standards-derived part |
@@ -18,8 +18,8 @@ invalid part.
 | `sourceUrl` | see below | where the figures came from |
 | `notes` | no | the caveat a reader needs (e.g. "typical, not a datasheet") |
 
-`sourceUrl` is **required** for `cable`, `splitter`, `olt` and `ont`: those carry the figures a verdict
-depends on. It is optional for `closure`, `connector` and `splice`, but a part without one should say
+`sourceUrl` is **required** for `cable`, `splitter`, `olt`, `ont` and `transceiver`: those carry the
+figures a verdict depends on. It is optional for `closure`, `connector` and `splice`, but a part without one should say
 in `notes` where its number came from.
 
 ## cable
@@ -85,6 +85,26 @@ in `notes` where its number came from.
 ```
 
 `pon` must match the OLT's, or the engine refuses the pair. Sensitivity must be below overload.
+
+## transceiver
+
+An optic: the two ends of an active (point-to-point) link. This is what an active design is budgeted
+against, instead of a PON class.
+
+```json
+{
+  "kind": "transceiver", "model": "sfp-plus-10g-lr-10km", "label": "SFP+ 10GBASE-LR 10 km",
+  "speedMbps": 10000, "wavelengthNm": 1310, "reachM": 10000,
+  "txPowerDbmMin": -8.2, "txPowerDbmMax": 0.5,
+  "rxSensitivityDbm": -14.4, "rxOverloadDbm": 0.5,
+  "polish": "upc"
+}
+```
+
+- `speedMbps` 1000 / 10000 / 25000 / 100000; `wavelengthNm` in [1260, 1675]; `reachM` up to 200 km.
+- The link budget is `txPowerDbmMin − rxSensitivityDbm` (10GBASE-LR: 6.2 dB), and reach is checked
+  separately. Sensitivity must be below overload.
+- Both ends must agree on speed and wavelength, or `budget.pointToPoint` refuses the pair.
 
 ## closure
 
