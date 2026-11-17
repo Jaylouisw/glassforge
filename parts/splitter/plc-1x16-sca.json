@@ -1,0 +1,17 @@
+{
+  "kind": "splitter",
+  "model": "plc-1x16-sca",
+  "vendor": "generic",
+  "label": "PLC 1x16 spliced",
+  "ratio": 16,
+  "splitLossDb": 12.04,
+  "excessLossDb": 1.76,
+  "termination": "spliced",
+  "technology": "plc",
+  "notes": "Insertion loss 13.8 dB typical for a 1:16 PLC cassette (ideal split 12.04 dB plus 1.76 dB excess). Excess loss is what the vendor sheet gives: replace it with the part you actually buy.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.671/en",
+  "tags": [
+    "plc",
+    "1x16"
+  ]
+}

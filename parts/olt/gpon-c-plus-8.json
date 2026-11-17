@@ -1,0 +1,21 @@
+{
+  "kind": "olt",
+  "model": "gpon-c-plus-8",
+  "vendor": "generic",
+  "label": "GPON OLT class C+, 8 ports",
+  "pon": "gpon",
+  "class": "C+",
+  "txPowerDbmMin": 3,
+  "txPowerDbmMax": 7,
+  "rxSensitivityDbm": -30,
+  "rxOverloadDbm": -8,
+  "budgetDb": 32,
+  "ports": 8,
+  "maxSplitRatio": 128,
+  "notes": "Class C+ per G.984.2: 32 dB budget, 1:128. The usual choice for a suburban FTTH build.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
+  "tags": [
+    "gpon",
+    "c+"
+  ]
+}

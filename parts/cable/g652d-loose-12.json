@@ -1,0 +1,26 @@
+{
+  "kind": "cable",
+  "model": "g652d-loose-12",
+  "vendor": "generic",
+  "label": "G.652.D loose-tube 12F",
+  "fiberCount": 12,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Attenuation figures are the G.652.D limits, not a particular factory's measurements. Replace with the bought cable's test report for a construction-grade budget.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.652/en",
+  "tags": [
+    "generic",
+    "g.652.d"
+  ]
+}

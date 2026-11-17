@@ -1,0 +1,13 @@
+{
+  "kind": "splice",
+  "model": "mechanical",
+  "vendor": "generic",
+  "label": "Mechanical splice",
+  "lossDb": 0.3,
+  "maxLossDb": 0.5,
+  "notes": "Field-installable mechanical splice, used where a fusion splicer is not on site.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.400/en",
+  "tags": [
+    "splice"
+  ]
+}

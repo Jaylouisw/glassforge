@@ -1,0 +1,21 @@
+.git
+.gitignore
+.gitattributes
+.editorconfig
+.dockerignore
+.github
+.forgejo
+
+node_modules
+*.log
+npm-debug.log*
+
+# Not needed at runtime.
+test
+scripts
+docs
+data
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md

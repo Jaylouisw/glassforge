@@ -1,0 +1,19 @@
+{
+  "kind": "ont",
+  "model": "gpon-ont-1ge",
+  "vendor": "generic",
+  "label": "GPON ONT 1x GE",
+  "pon": "gpon",
+  "txPowerDbmMin": 0.5,
+  "txPowerDbmMax": 5,
+  "rxSensitivityDbm": -27,
+  "rxOverloadDbm": -8,
+  "ports": {
+    "ge": 1
+  },
+  "notes": "Class B+ ONT receiver. Upstream burst transmit 0.5-5 dBm.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
+  "tags": [
+    "gpon"
+  ]
+}

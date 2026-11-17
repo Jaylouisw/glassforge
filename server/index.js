@@ -1,0 +1,387 @@
+'use strict';
+/**
+ * The HTTP surface: static UI, parts catalogue, projects, budgets, BOM and KML import.
+ *
+ * Zero dependencies, and that constraint is deliberate on both sides of the wire - no framework
+ * here, no build step or CDN in `web/`. Anything this server needs, Node 18 already has.
+ *
+ * Two behaviours worth knowing:
+ *
+ * - `/api/parts` answers with `ETag` derived from the body it just serialised, plus gzip when the
+ *   client offers it. An ETag taken from the clock instead revalidates nothing, so the catalogue is
+ *   hashed and two consecutive requests are asserted to agree in `test/api-http.test.js`.
+ * - every project write is validated against the engine before it lands. A saved design that the
+ *   engine cannot budget is worse than a refused save, because it fails days later on site.
+ */
+
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const zlib = require('zlib');
+const crypto = require('crypto');
+
+const engine = require('../engine');
+const store = require('./store');
+
+const WEB_DIR = path.join(__dirname, '..', 'web');
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+const CONTENT_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.ico': 'image/x-icon'
+};
+
+const staticCache = new Map();
+
+function etagOf(body) {
+  return '"' + crypto.createHash('sha1').update(body).digest('base64url').slice(0, 27) + '"';
+}
+
+function sendJson(req, res, status, value, extraHeaders) {
+  const body = Buffer.from(JSON.stringify(value));
+  const etag = etagOf(body);
+  const headers = Object.assign({
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    'ETag': etag
+  }, extraHeaders || {});
+
+  const inm = req.headers['if-none-match'];
+  if (inm && inm === etag) {
+    res.writeHead(304, headers);
+    res.end();
+    return;
+  }
+
+  const acceptsGzip = /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''));
+  if (acceptsGzip && body.length > 512) {
+    const gz = zlib.gzipSync(body);
+    headers['Content-Encoding'] = 'gzip';
+    headers['Vary'] = 'Accept-Encoding';
+    headers['Content-Length'] = gz.length;
+    res.writeHead(status, headers);
+    res.end(gz);
+    return;
+  }
+
+  headers['Content-Length'] = body.length;
+  res.writeHead(status, headers);
+  res.end(body);
+}
+
+function fail(req, res, status, message, extra) {
+  sendJson(req, res, status, Object.assign({ error: message }, extra || {}));
+}
+
+function readBody(req, limit) {
+  return new Promise(function (resolve, reject) {
+    const chunks = [];
+    let size = 0;
+    req.on('data', function (chunk) {
+      size += chunk.length;
+      if (size > limit) {
+        reject(Object.assign(new Error('request body exceeds ' + limit + ' bytes'), { status: 413 }));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', function () { resolve(Buffer.concat(chunks)); });
+    req.on('error', reject);
+  });
+}
+
+async function readJsonBody(req, limit) {
+  const buf = await readBody(req, limit || MAX_BODY_BYTES);
+  if (!buf.length) return {};
+  try {
+    return JSON.parse(buf.toString('utf8'));
+  } catch (err) {
+    throw Object.assign(new Error('invalid JSON body: ' + err.message), { status: 400 });
+  }
+}
+
+function serveStatic(req, res, urlPath) {
+  const rel = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/+/, '');
+  if (rel.indexOf('..') !== -1) return fail(req, res, 400, 'bad path');
+  const file = path.join(WEB_DIR, rel);
+  const ext = path.extname(file);
+  if (!CONTENT_TYPES[ext]) return fail(req, res, 404, 'not found');
+
+  let entry = staticCache.get(file);
+  try {
+    const stat = fs.statSync(file);
+    if (!entry || entry.mtimeMs !== stat.mtimeMs) {
+      const body = fs.readFileSync(file);
+      entry = { body: body, mtimeMs: stat.mtimeMs, etag: etagOf(body), type: CONTENT_TYPES[ext] };
+      staticCache.set(file, entry);
+    }
+  } catch (err) {
+    return fail(req, res, 404, 'not found');
+  }
+
+  const headers = { 'Content-Type': entry.type, 'Cache-Control': 'no-cache', 'ETag': entry.etag };
+  const inm = req.headers['if-none-match'];
+  if (inm && inm === entry.etag) {
+    res.writeHead(304, headers);
+    res.end();
+    return;
+  }
+  const acceptsGzip = /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''));
+  if (acceptsGzip && entry.body.length > 512) {
+    const gz = zlib.gzipSync(entry.body);
+    headers['Content-Encoding'] = 'gzip';
+    headers['Vary'] = 'Accept-Encoding';
+    headers['Content-Length'] = gz.length;
+    res.writeHead(200, headers);
+    res.end(gz);
+    return;
+  }
+  headers['Content-Length'] = entry.body.length;
+  res.writeHead(200, headers);
+  res.end(entry.body);
+}
+
+function serveEngineFile(req, res, name) {
+  // One engine file is shared with the browser verbatim: the TIA-598 colour table and the strand
+  // addressing. Serving the engine's own copy is the only way to guarantee the UI and the splice
+  // diagram cannot disagree about what "T03-F07" means.
+  const file = path.join(__dirname, '..', 'engine', name);
+  let body;
+  try {
+    body = fs.readFileSync(file);
+  } catch (err) {
+    return fail(req, res, 404, 'not found');
+  }
+  const headers = {
+    'Content-Type': 'application/javascript; charset=utf-8',
+    'Cache-Control': 'no-cache',
+    'ETag': etagOf(body)
+  };
+  if (req.headers['if-none-match'] === headers.ETag) {
+    res.writeHead(304, headers);
+    res.end();
+    return;
+  }
+  headers['Content-Length'] = body.length;
+  res.writeHead(200, headers);
+  res.end(body);
+}
+
+function cataloguePayload(registry, kind, term) {
+  const counts = registry.counts();
+  const partsOut = {};
+  const kinds = kind ? [kind] : engine.parts.KINDS;
+  for (const k of kinds) {
+    if (engine.parts.KINDS.indexOf(k) === -1) throw Object.assign(new Error('unknown part kind "' + k + '"'), { status: 400 });
+    partsOut[k] = registry.search(term, k);
+  }
+  return { counts: counts, parts: partsOut };
+}
+
+async function handle(req, res, ctx) {
+  const url = new URL(req.url, 'http://localhost');
+  const pathname = decodeURIComponent(url.pathname);
+  const method = req.method || 'GET';
+  const registry = ctx.registry;
+
+  if (pathname === '/api/health') {
+    return sendJson(req, res, 200, {
+      ok: true,
+      name: 'glassforge',
+      version: engine.version,
+      parts: registry.counts(),
+      projects: store.listProjects(ctx.dataRoot).length,
+      uptimeS: Math.round(process.uptime())
+    });
+  }
+
+  if (pathname === '/api/parts') {
+    const kind = url.searchParams.get('kind');
+    const term = url.searchParams.get('q') || '';
+    return sendJson(req, res, 200, cataloguePayload(registry, kind || null, term));
+  }
+
+  const partMatch = /^\/api\/parts\/([a-z]+)\/([a-z0-9._-]+)$/.exec(pathname);
+  if (partMatch) {
+    if (!registry.has(partMatch[1], partMatch[2])) {
+      return fail(req, res, 404, 'no ' + partMatch[1] + ' part with model "' + partMatch[2] + '"');
+    }
+    return sendJson(req, res, 200, registry.get(partMatch[1], partMatch[2]));
+  }
+
+  if (pathname === '/api/projects') {
+    if (method === 'GET') return sendJson(req, res, 200, { projects: store.listProjects(ctx.dataRoot) });
+    if (method === 'POST') {
+      const body = await readJsonBody(req);
+      const project = engine.project.createProject(body.name || 'Untitled project', { id: store.newId() });
+      if (body.olt) {
+        const applied = engine.project.apply(project, { op: 'add-node', node: { type: 'olt', model: body.olt } });
+        if (applied.error) return fail(req, res, 400, applied.error);
+        applied.project.id = project.id;
+        store.writeProject(applied.project, ctx.dataRoot);
+        return sendJson(req, res, 201, applied.project);
+      }
+      store.writeProject(project, ctx.dataRoot);
+      return sendJson(req, res, 201, project);
+    }
+    return fail(req, res, 405, 'method not allowed');
+  }
+
+  const projectMatch = /^\/api\/projects\/([a-z0-9-]+)(\/[a-z]+)?$/.exec(pathname);
+  if (projectMatch) {
+    const id = projectMatch[1];
+    const action = projectMatch[2] || '';
+    let project;
+    try {
+      project = store.readProject(id, ctx.dataRoot);
+    } catch (err) {
+      return fail(req, res, 404, err.message);
+    }
+
+    if (!action && method === 'GET') return sendJson(req, res, 200, withDerived(project, registry));
+    if (!action && method === 'DELETE') return sendJson(req, res, 200, store.removeProject(id, ctx.dataRoot));
+
+    if (!action && method === 'PUT') {
+      const body = await readJsonBody(req);
+      const candidate = Object.assign({}, project, body, { id: id });
+      const check = engine.project.check(candidate, registry);
+      if (!check.ok) return fail(req, res, 400, 'the design does not validate', { errors: check.errors });
+      candidate.updatedAt = new Date().toISOString();
+      store.writeProject(candidate, ctx.dataRoot);
+      return sendJson(req, res, 200, withDerived(candidate, registry));
+    }
+
+    if (action === '/ops' && method === 'POST') {
+      const body = await readJsonBody(req);
+      const applied = engine.project.apply(project, body, {});
+      if (applied.error) return fail(req, res, 400, applied.error);
+      const candidate = applied.project;
+      candidate.updatedAt = new Date().toISOString();
+      const check = engine.project.check(candidate, registry);
+      store.writeProject(candidate, ctx.dataRoot);
+      return sendJson(req, res, 200, Object.assign(withDerived(candidate, registry), { warnings: check.warnings }));
+    }
+
+    if (action === '/undo' && method === 'POST') {
+      const undone = engine.project.undo(project);
+      undone.project.id = id;
+      undone.project.updatedAt = new Date().toISOString();
+      store.writeProject(undone.project, ctx.dataRoot);
+      return sendJson(req, res, 200, Object.assign(withDerived(undone.project, registry), { undone: undone.undone ? undone.undone.op : null }));
+    }
+
+    if (action === '/budget' && method === 'POST') {
+      const body = await readJsonBody(req);
+      const budgets = body.ontId
+        ? [engine.network.designForOnt(project, body.ontId, registry, body)]
+        : engine.network.allOntBudgets(project, registry, body);
+      return sendJson(req, res, 200, { budgets: budgets });
+    }
+
+    if (action === '/bom' && method === 'GET') {
+      const bom = engine.length.billOfMaterials(project, registry, {});
+      return sendJson(req, res, 200, bom);
+    }
+
+    if (action === '/strands' && method === 'GET') {
+      return sendJson(req, res, 200, engine.network.strandLedger(project, registry));
+    }
+
+    return fail(req, res, 405, 'method not allowed on ' + pathname);
+  }
+
+  if (pathname === '/api/design/budget' && method === 'POST') {
+    const body = await readJsonBody(req);
+    return sendJson(req, res, 200, engine.budget.opticalBudget(body.design || body, registry));
+  }
+
+  if (pathname === '/api/design/length' && method === 'POST') {
+    const body = await readJsonBody(req);
+    if (Array.isArray(body.points)) return sendJson(req, res, 200, engine.length.cableToBuyForRoute(body.points, body));
+    return sendJson(req, res, 200, engine.length.cableToBuy(body));
+  }
+
+  if (pathname === '/api/design/splitter') {
+    const ratio = Number(url.searchParams.get('ratio') || 8);
+    const ideal = 10 * Math.log10(ratio);
+    return sendJson(req, res, 200, { ratio: ratio, idealSplitLossDb: Math.round(ideal * 100) / 100 });
+  }
+
+  if (pathname === '/api/import/kml' && method === 'POST') {
+    const buf = await readBody(req, MAX_UPLOAD_BYTES);
+    const isKmz = /kmz/.test(String(req.headers['content-type'] || '')) ||
+      (buf.length > 4 && buf.readUInt32LE(0) === 0x04034b50);
+    const parsed = isKmz ? engine.kml.parseKmz(buf) : engine.kml.parseKml(buf.toString('utf8'));
+    const classified = engine.kml.classify(parsed, {});
+    return sendJson(req, res, 200, Object.assign({ name: parsed.name, unsupported: parsed.unsupported }, classified));
+  }
+
+  if (pathname.startsWith('/api/')) return fail(req, res, 404, 'no such endpoint: ' + pathname);
+  if (method !== 'GET' && method !== 'HEAD') return fail(req, res, 405, 'method not allowed');
+  if (pathname === '/fiber.js') return serveEngineFile(req, res, 'fiber.js');
+  return serveStatic(req, res, pathname);
+}
+
+function withDerived(project, registry) {
+  const check = engine.project.check(project, registry);
+  return Object.assign({}, project, {
+    derived: {
+      summary: engine.project.summary(project, registry),
+      stats: engine.network.stats(project, registry),
+      errors: check.errors,
+      warnings: check.warnings
+    }
+  });
+}
+
+function createServer(opts) {
+  const o = opts || {};
+  const ctx = {
+    registry: o.registry || engine.createRegistry(o.partsDir),
+    dataRoot: o.dataRoot || store.dataDir()
+  };
+
+  const server = http.createServer(function (req, res) {
+    handle(req, res, ctx).catch(function (err) {
+      const status = err && err.status ? err.status : 500;
+      if (status >= 500) console.error('glassforge: ' + (err && err.stack ? err.stack : err));
+      fail(req, res, status, err && err.message ? err.message : 'internal error');
+    });
+  });
+
+  server.registry = ctx.registry;
+  server.dataRoot = ctx.dataRoot;
+  return server;
+}
+
+if (require.main === module) {
+  const port = Number(process.env.PORT || 8000);
+  const host = process.env.HOST || '127.0.0.1';
+  const server = createServer({});
+  const health = server.registry.validate();
+  if (!health.ok) {
+    console.error('glassforge: the parts catalogue does not validate — fix these before serving:');
+    for (const problem of health.problems) {
+      console.error('  parts/' + (problem.kind || '?') + '/' + (problem.model || '?') + ': ' + (problem.errors || []).join('; '));
+    }
+    process.exitCode = 1;
+  }
+  server.listen(port, host, function () {
+    const counts = server.registry.counts();
+    console.log('glassforge ' + engine.version + ' on http://' + host + ':' + port +
+      ' — ' + counts.total + ' parts (' + counts.byKind.cable + ' cables, ' + counts.byKind.splitter + ' splitters, ' +
+      counts.byKind.olt + ' OLTs, ' + counts.byKind.ont + ' ONTs)');
+  });
+  const shutdown = function () { server.close(function () { process.exit(0); }); };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
+
+module.exports = { createServer: createServer, handle: handle };

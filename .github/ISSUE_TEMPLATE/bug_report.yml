@@ -1,0 +1,42 @@
+name: Bug report
+description: Something behaves differently from what the docs or the UI says
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A wrong verdict is the most valuable bug this project can receive. Include the design.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The actual behaviour, ideally with the exact output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and why
+      description: Cite the standard, the datasheet figure, or the doc line that led you to expect it.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Commands, the project JSON, or the part file. Not a screenshot of a number.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `/api/health`, or the commit sha.
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      placeholder: node -v

@@ -1,0 +1,13 @@
+{
+  "kind": "splice",
+  "model": "fusion",
+  "vendor": "generic",
+  "label": "Fusion splice",
+  "lossDb": 0.1,
+  "maxLossDb": 0.15,
+  "notes": "0.1 dB typical for a single-fibre fusion splice; 0.15 dB is the acceptance limit most contracts use.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.400/en",
+  "tags": [
+    "splice"
+  ]
+}

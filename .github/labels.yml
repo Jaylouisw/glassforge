@@ -1,0 +1,15 @@
+- name: bug
+  color: d62828
+  description: Behaves differently from what is documented
+- name: enhancement
+  color: 1fb6c9
+  description: An agreed capability
+- name: parts
+  color: f07f13
+  description: Catalogue additions and corrections
+- name: docs
+  color: 7b3fa0
+  description: Documentation only
+- name: ci
+  color: 93a1b0
+  description: Workflows and guards

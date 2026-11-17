@@ -1,0 +1,25 @@
+{
+  "kind": "cable",
+  "model": "g657a2-drop-2",
+  "vendor": "generic",
+  "label": "G.657.A2 drop 2F",
+  "fiberCount": 2,
+  "fibersPerTube": 2,
+  "construction": "tight-buffer",
+  "fiberStandard": "G.657.A2",
+  "use": [
+    "drop"
+  ],
+  "drumM": 1000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Two-fibre drop: blue and orange, per TIA-598.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.657/en",
+  "tags": [
+    "generic",
+    "g.657.a2"
+  ]
+}

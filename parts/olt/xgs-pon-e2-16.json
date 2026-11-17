@@ -1,0 +1,21 @@
+{
+  "kind": "olt",
+  "model": "xgs-pon-e2-16",
+  "vendor": "generic",
+  "label": "XGS-PON OLT class E2, 16 ports",
+  "pon": "xgs-pon",
+  "class": "E2",
+  "txPowerDbmMin": 4,
+  "txPowerDbmMax": 8,
+  "rxSensitivityDbm": -33,
+  "rxOverloadDbm": -7,
+  "budgetDb": 35,
+  "ports": 16,
+  "maxSplitRatio": 128,
+  "notes": "XGS-PON class E2: 35 dB budget, extended reach.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.9807.1/en",
+  "tags": [
+    "xgs-pon",
+    "e2"
+  ]
+}

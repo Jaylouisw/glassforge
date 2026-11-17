@@ -1,0 +1,21 @@
+{
+  "kind": "olt",
+  "model": "gpon-b-plus-8",
+  "vendor": "generic",
+  "label": "GPON OLT class B+, 8 ports",
+  "pon": "gpon",
+  "class": "B+",
+  "txPowerDbmMin": 1.5,
+  "txPowerDbmMax": 5,
+  "rxSensitivityDbm": -28,
+  "rxOverloadDbm": -8,
+  "budgetDb": 28,
+  "ports": 8,
+  "maxSplitRatio": 64,
+  "notes": "Class B+ per ITU-T G.984.2: 28 dB ODN budget, 1:64 practical limit. Downstream OLT transmit 1.5-5 dBm.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
+  "tags": [
+    "gpon",
+    "b+"
+  ]
+}

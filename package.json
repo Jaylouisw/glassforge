@@ -1,0 +1,47 @@
+{
+  "name": "glassforge",
+  "version": "0.1.0",
+  "description": "Glassforge \u2014 an open-source FTTH/GPON network planner: map routes, splice thread diagrams, optical power budget, and the cable to buy. Zero runtime dependencies.",
+  "main": "engine/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "test": "node scripts/count-parts.js --check && node scripts/check-control-bytes.js && node scripts/check-node-surface.js && node scripts/run-tests.js",
+    "syntax": "node scripts/syntax-check.js",
+    "check:urls": "node scripts/check-canonical-urls.js",
+    "check:parts": "node scripts/count-parts.js",
+    "smoke": "node scripts/smoke-http.js",
+    "parts:audit": "node scripts/audit-parts.js"
+  },
+  "keywords": [
+    "ftth",
+    "gpon",
+    "xgs-pon",
+    "fiber",
+    "fibre",
+    "optical-budget",
+    "network-planner",
+    "kml",
+    "gis",
+    "splice"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://git.jayw.uk/jaylouisw/glassforge.git"
+  },
+  "bugs": {
+    "url": "https://git.jayw.uk/jaylouisw/glassforge/issues"
+  },
+  "homepage": "https://git.jayw.uk/jaylouisw/glassforge#readme",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "engine",
+    "server",
+    "web",
+    "parts"
+  ]
+}

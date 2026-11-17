@@ -1,0 +1,15 @@
+{
+  "kind": "closure",
+  "model": "nap-16",
+  "vendor": "generic",
+  "label": "NAP 16-port",
+  "type": "nap",
+  "ports": 16,
+  "spliceCapacity": 48,
+  "trays": 4,
+  "notes": "16 drop ports.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.110/en",
+  "tags": [
+    "nap"
+  ]
+}

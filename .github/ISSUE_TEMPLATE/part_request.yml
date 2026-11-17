@@ -1,0 +1,44 @@
+name: Part request
+description: A cable, splitter, OLT, ONT, closure, connector or splice to add to the catalogue
+labels: [parts]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A part is a JSON file. If you can, open the PR yourself — `docs/PARTS.md` has the field list.
+  - type: input
+    id: kind
+    attributes:
+      label: Kind
+      description: cable, splitter, olt, ont, closure, connector or splice
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Vendor and model
+      placeholder: e.g. Huawei EG8145V5
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Datasheet URL
+      description: Required. A figure without provenance cannot be checked.
+    validations:
+      required: true
+  - type: textarea
+    id: figures
+    attributes:
+      label: The figures
+      description: Attenuation per wavelength, insertion and excess loss, class and budget, sensitivity and overload.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything unusual
+      description: Non-standard naming, a connector the engine does not model, an ambiguous datasheet.
+    validations:
+      required: false

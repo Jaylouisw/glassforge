@@ -1,0 +1,15 @@
+{
+  "kind": "closure",
+  "model": "handhole-4",
+  "vendor": "generic",
+  "label": "Handhole 4-port",
+  "type": "handhole",
+  "ports": 4,
+  "spliceCapacity": 12,
+  "trays": 1,
+  "notes": "Small pedestal closure for a drop fan-out.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.110/en",
+  "tags": [
+    "handhole"
+  ]
+}

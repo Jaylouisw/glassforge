@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Merging through the API does not reach the runner as a push event, so a matrix can be run
+  # against any branch on demand rather than by pushing a dummy commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Group by pull request, not by branch: two runs of the same PR are the same question asked twice,
+# so the newer wins and the older is cancelled. Two runs on `main` are different questions - each
+# verifies a different commit - so those are never cancelled.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Syntax check (every JS file)
+        run: node scripts/syntax-check.js
+
+      - name: No control bytes in source
+        # A backslash collapsed by a scripted edit turns \b into a literal backspace: a valid regex
+        # that matches nothing, invisible in every editor, and silent at runtime.
+        run: node scripts/check-control-bytes.js
+
+      - name: No API newer than the Node 18 floor
+        # A green suite on the newest Node means nothing for the oldest matrix job, and that failure
+        # reads like a flaky runner rather than "you used a Node 20 API".
+        run: node scripts/check-node-surface.js
+
+      - name: Every project URL points at Forgejo
+        run: node scripts/check-canonical-urls.js
+
+      - name: README part counts match the catalogue
+        run: node scripts/count-parts.js --check
+
+      - name: The parts catalogue validates
+        run: node scripts/audit-parts.js
+
+      - name: Full test suite
+        run: node scripts/run-tests.js
+
+  smoke:
+    name: Server smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Drive the API end to end over a real socket
+        run: node scripts/smoke-http.js
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Dockerfile static checks
+        # The job image ships no docker binary that can reach a daemon on every runner, so the
+        # Dockerfile is checked statically first - base image pinned, non-root, healthcheck, every
+        # COPY source present, entrypoint exists - and the build below runs where a daemon exists.
+        run: node scripts/check-dockerfile.js
+
+      - name: Install Docker CLI
+        run: sudo apt-get update && sudo apt-get install -y docker.io
+
+      - name: Build image (only where a docker daemon is available)
+        run: |
+          if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+            echo "docker daemon found - building the image for real"
+            docker build -t glassforge:ci .
+          else
+            echo "No docker daemon in this job image."
+            echo "The Dockerfile passed the static checks above; the build is verified where a daemon exists."
+          fi

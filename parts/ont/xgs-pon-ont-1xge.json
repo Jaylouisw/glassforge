@@ -1,0 +1,19 @@
+{
+  "kind": "ont",
+  "model": "xgs-pon-ont-1xge",
+  "vendor": "generic",
+  "label": "XGS-PON ONT 1x 10GE",
+  "pon": "xgs-pon",
+  "txPowerDbmMin": 4,
+  "txPowerDbmMax": 7,
+  "rxSensitivityDbm": -28,
+  "rxOverloadDbm": -7,
+  "ports": {
+    "ge": 1
+  },
+  "notes": "XGS-PON N1-class receiver. A GPON OLT and an XGS-PON ONT cannot share a PON port; the engine refuses the pair.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.9807.1/en",
+  "tags": [
+    "xgs-pon"
+  ]
+}

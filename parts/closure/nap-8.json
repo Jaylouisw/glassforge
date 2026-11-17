@@ -1,0 +1,15 @@
+{
+  "kind": "closure",
+  "model": "nap-8",
+  "vendor": "generic",
+  "label": "NAP 8-port",
+  "type": "nap",
+  "ports": 8,
+  "spliceCapacity": 24,
+  "trays": 2,
+  "notes": "The box a technician opens at the pole: 8 drop ports, two 12-fibre trays.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.110/en",
+  "tags": [
+    "nap"
+  ]
+}

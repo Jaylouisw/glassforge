@@ -1,0 +1,21 @@
+{
+  "kind": "olt",
+  "model": "gpon-c-plus-plus-16",
+  "vendor": "generic",
+  "label": "GPON OLT class C++, 16 ports",
+  "pon": "gpon",
+  "class": "C++",
+  "txPowerDbmMin": 5,
+  "txPowerDbmMax": 9,
+  "rxSensitivityDbm": -33,
+  "rxOverloadDbm": -8,
+  "budgetDb": 35,
+  "ports": 16,
+  "maxSplitRatio": 128,
+  "notes": "Class C++ (G.984.2 Amendment 1): 35 dB budget for long rural spans.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
+  "tags": [
+    "gpon",
+    "c++"
+  ]
+}

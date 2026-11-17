@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose a capability, with the case that forced it
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Features are built after they are agreed, not before. Describe the design you could not
+        complete and the workaround you used instead.
+  - type: textarea
+    id: case
+    attributes:
+      label: The case that forced this
+      description: A real design, not a hypothetical. What did you have to fake or leave in a note?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: Behaviour, inputs, outputs. If it changes the engine, say which module.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+    validations:
+      required: false

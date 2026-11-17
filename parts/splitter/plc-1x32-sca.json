@@ -1,0 +1,17 @@
+{
+  "kind": "splitter",
+  "model": "plc-1x32-sca",
+  "vendor": "generic",
+  "label": "PLC 1x32 spliced",
+  "ratio": 32,
+  "splitLossDb": 15.05,
+  "excessLossDb": 2.05,
+  "termination": "spliced",
+  "technology": "plc",
+  "notes": "Insertion loss 17.1 dB typical for a 1:32 PLC cassette (ideal split 15.05 dB plus 2.05 dB excess). Excess loss is what the vendor sheet gives: replace it with the part you actually buy.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.671/en",
+  "tags": [
+    "plc",
+    "1x32"
+  ]
+}

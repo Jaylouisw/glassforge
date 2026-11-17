@@ -1,0 +1,15 @@
+{
+  "kind": "closure",
+  "model": "splitter-box-16",
+  "vendor": "generic",
+  "label": "Splitter box 16-port",
+  "type": "splitter-box",
+  "ports": 16,
+  "spliceCapacity": 48,
+  "trays": 4,
+  "notes": "Holds one 1:8 or 1:16 cassette plus the feeder splice.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.110/en",
+  "tags": [
+    "splitter-box"
+  ]
+}

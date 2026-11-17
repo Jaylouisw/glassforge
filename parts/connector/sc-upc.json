@@ -1,0 +1,14 @@
+{
+  "kind": "connector",
+  "model": "sc-upc",
+  "vendor": "generic",
+  "label": "SC/UPC connector pair",
+  "lossDb": 0.3,
+  "maxLossDb": 0.5,
+  "notes": "UPC polish. Never mate it with APC: the physical contact is different and the return loss collapses.",
+  "sourceUrl": "https://webstore.iec.ch/publication/6172",
+  "tags": [
+    "connector"
+  ],
+  "polish": "upc"
+}

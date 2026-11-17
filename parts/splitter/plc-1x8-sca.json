@@ -1,0 +1,17 @@
+{
+  "kind": "splitter",
+  "model": "plc-1x8-sca",
+  "vendor": "generic",
+  "label": "PLC 1x8 spliced",
+  "ratio": 8,
+  "splitLossDb": 9.03,
+  "excessLossDb": 1.47,
+  "termination": "spliced",
+  "technology": "plc",
+  "notes": "Insertion loss 10.5 dB typical for a 1:8 PLC cassette (ideal split 9.03 dB plus 1.47 dB excess). Excess loss is what the vendor sheet gives: replace it with the part you actually buy.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.671/en",
+  "tags": [
+    "plc",
+    "1x8"
+  ]
+}

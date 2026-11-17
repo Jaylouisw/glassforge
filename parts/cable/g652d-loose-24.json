@@ -1,0 +1,26 @@
+{
+  "kind": "cable",
+  "model": "g652d-loose-24",
+  "vendor": "generic",
+  "label": "G.652.D loose-tube 24F",
+  "fiberCount": 24,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Two tubes of 12, TIA-598 tube colours 1-2.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.652/en",
+  "tags": [
+    "generic",
+    "g.652.d"
+  ]
+}

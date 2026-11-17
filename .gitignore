@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+npm-debug.log*
+
+# scratch / editor
+*.swp
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# runtime artifacts
+*.pid
+
+# Projects saved by the server. They are the user's design work, not the project's: a real
+# network drawn over a real neighbourhood must not end up in the repository.
+/data/
+.tmp-*

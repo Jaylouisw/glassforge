@@ -1,0 +1,21 @@
+{
+  "kind": "olt",
+  "model": "xgs-pon-n2-8",
+  "vendor": "generic",
+  "label": "XGS-PON OLT class N2, 8 ports",
+  "pon": "xgs-pon",
+  "class": "N2",
+  "txPowerDbmMin": 2,
+  "txPowerDbmMax": 6,
+  "rxSensitivityDbm": -30,
+  "rxOverloadDbm": -7,
+  "budgetDb": 31,
+  "ports": 8,
+  "maxSplitRatio": 128,
+  "notes": "XGS-PON class N2 per ITU-T G.9807.1: 31 dB budget. 10G symmetric, coexists with GPON on the same ODN.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.9807.1/en",
+  "tags": [
+    "xgs-pon",
+    "n2"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "kind": "cable",
+  "model": "g652d-loose-144",
+  "vendor": "generic",
+  "label": "G.652.D loose-tube 144F",
+  "fiberCount": 144,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Twelve tubes of 12.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.652/en",
+  "tags": [
+    "generic",
+    "g.652.d"
+  ]
+}

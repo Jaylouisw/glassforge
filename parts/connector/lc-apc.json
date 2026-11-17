@@ -1,0 +1,14 @@
+{
+  "kind": "connector",
+  "model": "lc-apc",
+  "vendor": "generic",
+  "label": "LC/APC connector pair",
+  "lossDb": 0.25,
+  "maxLossDb": 0.5,
+  "notes": "Small-form-factor connector used in OLT line cards and ODF panels.",
+  "sourceUrl": "https://webstore.iec.ch/publication/6172",
+  "tags": [
+    "connector"
+  ],
+  "polish": "apc"
+}

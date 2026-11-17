@@ -1,0 +1,247 @@
+'use strict';
+/**
+ * A project is the design: nodes, spans, and enough history to take back the last 50 things.
+ *
+ * Deliberately pure data and pure functions. The server persists the JSON; this module never
+ * touches the disk, never generates a timestamp it cannot be told, and never mutates the project it
+ * is handed - `apply` returns a new object. That is what makes undo a copy rather than a `git reset`
+ * and what lets two callers (the HTTP API and a test) drive the same design without stepping on
+ * each other.
+ */
+
+const network = require('./network');
+
+const MAX_HISTORY = 50;
+const NODE_TYPES = network.NODE_TYPES;
+
+function nowIso(clock) {
+  return (clock ? new Date(clock) : new Date()).toISOString();
+}
+
+function cloneState(project) {
+  return {
+    name: project.name,
+    nodes: JSON.parse(JSON.stringify(project.nodes || [])),
+    spans: JSON.parse(JSON.stringify(project.spans || []))
+  };
+}
+
+function createProject(name, opts) {
+  const o = opts || {};
+  const created = nowIso(o.now);
+  return {
+    id: o.id || null,
+    name: name || 'Untitled project',
+    createdAt: created,
+    updatedAt: created,
+    nodes: [],
+    spans: [],
+    history: [],
+    version: 1
+  };
+}
+
+function nextId(list, prefix) {
+  let max = 0;
+  for (const item of list || []) {
+    const m = new RegExp('^' + prefix + '(\\d+)$').exec(String(item.id || ''));
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return prefix + (max + 1);
+}
+
+function snapshot(project, op, clock) {
+  const history = (project.history || []).concat([{
+    at: nowIso(clock),
+    op: op,
+    state: cloneState(project)
+  }]);
+  return history.slice(Math.max(0, history.length - MAX_HISTORY));
+}
+
+/**
+ * Apply one operation. Returns `{ project, error }` and never throws for bad input: an API that
+ * rejects a bad edit with a reason is more useful than a 500, and the caller keeps the old project.
+ *
+ * Ops:
+ *   { op: 'add-node',  node: { type, model?, name?, lat?, lon? } }
+ *   { op: 'add-span',  span: { from, to, cable, lengthM, strands?, splices?, closures? } }
+ *   { op: 'update-node', id, patch: { name?, model?, lat?, lon? } }
+ *   { op: 'move-node', id, lat, lon }
+ *   { op: 'remove-node', id }
+ *   { op: 'remove-span', id }
+ *   { op: 'rename', name }
+ */
+function apply(project, operation, opts) {
+  const o = opts || {};
+  if (!project) return { error: 'no project' };
+  if (!operation || !operation.op) return { error: 'operation.op is required' };
+
+  const next = {
+    id: project.id,
+    name: project.name,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    nodes: JSON.parse(JSON.stringify(project.nodes || [])),
+    spans: JSON.parse(JSON.stringify(project.spans || [])),
+    history: (project.history || []).slice(),
+    version: project.version || 1
+  };
+
+  const fail = function (message) { return { error: message }; };
+
+  switch (operation.op) {
+    case 'add-node': {
+      const input = operation.node || {};
+      if (NODE_TYPES.indexOf(input.type) === -1) return fail('node.type must be one of ' + NODE_TYPES.join(', '));
+      if (input.type === 'olt' && next.nodes.some(function (n) { return n.type === 'olt'; })) {
+        return fail('this project already has an OLT node');
+      }
+      const node = {
+        id: input.id || nextId(next.nodes, 'n'),
+        type: input.type,
+        model: input.model || null,
+        name: input.name || null,
+        lat: input.lat === undefined ? null : input.lat,
+        lon: input.lon === undefined ? null : input.lon
+      };
+      if (next.nodes.some(function (n) { return n.id === node.id; })) return fail('node id "' + node.id + '" already exists');
+      next.history = snapshot(project, operation.op + ' ' + node.id, o.now);
+      next.nodes.push(node);
+      next.updatedAt = nowIso(o.now);
+      return { project: next };
+    }
+
+    case 'add-span': {
+      const input = operation.span || {};
+      if (!input.from || !input.to) return fail('span.from and span.to are required');
+      if (!next.nodes.some(function (n) { return n.id === input.from; })) return fail('unknown node "' + input.from + '"');
+      if (!next.nodes.some(function (n) { return n.id === input.to; })) return fail('unknown node "' + input.to + '"');
+      if (input.from === input.to) return fail('a span cannot start and end at the same node');
+      if (!input.cable) return fail('span.cable is required');
+      if (typeof input.lengthM !== 'number' || !isFinite(input.lengthM) || input.lengthM <= 0) {
+        return fail('span.lengthM must be a positive number of metres');
+      }
+      const span = {
+        id: input.id || nextId(next.spans, 's'),
+        from: input.from,
+        to: input.to,
+        cable: input.cable,
+        lengthM: input.lengthM,
+        strands: Array.isArray(input.strands) ? input.strands.slice() : [],
+        splices: input.splices || 0,
+        closures: input.closures || 0,
+        route: Array.isArray(input.route) ? input.route : null
+      };
+      if (next.spans.some(function (s) { return s.id === span.id; })) return fail('span id "' + span.id + '" already exists');
+      next.history = snapshot(project, operation.op + ' ' + span.id, o.now);
+      next.spans.push(span);
+      next.updatedAt = nowIso(o.now);
+      return { project: next };
+    }
+
+    case 'update-node': {
+      const node = next.nodes.find(function (n) { return n.id === operation.id; });
+      if (!node) return fail('unknown node "' + operation.id + '"');
+      const patch = operation.patch || {};
+      for (const key of ['name', 'model', 'lat', 'lon', 'type']) {
+        if (patch[key] !== undefined) node[key] = patch[key];
+      }
+      next.history = snapshot(project, operation.op + ' ' + node.id, o.now);
+      next.updatedAt = nowIso(o.now);
+      return { project: next };
+    }
+
+    case 'move-node': {
+      const node = next.nodes.find(function (n) { return n.id === operation.id; });
+      if (!node) return fail('unknown node "' + operation.id + '"');
+      if (typeof operation.lat !== 'number' || typeof operation.lon !== 'number') return fail('move-node needs numeric lat and lon');
+      next.history = snapshot(project, operation.op + ' ' + node.id, o.now);
+      node.lat = operation.lat;
+      node.lon = operation.lon;
+      next.updatedAt = nowIso(o.now);
+      return { project: next };
+    }
+
+    case 'remove-node': {
+      const exists = next.nodes.some(function (n) { return n.id === operation.id; });
+      if (!exists) return fail('unknown node "' + operation.id + '"');
+      next.history = snapshot(project, operation.op + ' ' + operation.id, o.now);
+      next.nodes = next.nodes.filter(function (n) { return n.id !== operation.id; });
+      next.spans = next.spans.filter(function (s) { return s.from !== operation.id && s.to !== operation.id; });
+      next.updatedAt = nowIso(o.now);
+      return { project: next };
+    }
+
+    case 'remove-span': {
+      const exists = next.spans.some(function (s) { return s.id === operation.id; });
+      if (!exists) return fail('unknown span "' + operation.id + '"');
+      next.history = snapshot(project, operation.op + ' ' + operation.id, o.now);
+      next.spans = next.spans.filter(function (s) { return s.id !== operation.id; });
+      next.updatedAt = nowIso(o.now);
+      return { project: next };
+    }
+
+    case 'rename': {
+      if (!operation.name || !String(operation.name).trim()) return fail('rename needs a name');
+      next.history = snapshot(project, operation.op, o.now);
+      next.name = String(operation.name).trim();
+      next.updatedAt = nowIso(o.now);
+      return { project: next };
+    }
+
+    default:
+      return fail('unknown op "' + operation.op + '"');
+  }
+}
+
+/** Take back the last edit. Returns `{ project, undone }`; the oldest state falls off at 50. */
+function undo(project) {
+  const history = (project.history || []).slice();
+  if (!history.length) return { project: project, undone: null };
+  const last = history.pop();
+  return {
+    project: {
+      id: project.id,
+      name: last.state.name,
+      createdAt: project.createdAt,
+      updatedAt: nowIso(),
+      nodes: last.state.nodes,
+      spans: last.state.spans,
+      history: history,
+      version: project.version || 1
+    },
+    undone: last
+  };
+}
+
+function check(project, registry) {
+  const structural = network.validate(project, registry);
+  const errors = structural.errors.slice();
+  const warnings = structural.warnings.slice();
+  if (!project.id) warnings.push('project has no id yet');
+  return { ok: errors.length === 0, errors: errors, warnings: warnings };
+}
+
+function summary(project, registry) {
+  return {
+    id: project.id,
+    name: project.name,
+    updatedAt: project.updatedAt,
+    nodes: (project.nodes || []).length,
+    spans: (project.spans || []).length,
+    onts: (project.nodes || []).filter(function (n) { return n.type === 'ont'; }).length,
+    routeM: Math.round((project.spans || []).reduce(function (n, s) { return n + (s.lengthM || 0); }, 0) * 10) / 10,
+    capacity: registry ? network.capacity(project, registry) : null
+  };
+}
+
+module.exports = {
+  MAX_HISTORY: MAX_HISTORY,
+  createProject: createProject,
+  apply: apply,
+  undo: undo,
+  check: check,
+  summary: summary,
+  nextId: nextId
+};

@@ -1,0 +1,14 @@
+{
+  "kind": "connector",
+  "model": "sc-apc",
+  "vendor": "generic",
+  "label": "SC/APC connector pair",
+  "lossDb": 0.3,
+  "maxLossDb": 0.5,
+  "notes": "0.3 dB typical per mated pair; grade B IEC 61753-1 allows 0.25 dB mean. The engine charges one connector per mating.",
+  "sourceUrl": "https://webstore.iec.ch/publication/6172",
+  "tags": [
+    "connector"
+  ],
+  "polish": "apc"
+}

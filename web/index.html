@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glassforge — FTTH planner</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">glassforge<span class="ver" id="version"></span></div>
+  <input id="project-name" class="project-name" type="text" aria-label="Project name" value="Untitled project">
+  <div class="spacer"></div>
+  <div class="toolgroup">
+    <button data-tool="select" class="tool active" title="Select and move">Select</button>
+    <button data-tool="closure" class="tool" title="Place a closure / NAP">+ Closure</button>
+    <button data-tool="splitter" class="tool" title="Place a splitter">+ Splitter</button>
+    <button data-tool="ont" class="tool" title="Place an ONT">+ ONT</button>
+    <button data-tool="connect" class="tool" title="Draw a cable between two nodes">Connect</button>
+  </div>
+  <div class="toolgroup">
+    <button id="undo" title="Undo the last change">Undo</button>
+    <button id="new-project">New</button>
+    <label class="filebtn">Import KML<input id="kml-file" type="file" accept=".kml,.kmz" hidden></label>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="panel left">
+    <section>
+      <h2>Parts <span class="hint" id="part-counts"></span></h2>
+      <input id="part-search" type="search" placeholder="Search cables, splitters, OLTs…">
+      <div id="palette" class="palette"></div>
+    </section>
+    <section>
+      <h2>Projects</h2>
+      <ul id="project-list" class="projects"></ul>
+    </section>
+  </aside>
+
+  <section class="canvas-wrap">
+    <div id="banner" class="banner" hidden></div>
+    <svg id="canvas" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet" aria-label="Network canvas">
+      <g id="layer-spans"></g>
+      <g id="layer-nodes"></g>
+    </svg>
+    <div class="canvas-legend">
+      <span><i class="dot olt"></i>OLT</span>
+      <span><i class="dot closure"></i>Closure / NAP</span>
+      <span><i class="dot splitter"></i>Splitter</span>
+      <span><i class="dot ont"></i>ONT</span>
+    </div>
+  </section>
+
+  <aside class="panel right">
+    <nav class="tabs">
+      <button data-tab="signal" class="tab active">Signal</button>
+      <button data-tab="cable" class="tab">Cable</button>
+      <button data-tab="strands" class="tab">Strands</button>
+      <button data-tab="splice" class="tab">Splice</button>
+      <button data-tab="checks" class="tab">Checks</button>
+    </nav>
+    <div id="tab-body" class="tab-body"></div>
+  </aside>
+</main>
+<script src="/fiber.js"></script>
+<script src="/scene.js"></script>
+<script src="/dom.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

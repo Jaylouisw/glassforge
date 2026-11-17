@@ -1,0 +1,19 @@
+{
+  "kind": "ont",
+  "model": "gpon-ont-4ge",
+  "vendor": "generic",
+  "label": "GPON ONT 4x GE",
+  "pon": "gpon",
+  "txPowerDbmMin": 0.5,
+  "txPowerDbmMax": 5,
+  "rxSensitivityDbm": -30,
+  "rxOverloadDbm": -8,
+  "ports": {
+    "ge": 1
+  },
+  "notes": "Class C+ capable ONT receiver: -30 dBm sensitivity, the extra 3 dB C+ buys.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
+  "tags": [
+    "gpon"
+  ]
+}

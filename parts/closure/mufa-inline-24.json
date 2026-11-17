@@ -1,0 +1,15 @@
+{
+  "kind": "closure",
+  "model": "mufa-inline-24",
+  "vendor": "generic",
+  "label": "Inline closure 24F",
+  "type": "mufa",
+  "ports": 4,
+  "spliceCapacity": 24,
+  "trays": 2,
+  "notes": "Underground in-line splice closure.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.110/en",
+  "tags": [
+    "mufa"
+  ]
+}
