@@ -65,8 +65,10 @@ objective it used.
    feeder would pass *through* splitter nodes and a path to the third site would be charged three
    splitter losses, inventing a 1:512 cascade that no ONT is behind.
 3. **Distribution**: a tree from the splitter past the houses, **one fibre per ONT**, tapered to the
-   smallest cable that carries the subtree. A house the cable passes becomes a closure with a 2 m
-   drop; a house at the end of the run is the ONT itself.
+   smallest cable that carries the subtree. A house the cable passes becomes a closure with a drop
+   span — the measured snap distance when the run is street-routed, and 1 m when it is not, because a
+   straight-line spur is 0 and `Math.max(1, round(spurM, 1))` keeps the span measured; a house at the
+   end of the run is the ONT itself.
 4. Cable floor: 12 fibres for a feeder, because nobody pulls a 4-fibre feeder.
 
 ### Active Ethernet
@@ -75,7 +77,8 @@ A minimum spanning tree from the head-end over every address, then:
 
 - each branch point becomes a closure (NAP up to 8 ways, NAP-16 to 16, in-line mufa beyond that);
 - each span carries **two fibres per ONT below it**, tapered to the smallest cable that fits;
-- a house the tree passes becomes a closure plus a 2 m drop;
+- a house the tree passes becomes a closure plus a drop span, measured the same way as a PON drop
+  (the snap distance when routed, 1 m straight-line);
 - every optic pair in `active.optics` is tried, because the cheapest optic that closes the budget is
   a different answer at 2 km and at 30 km.
 
