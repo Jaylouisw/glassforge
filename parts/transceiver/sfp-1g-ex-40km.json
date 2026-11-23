@@ -1,0 +1,23 @@
+{
+  "kind": "transceiver",
+  "model": "sfp-1g-ex-40km",
+  "vendor": "cisco",
+  "label": "Cisco GLC-EX-SMD 1000BASE-EX 40 km",
+  "speedMbps": 1000,
+  "wavelengthNm": 1310,
+  "reachM": 40000,
+  "txPowerDbmMin": -1,
+  "txPowerDbmMax": 3,
+  "rxSensitivityDbm": -22,
+  "rxOverloadDbm": 1,
+  "polish": "upc",
+  "notes": "Cisco SFP and SFP+ Transceiver Module Installation Notes, optical specifications table (GLC-EX-SMD): average launch -1.0..+3.0 dBm, receiver overload +1.0 dBm, sensitivity -22.0 dBm, 1290-1335 nm, 40 km on G.652 SMF, 18 dB maximum channel insertion loss. 1000BASE-EX is NOT an IEEE 802.3 class - it is a vendor long-reach convention - so this row cites the Cisco document that publishes it rather than a standard. The 21 dB between launch floor and sensitivity is not free headroom: the launch ceiling (+3 dBm) sits 2 dB above the receiver's own +1 dBm overload, which is why Cisco's note calls for a 5 dB inline attenuator on back-to-back or very short links - on a short span this optic fails on OVERLOAD, not on reach. Connector is dual LC/PC; APC is not supported. Replace these figures with the test report for the module actually purchased before pricing a build.",
+  "sourceUrl": "https://www.cisco.com/c/en/us/td/docs/interfaces_modules/transceiver_modules/installation/note/78_15160.html",
+  "tags": [
+    "1000",
+    "1310nm",
+    "40km",
+    "long-reach",
+    "cisco"
+  ]
+}

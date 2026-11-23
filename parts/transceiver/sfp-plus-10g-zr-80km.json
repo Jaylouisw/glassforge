@@ -1,0 +1,23 @@
+{
+  "kind": "transceiver",
+  "model": "sfp-plus-10g-zr-80km",
+  "vendor": "cisco",
+  "label": "Cisco SFP-10G-ZR 10GBASE-ZR 80 km",
+  "speedMbps": 10000,
+  "wavelengthNm": 1550,
+  "reachM": 80000,
+  "txPowerDbmMin": 0,
+  "txPowerDbmMax": 4,
+  "rxSensitivityDbm": -24,
+  "rxOverloadDbm": -7,
+  "polish": "upc",
+  "notes": "Cisco 10GBASE SFP+ data sheet, Tables 4 and 5 (SFP-10G-ZR): average launch 0..+4.0 dBm, receiver overload -7.0 dBm, sensitivity -24.0 dBm at BER 1e-12 with PRBS31 and no FEC, 1530-1565 nm, 80 km on G.652 - a 24 dB budget. The -24 dBm is the non-FEC figure: Cisco also publishes -27 dBm for OTU2/OTU2e with FEC (Table 5), which is not a 10GbE link and is deliberately not used here. 10GBASE-ZR is NOT an IEEE 802.3 class - Cisco builds it to its own specification - so this row cites the vendor and must not be read as a standards limit. Maximum chromatic dispersion 1600 ps/nm is about 94 km of G.652 at 17 ps/nm/km, so 80 km is inside the dispersion limit as well as the loss budget. Connector is dual LC/PC; APC patch cords are not supported. Replace these figures with the test report for the module actually purchased before pricing a build.",
+  "sourceUrl": "https://www.cisco.com/c/en/us/products/collateral/interfaces-modules/transceiver-modules/data_sheet_c78-455693.html",
+  "tags": [
+    "10000",
+    "1550nm",
+    "80km",
+    "long-reach",
+    "cisco"
+  ]
+}
