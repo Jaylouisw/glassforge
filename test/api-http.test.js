@@ -130,6 +130,32 @@ async function main() {
     }
   });
 
+  // A project file can predate the save-time validation (a span with an unknown cable is refused
+  // now) or be hand-edited on disk. The BOM must not answer 500 - "the server broke" - for a plant
+  // it simply cannot price: it names the span, the way PUT and /ops name it.
+  const legacyId = 'plegacy0001';
+  fs.mkdirSync(path.join(dataRoot, 'projects'), { recursive: true });
+  fs.writeFileSync(path.join(dataRoot, 'projects', legacyId + '.json'), JSON.stringify({
+    id: legacyId,
+    name: 'Legacy cable',
+    nodes: [
+      { id: 'n1', type: 'olt', model: 'gpon-c-plus-8', name: 'OLT' },
+      { id: 'n2', type: 'ont', model: 'gpon-ont-4ge', name: 'ONT' }
+    ],
+    spans: [{ id: 's1', from: 'n1', to: 'n2', cable: 'nope-99', lengthM: 100 }]
+  }));
+  const legacyBom = await request('GET', '/api/projects/' + legacyId + '/bom');
+  test('a stored span with an unknown cable is a 400 naming the span, not a 500', function () {
+    assert.strictEqual(legacyBom.status, 400);
+    assert.ok(legacyBom.body.error.indexOf('s1') !== -1, legacyBom.body.error);
+    assert.ok(legacyBom.body.error.indexOf('nope-99') !== -1, legacyBom.body.error);
+  });
+
+  const legacyGet = await request('GET', '/api/projects/' + legacyId);
+  test('the same project still opens; only its BOM cannot be priced', function () {
+    assert.strictEqual(legacyGet.status, 200);
+  });
+
   const strands = await request('GET', '/api/projects/' + id + '/strands');
   test('the strand page reports usage against the cable', function () {
     assert.strictEqual(strands.status, 200);

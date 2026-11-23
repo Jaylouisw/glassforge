@@ -311,7 +311,22 @@ async function handle(req, res, ctx) {
     }
 
     if (action === '/bom' && method === 'GET') {
-      const bom = engine.length.billOfMaterials(project, registry, {});
+      // A project on disk can predate the save-time check, or be edited by hand, so a span may name
+      // a cable the catalogue does not have. That plant cannot be priced - it is not a broken
+      // server - so answer 400 naming the span instead of letting the lookup's throw become a 500.
+      // Any other error still escapes as a 500: a real fault must not be dressed up as caller input.
+      let bom;
+      try {
+        bom = engine.length.billOfMaterials(project, registry, {});
+      } catch (err) {
+        const unpriceable = (project.spans || []).filter(function (span) {
+          return span && span.cable && !registry.has('cable', span.cable);
+        }).map(function (span) {
+          return 'span "' + span.id + '" uses unknown cable model "' + span.cable + '"';
+        });
+        if (!unpriceable.length) throw err;
+        throw asBadRequest(new Error(unpriceable.join('; ')));
+      }
       return sendJson(req, res, 200, bom);
     }
 
