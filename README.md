@@ -18,7 +18,8 @@ node server/index.js          # then open http://127.0.0.1:8000
 ```
 
 Node 18 or newer. No `npm install`, because there is nothing to install: the server is `http` and
-`fs`, the UI is one HTML file and two scripts, and the engine is plain CommonJS.
+`fs`, the UI is one HTML file and three scripts (`app.js`, `scene.js`, `dom.js`), and the engine is
+plain CommonJS.
 
 <!-- parts:start -->
 **37 parts across 8 kinds** — 8 cables, 6 splitters, 5 OLTs, 3 ONTs, 5 transceiver, 5 closures, 3 connectors, 2 splices.
@@ -28,7 +29,7 @@ Node 18 or newer. No `npm install`, because there is nothing to install: the ser
 
 | Piece | Behaviour |
 |---|---|
-| **Plant** | A tree with one head-end: OLT → feeder → closures and splitters → drop → ONT for a PON, or head-end → cable tree → ONTs for active Ethernet. Duplicate ids, unknown models, over-split PONs and unmeasured spans are refused; a dangling node is a warning, not a wall. |
+| **Plant** | A tree with one head-end: OLT → feeder → closures and splitters → drop → ONT for a PON, or head-end → cable tree → ONTs for active Ethernet. Duplicate ids, unknown models, over-split PONs and unmeasured spans are errors — `PUT /api/projects/:id` refuses them — while the `/ops` edit route saves the plant and reports them in `derived.errors` instead (issue #25, written up in [docs/API.md](docs/API.md)); a dangling node is a warning, not a wall. |
 | **Optical budget** | Worst-case loss both ways: fibre by the metre, splices, connectors, splitters. Two verdicts — receiver headroom against a design margin, and the plant's own budget (a PON class, or the optic pair's launch-minus-sensitivity for an active link). |
 | **Auto-design** | Paste addresses plus a head-end and it builds PON (at each splitter ratio), active-over-a-tree and active home-run, validates and budgets every one, and ranks them by fibre-metres or by your cost model. Winners are applicable to the project in one undoable step. |
 | **Street routing** | Import the street or duct network (KML/KMZ) and every run is measured along it and drawn along it: snaps each property to the nearest edge, routes the union of shortest paths, keeps the polyline on the span. Anything the network cannot reach is refused by address, not connected by a straight line. |
@@ -48,16 +49,21 @@ curl -s http://127.0.0.1:8000/api/design/synthesise -H 'Content-Type: applicatio
 ```
 
 It returns every candidate with its metrics and the reason it lost, the winner's plant and runs, and a
-`rationale` quoting the numbers the ranking used:
+`rationale` quoting the numbers the ranking used. This is the `rationale` from the request above, run
+against this tree (`objective: "fibre-metres"`, `routeMethod: "straight-line x1.2"`), one entry per line:
 
 ```
-Chosen: PON 1:8 with 3 splitter site(s): 24 ONT(s), 2987.7 m of cable (26987.7 fibre-metres),
-        3 splitter(s), 21 closure(s), worst headroom 20.7 dB.
-Rejected PON 1:16 with 2 splitter site(s): feasible but needs 2857.2 m of cable and 28188.9
-        fibre-metres (1.04x)
-Rejected Active Ethernet over a shared cable tree, 1 Gb/s 1G-LX-10KM: feasible but needs 1788.5 m
-        of cable and 58969.6 fibre-metres (2.19x)
+Chosen: Active Ethernet over a shared cable tree, 1 Gb/s 1G-LX-10KM: 3 ONT(s), 343.5 m of cable (3404 fibre-metres), 0 splitter(s), 3 closure(s), worst headroom 9.48 dB.
+Rejected PON 1:8 with 1 splitter site(s): feasible but needs 414.1 m of cable and 3411.6 fibre-metres (1x)
+Rejected Active Ethernet, one cable per customer, 1 Gb/s 1G-LX-10KM: feasible but needs 814.5 m of cable and 5030 fibre-metres (1.48x)
+Rejected Active Ethernet over a shared cable tree, 10 Gb/s PLUS-10G-LR-10KM: feasible but needs 343.5 m of cable and 3404 fibre-metres (1x)
+5 further ratio/optic variant(s) scored worse or were infeasible; every one is in the candidate table with its numbers.
 ```
+
+Three addresses 57 m apart (Casa 1 to Casa 2) do not make a PON look good: one splitter site costs more
+cable than the shared tree, so the active tree wins on fibre-metres and the PON is reported as a loser
+rather than dropped. Paste a longer list and the ranking moves — the point is that the reason travels
+with the number.
 
 Supply a street or duct network and the runs are **routed along it**; without one they are
 straight-line × `routeFactor` (default 1.2). Every response says which it used (`routeMethod`), and
@@ -82,17 +88,21 @@ Being explicit, because a planner that quietly lacks a feature is worse than one
 ## How it is put together
 
 ```
-engine/     pure functions — fibre colours, parts registry, budget, lengths, plant, KML, projects
+engine/     the model — fibre colours, budget, lengths, plant, routing, synthesis
 parts/      the catalogue, one JSON file per part (add a model = drop a file, no code change)
 server/     HTTP surface and project storage: http + fs, nothing else
-web/        the UI: index.html, app.js, scene.js, style.css — no framework, no build step
+web/        the UI: index.html, app.js, scene.js, dom.js, style.css — no framework, no build step
 test/       one suite per behaviour, discovered by scripts/run-tests.js
 docs/       SPEC.md (the model), AUTO-DESIGN.md (topology synthesis), OPTICAL.md (the numbers),
             PARTS.md, FIBRE-COLOURS.md, API.md
 ```
 
-The engine has no HTTP, no disk and no clock in it. That is what lets the whole planning model be
-exercised in milliseconds, and it is why `server/` is the only file that knows what a port is.
+The arithmetic — geometry, the loss model, lengths, the synthesiser — is pure functions over plain data,
+with no HTTP and no dependency, which is what lets a whole planning model be exercised in milliseconds
+and `server/` be the only file that knows what a port is. The two edges that touch the machine are
+deliberate and named: `engine/parts.js` reads `parts/` from disk at load time, and `engine/project.js`
+stamps `new Date()` on an edit unless a clock is passed in. Inject the clock (`apply(project, op, { now
+})`) when a test needs a fixed time.
 
 Read [docs/SPEC.md](docs/SPEC.md) before changing behaviour, [docs/AUTO-DESIGN.md](docs/AUTO-DESIGN.md)
 before touching the synthesiser, and [docs/OPTICAL.md](docs/OPTICAL.md) before changing a loss figure.

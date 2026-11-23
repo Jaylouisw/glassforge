@@ -21,8 +21,11 @@ When a street/duct network is supplied, every length is measured by walking that
 Straight-line distance survives only as the fallback for the case where no network was supplied, and then
 `routeMethod` says `straight-line xN`. A property that cannot be reached is refused by address.
 
-`dijkstra(graph, rootId, opts)` accepts `opts.costOf(entry)` so a second, diverse leg can be costed
-without rebuilding the graph.
+`dijkstra(graph, rootId)` (`engine/street.js`) is a plain shortest-path tree from one root, with a
+deterministic node-id tie-break. The protected-circuit work sits beside it rather than inside it:
+`diversePaths(graph, fromId, toId, opts)` takes the minimum-cost edge-disjoint pair (Suurballe over the
+residual graph) and, when the graph allows none, the path that shares the fewest metres — `opts.method`
+only labels the answer. Costs live on the arcs, so nothing has to be rebuilt to look for a second route.
 
 ## Consequences
 

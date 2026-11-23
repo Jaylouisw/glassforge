@@ -77,8 +77,9 @@ demand always produces the same design.
 | The ONT | **one connector** |
 
 That table is the whole model, and it is deliberately explicit: a design where splitters are
-connectorised is 0.6 dB worse than the same design with cassettes, and the planner should say so
-rather than average it away.
+connectorised is **0.5 dB worse** than the same design with cassettes — two connectors at 0.3 dB
+(`parts/connector/sc-apc.json`) instead of one fusion splice at 0.1 dB (`parts/splice/fusion.json`) — and
+the planner should say so rather than average it away.
 
 ## 4. Two verdicts, not one
 
@@ -139,10 +140,14 @@ fifty-first edit is the one that becomes permanent. The server persists projects
 ## 8. What the engine refuses to guess
 
 - A cable with no attenuation figure at the requested wavelength → **error**, never zero.
-- A GPON OLT with an XGS-PON ONT → **error**; they cannot share a PON.
+- A GPON OLT with an XGS-PON ONT → **error** from the budget (`opticalBudget`: "they cannot share a
+  PON"), but not from `validate`: a plant pairing the two is structurally valid and only fails when
+  somebody asks it for a number.
 - Two optics of different rates or wavelengths → **error**; they cannot form a link.
 - A splitter in an active plant, or a transceiver at the customer end of a PON → **error**.
-- An unknown part model → **error** naming the models that do exist.
+- An unknown part model → **error** naming the node and the model it asked for. The registry's own
+  lookup — `registry.get`, the path a budget takes — also lists the models that do exist
+  (`unknown splitter model "plc-1x7-sca" - known models: plc-1x16-sca, ...`); plant validation does not.
 - A split ratio beyond the OLT's `maxSplitRatio` → **error**.
 - A span with no measured length → **error** at BOM time.
 

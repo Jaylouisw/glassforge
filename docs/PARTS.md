@@ -115,8 +115,9 @@ against, instead of a PON class.
 }
 ```
 
-`type`: `nap`, `mufa`, `inline`, `handhole`, `cabinet`, `splitter-box`. `ports` above the cable count
-into the closure warns; `spliceCapacity` is what stops an over-stuffed tray.
+`type`: `nap`, `mufa`, `inline`, `handhole`, `cabinet`, `splitter-box`. More cables into the closure than
+`ports` is a warning (`closure "Mufa 1" has 5 cables into 4 ports`), and a `spliceCapacity` smaller than
+the splices a path would leave in it is reported as a note on the budget.
 
 ## connector and splice
 

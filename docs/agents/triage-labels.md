@@ -12,7 +12,12 @@ label strings used in this repo's tracker.
 | `wontfix`              | `wontfix`            | Will not be actioned                     |
 
 When a skill mentions a role ("apply the AFK-ready triage label"), use the label string from the right
-column. The labels exist on the repo already; creating them again is not part of triage.
+column. All five exist on the Forgejo repository at `git.jayw.uk/jaylouisw/glassforge` — created
+2026-11-23 through the API — so applying one is a `POST .../issues/<n>/labels`, not a creation step.
+
+They are **not** declared in `.github/labels.yml`: that file lists the five workflow labels (`bug`,
+`enhancement`, `parts`, `docs`, `ci`) and none of the triage five. Do not add them there, and do not treat
+that file as the source of truth for triage — the repository is.
 
 An issue is only `ready-for-agent` when it names the behaviour that is wrong, the file or module it
 lives in, and how to tell a fix from a non-fix. "Improve the UI" is `needs-info`, always.

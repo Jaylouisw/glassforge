@@ -11,8 +11,11 @@ The server binds `127.0.0.1:8000` by default (`HOST`, `PORT`), and stores projec
 
 ```
 GET /api/health
-→ { ok: true, name: "glassforge", version: "0.1.0", parts: { total: 32, byKind: {...} }, projects: 0, uptimeS: 12 }
+→ { ok: true, name: "glassforge", version: "0.4.0", parts: { total: 37, byKind: {...} }, projects: 0, uptimeS: 12 }
 ```
+
+`version` is `package.json`'s version and `parts.total` is the catalogue as loaded, so both move with
+the repo. The example above is the response from this tree; nothing in it is hard-coded.
 
 ## Parts
 
@@ -51,7 +54,16 @@ Operations for `/ops`:
 { "op": "rename",      "name": "Barrio Norte phase 2" }
 ```
 
-A refused operation returns `400` with the reason and leaves the saved project untouched.
+A refused operation returns `400` with the reason and leaves the saved project untouched. "Refused"
+here means the *operation* cannot be expressed: a second OLT or head-end, an unknown node id, a span
+from a node to itself, a span with no cable, a length that is not a positive number.
+
+`/ops` does **not** run the plant validator before it saves. An unknown cable model or an over-split
+PON is applied, written to disk and answered `200`; the verdict comes back afterwards in
+`derived.errors`, beside the plant. Only `PUT /api/projects/:id` refuses an invalid design with `400`
+and its `errors`. That difference between the two write paths is a known inconsistency in the
+behaviour, tracked as issue #25 — until it is closed, read `derived.errors` after a `/ops` call before
+trusting the saved plant.
 
 ## Auto-design
 
@@ -116,11 +128,35 @@ GET  /api/projects/:id/bom       → { lines: [...per span], byCable: [...per mo
 GET  /api/projects/:id/strands   → { rows: [...per span], totalStrands, totalUsed, utilisation, overbooked }
 
 POST /api/design/budget          { design: { olt, ont, spans, splitters, splices, connectors, ... } }
-                                 or { design: { headEnd: { model }, cpe: { model }, spans, ... } } for an active link
 POST /api/design/length          { routeM, overlengthPct?, splices?, closures?, drumM? }
                                  or { points: [{lat, lon}, ...], ... }
 GET  /api/design/splitter?ratio=8 → { ratio, idealSplitLossDb }
 ```
+
+`POST /api/design/budget` runs `budget.opticalBudget` and nothing else, so the body it takes is the PON
+one: `olt.model`, `ont.model`, `spans`, `splitters`, `splices`, `connectors`. An **active-link** body
+(`headEnd`/`cpe` instead of `olt`/`ont`) is not handled by this route — it answers
+`500 {"error":"design.olt.model is required"}`, because the route never reaches `budget.pointToPoint`:
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/api/design/budget -H 'Content-Type: application/json' -d '{
+  "design": {
+    "olt": { "model": "gpon-c-plus-8" }, "ont": { "model": "gpon-ont-4ge" },
+    "spans": [ { "cable": "g652d-loose-24", "lengthM": 1200 },
+               { "cable": "g657a2-drop-1", "lengthM": 45 } ],
+    "splitters": [ { "model": "plc-1x8-sca" } ], "connectors": 2, "splices": 2 } }'
+→ { "ok": true, "verdict": "ok", "odnLossDb": 11.574, "headroomDb": 21.43,
+    "cascadeRatio": 8, ... }
+```
+
+Drop the connectors and the splices and the same plant fails the *overload* test instead: 10.764 dB of
+ODN puts −7.76 dBm on an ONT whose overload point is −8 dBm. Both verdicts are real; neither is
+assumed.
+
+An active circuit is budgeted through [`POST /api/design/link`](#site-to-site-links), which gives one
+`pointToPoint` verdict per leg. For an active **plant** (a `headend` root in a project),
+`budget.pointToPoint` is reached through `engine/network.js` — the project budget route,
+`POST /api/projects/:id/budget` — and there is no design-body route for it.
 
 A budget `result` carries: `verdict` (`ok`/`marginal`/`fail`), `reasons`, `rxPowerDbm`,
 `headroomDb`, `odnLossDb`, `budgetDb`, `classHeadroomDb`, `cascadeRatio`, `wavelength`, `direction`

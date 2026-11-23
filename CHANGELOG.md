@@ -50,7 +50,7 @@ Street routing: runs are measured, and drawn, along the streets instead of a det
   network length it loaded.
 - **Refusals that name the address**: a property more than `maxSnapM` (default 250 m) from the network,
   or disconnected from the head-end, makes the candidate infeasible with the address ids listed.
-- 18 test suites / 153 assertions (was 16 / 141).
+- 17 test suites / 157 assertions (was 16 / 141).
 
 ### Changed
 
@@ -92,7 +92,7 @@ Active optical networks, and auto-design from a list of addresses.
   with its verdict and numbers, read the rationale, and apply the winner to the open project.
 - **`docs/AUTO-DESIGN.md`** — the pipeline, the algorithms, the objective function, and what the
   synthesiser deliberately does not model.
-- 16 test suites / 137 assertions (was 13 / 107).
+- 16 test suites / 141 assertions (was 13 / 107).
 
 ### Fixed
 

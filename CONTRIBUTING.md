@@ -2,7 +2,7 @@
 
 Development happens on the Forgejo instance at
 [git.jayw.uk/jaylouisw/glassforge](https://git.jayw.uk/jaylouisw/glassforge). Issues and pull requests
-there are the only tracker; a GitHub mirror, if one exists, is a mirror.
+there are the only tracker: there is no GitHub mirror, and nothing is expected to appear on one.
 
 ```bash
 git clone https://git.jayw.uk/jaylouisw/glassforge.git

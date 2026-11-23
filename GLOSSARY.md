@@ -12,7 +12,7 @@ customer's ONT: cable, closures, splices, connectors, splitters.
 `splitter`, `closure`, `ont`).
 
 **Span** — one cable run between two nodes, with a `lengthM` and a `purpose` (`feeder`, `distribution`,
-`drop`, `splitter-tail`).
+`drop`, `splitter-tail`, `tree`, `home-run`, or `link` for a leg of a site-to-site circuit).
 
 **Head end** — where the provider's signal starts. `olt` for a PON, `headend` for an active
 point-to-point or active-over-tree design. The root node type selects the budget that is applied.
@@ -20,8 +20,10 @@ point-to-point or active-over-tree design. The root node type selects the budget
 **Splitter site** — a closure that holds a splitter, reached by a 1 m **splitter tail** so a feeder
 cable passing three sites is not mistaken for three cascaded splitters.
 
-**Cascade** — the number of splitters on the deepest root-to-leaf path. `maxCascade` is that path, not
-the product of every splitter in the plant.
+**Cascade** — the deepest split ratio from the root to any leaf: the product of the `ratio` of every
+splitter on the deepest root-to-leaf path, not the product of every splitter in the plant. It is exposed
+as `splitterCascade` on the capacity object (`capacity()` in `engine/network.js`, compared against the
+OLT's `maxSplitRatio`); `maxCascade` is the local variable that computes it, not a field.
 
 ## Money and cable
 
@@ -56,6 +58,25 @@ without saying so.
 **Diversity** — for a two-site link, how much of the second leg shares geometry with the first, reported
 in metres and naming every shared segment. A third-party segment is a leased circuit: it carries a stated
 length and loss, and stays out of the cable-to-buy.
+
+## Circuits and legs
+
+**Circuit** — a site-to-site link: two named sites, an optic at each end, and one or two legs
+(`link.design` in `engine/link.js`). Deliberately not a plant, because two paths between the same pair of
+nodes is a cycle and a plant is a tree.
+
+**Leg** — one fibre path between the two sites of a circuit: `a` (the A-leg) or `b` (the B-leg), each
+routed on the graph and budgeted on its own with `budget.pointToPoint`, so each carries its own
+`verdict`. Listed in `legs[]` and repeated, flattened, in `runs[]` with `purpose: "link"`.
+
+**Protection** — `"diverse"` (the default) or `"single"`: whether a second leg is asked for. `diverse`
+never invents diversity — where the graph offers no edge-disjoint pair, the second leg is the one that
+shares the fewest metres and `diversity.shared` names each shared segment with its metres. Anything else
+is refused: `protection must be "diverse" or "single"`.
+
+**routedM / ownM / lengthM** — the three lengths a leg reports, because they answer three questions:
+`routedM` is what the graph measured, `ownM` adds both site spurs (the cable to buy), and `lengthM` adds
+the leased segments. `spurM` and `leasedM` sit beside them, so `lengthM = ownM + leasedM`.
 
 ## Design and refusal
 
