@@ -131,6 +131,25 @@ function trace(plant, ontId) {
  * - one connector at the OLT port and one at the ONT;
  * - fibre loss from every span's own cable spec and measured length.
  */
+/**
+ * How many splices a closure on a traced path holds.
+ *
+ * A through-splice joins what both cable ends carry, so the tray count is the smaller of the
+ * cables meeting the box, and the one cable touching it at the end of a path. That is why the last
+ * handhole on a feeder fed by 12 fibres and closed by one drop holds one splice, not twelve.
+ * A strand's own loss is a separate question and stays one splice per closure (see `designForOnt`).
+ */
+function splicesAtClosure(nodeId, spans, registry) {
+  let smallest = null;
+  for (const span of spans) {
+    if (span.from !== nodeId && span.to !== nodeId) continue;
+    const cable = registry.has('cable', span.cable) ? registry.get('cable', span.cable) : null;
+    if (!cable || !isNum(cable.fiberCount)) continue;
+    if (smallest === null || cable.fiberCount < smallest) smallest = cable.fiberCount;
+  }
+  return smallest === null ? 0 : smallest;
+}
+
 function designForOnt(plant, ontId, registry, opts) {
   const o = opts || {};
   const path = trace(plant, ontId);
@@ -145,8 +164,14 @@ function designForOnt(plant, ontId, registry, opts) {
       splices += 1;
       if (node.model) {
         const closure = registry.has('closure', node.model) ? registry.get('closure', node.model) : null;
-        if (closure && closure.spliceCapacity && splices > closure.spliceCapacity) {
-          notes.push('closure "' + node.name + '" would carry ' + splices + ' splices, capacity ' + closure.spliceCapacity);
+        // The box holds one splice per strand it joins, so the question is how many fibres pass
+        // through *this* closure - not how many splices the whole path has made by the time it
+        // arrives. A cumulative counter told the thirteenth handhole on a feeder that it carried
+        // thirteen splices when it carried twelve, and it could never see a 48-fibre cable dragged
+        // through a 12-splice box. Warnings that are wrong in both directions stop being read.
+        const inThisClosure = splicesAtClosure(node.id, path.spans, registry);
+        if (closure && closure.spliceCapacity && inThisClosure > closure.spliceCapacity) {
+          notes.push('closure "' + node.name + '" would carry ' + inThisClosure + ' splices, capacity ' + closure.spliceCapacity);
         }
       }
     } else if (node.type === 'splitter') {
