@@ -11,8 +11,14 @@ The server binds `127.0.0.1:8000` by default (`HOST`, `PORT`), and stores projec
 
 ```
 GET /api/health
-→ { ok: true, name: "glassforge", version: "0.1.0", parts: { total: 32, byKind: {...} }, projects: 0, uptimeS: 12 }
+→ { ok: true, name: "glassforge", version: "0.4.0",
+    parts: { total: 37, byKind: { cable: 8, splitter: 6, olt: 5, ont: 3, transceiver: 5,
+                                 closure: 5, connector: 3, splice: 2 } },
+    projects: 0, uptimeS: 4 }
 ```
+
+`version` is `package.json`'s, and `parts.total` is the catalogue on disk, so both move with a release;
+the numbers above are what this build answers (`node scripts/count-parts.js` prints the catalogue line).
 
 ## Parts
 
