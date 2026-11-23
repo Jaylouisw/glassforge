@@ -70,9 +70,26 @@ test('a 1 Gb/s optic has more budget than a 10 Gb/s one, and the engine says so'
   const g1 = budget.pointToPoint(link({ headEnd: { model: 'sfp-1g-lx-10km' }, cpe: { model: 'sfp-1g-lx-10km' } }), registry);
   const g10 = budget.pointToPoint(link(), registry);
   assert.ok(g1.budgetDb > g10.budgetDb);
-  close(g1.budgetDb, 10.5, 0.001, '1G-LX budget (launch -9.5, sensitivity -20)');
+  // 8.0 dB is the single-mode class window: -11.0 launch minus -19.0 sensitivity (802.3 Tables
+  // 38-7 / 38-8). This assertion used to demand 10.5 dB from a -9.5 dBm launch and a -20.0 dBm
+  // sensitivity - an SX multimode launch floor and a figure no LX column publishes - which handed
+  // every 1G link 2.5 dB it does not have.
+  close(g1.budgetDb, 8.0, 0.001, '1G-LX budget (launch -11.0, sensitivity -19.0)');
   close(g10.budgetDb, 6.2, 0.001, '10G-LR budget');
   assert.strictEqual(g1.speedMbps, 1000);
+});
+
+test('the 1G-LX class window, not a borrowed SX floor, decides a spliced-out 10 km run', function () {
+  const r = budget.pointToPoint(link({
+    headEnd: { model: 'sfp-1g-lx-10km' }, cpe: { model: 'sfp-1g-lx-10km' },
+    spans: [{ cable: 'g652d-loose-12', lengthM: 10000 }], splices: 10, connectors: 2
+  }), registry);
+  // 10 km x 0.35 = 3.5 dB, ten fusion splices x 0.1 = 1.0, two connectors x 0.3 = 0.6 -> ODN 5.1 dB
+  close(r.odnLossDb, 5.1, 0.001, 'ODN loss');
+  // 8.0 - 5.1 = 2.9 dB against the 3 dB margin: fail. The old row gave this span 5.4 dB and
+  // called it ok, which is the 2.5 dB an SX launch floor invents.
+  close(r.headroomDb, 2.9, 0.001, 'headroom');
+  assert.strictEqual(r.verdict, 'fail');
 });
 
 test('optics that cannot hear each other are refused, not averaged', function () {

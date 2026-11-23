@@ -6,13 +6,13 @@
   "speedMbps": 1000,
   "wavelengthNm": 1310,
   "reachM": 10000,
-  "txPowerDbmMin": -9.5,
+  "txPowerDbmMin": -11,
   "txPowerDbmMax": -3,
-  "rxSensitivityDbm": -20,
+  "rxSensitivityDbm": -19,
   "rxOverloadDbm": -3,
   "polish": "upc",
   "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
-  "notes": "1000BASE-LX class figures from IEEE 802.3: launch -9.5..-3 dBm at 1310 nm, receiver sensitivity -20 dBm, overload -3 dBm (a 10.5 dB link budget over 10 km of G.652). Published class figures, but module datasheets vary by a dB or two - replace with the module actually purchased.",
+  "notes": "Figure provenance: IEEE 802.3 Table 38-7 and Table 38-8, single-mode column - average launch power -11.0..-3.0 dBm at 1310 nm, receiver sensitivity -19.0 dBm, overload -3.0 dBm. The class window that follows is 8.0 dB (-11.0 - -19.0), and it is what this row is budgeted at. What it used to claim was 10.5 dB from a -9.5 dBm launch and a -20.0 dBm sensitivity; neither is a 1000BASE-LX single-mode figure - -9.5 dBm is 1000BASE-SX's multimode launch floor and -20.0 dBm appears in no 802.3 LX column - so every 1G link was handed 2.5 dB it does not have. That is the difference between a 10 km run through ten splice trays reading ok and reading marginal. Two traps in the standard's own tables: Table 38-11's 7.5 dB link power budget is -11.5 dBm (the multimode columns' launch floor) minus -19.0 dBm, so the single-mode window is 8.0 dB and this row does not use 7.5; and 802.3's LX support distance on single-mode fibre is 5 km at 6.0 dB channel insertion loss, while 10 km is the vendor LX10 convention this row's label follows - reach and loss budget are separate verdicts here, and the loss budget binds first on a 10 km span. Launch ceiling equals receiver overload (-3.0 dBm), so a back-to-back pair with two connectors sits 0.6 dB under it and needs no pad. Many module datasheets quote a -9.5 dBm launch floor, which is 1.5 dB better than the class and fine to take from its test report. Replace these class figures with the module actually purchased before pricing a build.",
   "tags": [
     "1000",
     "1310nm"
