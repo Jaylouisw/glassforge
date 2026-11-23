@@ -6,6 +6,32 @@ const engine = require('../engine');
 const registry = engine.createRegistry();
 const budget = engine.budget;
 
+/**
+ * A registry whose two optics differ, which the shipped catalogue cannot offer.
+ *
+ * A point-to-point budget refuses a pair that differs in rate or wavelength, so the only legal
+ * "two different optics" fixture is a pair that agrees on both and differs in its datasheet. Cloning
+ * the catalogue's LR entry keeps every validated field present; B is a 40 km part with a hotter
+ * launch and a more sensitive receiver, so which end the engine reads is visible in the result.
+ */
+const twoOptics = (function () {
+  const specs = engine.parts.loadSpecs().specs;
+  const base = specs.filter(function (s) { return s.kind === 'transceiver' && s.model === 'sfp-plus-10g-lr-10km'; })[0];
+  const a = Object.assign({}, base, { model: 'test-optic-a-agg', label: 'Test optic A: aggregation end, 10 km' });
+  const b = Object.assign({}, base, {
+    model: 'test-optic-b-cpe',
+    label: 'Test optic B: customer end, 40 km',
+    reachM: 40000,
+    txPowerDbmMin: -3,
+    txPowerDbmMax: 2,
+    rxSensitivityDbm: -18,
+    rxOverloadDbm: -1
+  });
+  delete a._search;
+  delete b._search;
+  return new engine.parts.Registry(specs.concat([a, b]));
+}());
+
 function link(overrides) {
   return Object.assign({
     headEnd: { model: 'sfp-plus-10g-lr-10km' },
@@ -74,10 +100,33 @@ test('too much power is a failure on an active link too', function () {
 });
 
 test('upstream uses the customer optic as the transmitter', function () {
-  const r = budget.pointToPoint(link({ direction: 'up' }), registry);
-  assert.strictEqual(r.direction, 'up');
-  assert.strictEqual(r.sensitivityDbm, -14.4, 'the head-end optic is the receiver upstream');
-  assert.ok(r.warnings.length === 0 || r.warnings[0].indexOf('no cable spans') === -1);
+  // Two *different* optics on the same rate and wavelength: `a` at the aggregation end, `b` at the
+  // customer end. With one model at both ends the sensitivity is the same figure whichever end the
+  // engine read, so the direction was never actually observed. The shipped catalogue has no such
+  // pair, hence a test registry cloned from one entry with B's datasheet changed.
+  const design = { headEnd: { model: 'test-optic-a-agg' }, cpe: { model: 'test-optic-b-cpe' } };
+  const down = budget.pointToPoint(link(design), twoOptics);
+  const up = budget.pointToPoint(link(Object.assign({ direction: 'up' }, design)), twoOptics);
+
+  // Downstream: A launches at -8.2 dBm and B receives against -18 dBm. 0.95 dB of ODN -> -9.15 dBm.
+  assert.strictEqual(down.direction, 'down');
+  close(down.txDbm, -8.2, 0.001, 'downstream launch is the head-end optic');
+  assert.strictEqual(down.sensitivityDbm, -18, 'downstream receives into the customer optic');
+  close(down.rxPowerDbm, -9.15, 0.001, 'downstream receive power');
+  close(down.headroomDb, 8.85, 0.001, 'downstream headroom against -18 dBm');
+
+  // Upstream: B launches at -3 dBm and A receives against -14.4 dBm -> -3.95 dBm, 10.45 dB of
+  // headroom. An rxSpec that ignored direction would report -18 dBm and 3.1 dB more headroom here.
+  assert.strictEqual(up.direction, 'up');
+  close(up.txDbm, -3, 0.001, 'upstream launch is the customer optic');
+  assert.strictEqual(up.sensitivityDbm, -14.4, 'upstream receives into the head-end optic');
+  close(up.rxPowerDbm, -3.95, 0.001, 'upstream receive power');
+  close(up.headroomDb, 10.45, 0.001, 'upstream headroom against -14.4 dBm');
+
+  // Reach is the shorter of the two datasheets, in both directions: A reaches 10 km, B reaches 40 km.
+  assert.strictEqual(down.reachM, 10000, 'downstream reach');
+  assert.strictEqual(up.reachM, 10000, 'upstream reach');
+  assert.ok(up.warnings.length === 0 || up.warnings[0].indexOf('no cable spans') === -1);
 });
 
 test('a missing optic is refused by name', function () {

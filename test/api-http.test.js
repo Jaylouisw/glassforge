@@ -315,9 +315,19 @@ async function main() {
     assert.ok(fibre.raw.toString('utf8').indexOf('GFFiber') !== -1);
   });
 
-  const traversal = await request('GET', '/../package.json');
+  // A plain '/../package.json' is rewritten to '/package.json' by the client before the handler ever
+  // sees it, and then 404s because web/package.json does not exist - an unrelated reason that proves
+  // nothing about the guard. The traversal that actually reaches serveStatic is the encoded one.
+  const plainTraversal = await request('GET', '/../package.json');
+  const traversal = await request('GET', '/..%2fpackage.json');
   test('path traversal is refused', function () {
-    assert.ok(traversal.status === 400 || traversal.status === 404, 'status ' + traversal.status);
+    assert.strictEqual(plainTraversal.status, 404, 'plain /../ is normalised away before the handler');
+    assert.strictEqual(traversal.status, 400, 'an encoded .. must be refused by the handler, got ' + traversal.status);
+    assert.ok(traversal.body && String(traversal.body.error).indexOf('bad path') !== -1,
+      'the refusal should name the path, got: ' + JSON.stringify(traversal.body));
+    const served = traversal.raw.toString('utf8');
+    assert.ok(served.indexOf('"glassforge"') === -1 && served.indexOf('"dependencies"') === -1,
+      'a file outside web/ was served: ' + served.slice(0, 120));
   });
 
   await new Promise(function (resolve) { server.close(resolve); });

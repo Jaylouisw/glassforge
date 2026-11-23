@@ -22,6 +22,22 @@ const NODE_TYPES = ['olt', 'headend', 'closure', 'splitter', 'ont'];
 const ROOT_TYPES = ['olt', 'headend'];
 
 /**
+ * The plant-level root rule, stated once.
+ *
+ * Two OLTs is not a design with a spare - it is two designs in one file. Everything the engine
+ * derives (the path, the cascade, the port count) would silently be about whichever root happened to
+ * be found first, so the count is checked rather than guessed, and the count is quoted so the fault
+ * cannot be mistaken for one customer's problem.
+ */
+function rootCountMessage(found) {
+  return 'exactly one olt or headend node is required, found ' + found;
+}
+
+function rootNodes(plant) {
+  return ((plant && plant.nodes) || []).filter(function (n) { return n && ROOT_TYPES.indexOf(n.type) !== -1; });
+}
+
+/**
  * Which catalogue kinds a node's `model` may name.
  *
  * A customer endpoint is an `ont` on a PON and a `transceiver` on an active network - same node type,
@@ -243,8 +259,27 @@ function strandLedger(plant, registry) {
 function capacity(plant, registry) {
   const onts = (plant.nodes || []).filter(function (n) { return n.type === 'ont'; });
   const splitters = (plant.nodes || []).filter(function (n) { return n.type === 'splitter'; });
-  const oltNode = (plant.nodes || []).find(function (n) { return n.type === 'olt'; });
-  const headendNode = (plant.nodes || []).find(function (n) { return n.type === 'headend'; });
+  const roots = rootNodes(plant);
+  if (roots.length !== 1) {
+    // Refuse to pick a root. Reporting the first OLT's ports for a plant that has two of them (or
+    // none yet) would let an ambiguous plant read as healthy: `stats` and `project.summary` run on
+    // projects that were never validated, and the signal page prints this next to the ONT count.
+    return {
+      technology: null,
+      olt: null,
+      headend: null,
+      ports: null,
+      maxSplitRatio: null,
+      onts: onts.length,
+      splitters: splitters.length,
+      splitterCascade: 1,
+      theoreticalMaxOnts: null,
+      problems: ['capacity needs exactly one olt/headend root, found ' + roots.length]
+    };
+  }
+  const root = roots[0];
+  const oltNode = root.type === 'olt' ? root : null;
+  const headendNode = root.type === 'headend' ? root : null;
 
   if (!oltNode && headendNode) {
     // An active network's limit is the aggregation switch's port count and its uplink budget, neither
@@ -360,7 +395,7 @@ function validate(plant, registry) {
 
   const roots = nodes.filter(function (n) { return n && ROOT_TYPES.indexOf(n.type) !== -1; });
   if (roots.length !== 1) {
-    errors.push('exactly one olt or headend node is required, found ' + roots.length);
+    errors.push(rootCountMessage(roots.length));
   } else {
     const active = roots[0].type === 'headend';
     if (active && nodes.some(function (n) { return n.type === 'splitter'; })) {
@@ -372,6 +407,9 @@ function validate(plant, registry) {
       errors.push('a PON plant needs ONT models at the customer end, not transceivers');
     }
   }
+  // From here the root count is either exactly one or already an error, and the per-ONT pass further
+  // down lives inside `if (!errors.length)`. That ordering is what keeps a root-count fault a *plant*
+  // fault: no customer ONT can ever be blamed for it, so the message a caller greps for is unambiguous.
 
   const spanIds = new Set();
   for (const span of spans) {

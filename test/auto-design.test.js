@@ -1,6 +1,8 @@
 'use strict';
 // Topology synthesis: the same demand must produce the same design, and the design must be buildable.
 const { test, assert, throws, close, done } = require('./harness');
+const fs = require('fs');
+const path = require('path');
 const engine = require('../engine');
 
 const registry = engine.createRegistry();
@@ -26,6 +28,25 @@ test('the same demand and options produce byte-identical output', function () {
   assert.strictEqual(JSON.stringify(a.plant), JSON.stringify(b.plant));
   assert.strictEqual(a.technology, b.technology);
   assert.strictEqual(a.best.metrics.fibreMetres, b.best.metrics.fibreMetres);
+
+  // That comparison is only worth something while the design path cannot read a clock or an RNG:
+  // put either in it and two consecutive runs differ, so this test would flake rather than fail -
+  // which hides the regression instead of reporting it. So the sources are scanned, and the scan is
+  // what gives this test teeth. `project.js` is exempt from the clock rule alone: it stamps
+  // `updatedAt` from an injectable clock, and that timestamp is metadata, not part of a plant.
+  const engineDir = path.join(__dirname, '..', 'engine');
+  const rng = [];
+  const clock = [];
+  for (const name of fs.readdirSync(engineDir).sort()) {
+    if (!/\.js$/.test(name)) continue;
+    fs.readFileSync(path.join(engineDir, name), 'utf8').split(/\r?\n/).forEach(function (line, i) {
+      const at = name + ':' + (i + 1) + ' ' + line.trim();
+      if (/\bMath\.random\b/.test(line)) rng.push(at);
+      if (name !== 'project.js' && /\bDate\.now\b|\bnew Date\b|\bperformance\.now\b|\bprocess\.hrtime\b/.test(line)) clock.push(at);
+    });
+  }
+  assert.deepStrictEqual(rng, [], 'engine/ must not use Math.random: ' + rng.join(' | '));
+  assert.deepStrictEqual(clock, [], 'the design path must not read the clock: ' + clock.join(' | '));
 });
 
 test('every demand point becomes exactly one ONT', function () {

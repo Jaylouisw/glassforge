@@ -25,10 +25,51 @@ test('a well-formed plant validates', function () {
   assert.deepStrictEqual(result.warnings, []);
 });
 
-test('exactly one OLT', function () {
+test('exactly one OLT: a second root is refused at plant level, with or without an ONT', function () {
+  // With an ONT in the plant the per-ONT trace notices the ambiguity too, so a needle match alone
+  // passes for the wrong reason: it must be the *plant-level* refusal, quoted verbatim.
   const p = base();
   p.nodes.push({ id: 'n9', type: 'olt', model: 'gpon-c-plus-8' });
-  assert.ok(engine.network.validate(p, registry).errors.some(function (e) { return e.indexOf('exactly one olt') !== -1; }));
+  const withOnt = engine.network.validate(p, registry);
+  assert.strictEqual(withOnt.ok, false, 'two OLTs must refuse the save');
+  assert.ok(withOnt.errors.indexOf('exactly one olt or headend node is required, found 2') !== -1,
+    'plant-level refusal expected, got: ' + withOnt.errors.join(' | '));
+  assert.ok(!withOnt.errors.some(function (e) { return e.indexOf('ont "') === 0; }),
+    'a root-count fault belongs to the plant, not to a customer ONT: ' + withOnt.errors.join(' | '));
+
+  // And the fixture no ONT can speak for: two OLTs and nothing else. This is what makes the
+  // plant-level guard load-bearing - weaken it and this plant validates clean, which is the bug.
+  const bare = {
+    nodes: [
+      { id: 'n1', type: 'olt', model: 'gpon-c-plus-8', lat: 51.5, lon: -0.1 },
+      { id: 'n2', type: 'olt', model: 'gpon-c-plus-8', lat: 51.5, lon: -0.1 }
+    ],
+    spans: []
+  };
+  const noOnt = engine.network.validate(bare, registry);
+  assert.strictEqual(noOnt.ok, false, 'two OLTs and no ONT must still refuse the save');
+  assert.deepStrictEqual(noOnt.errors, ['exactly one olt or headend node is required, found 2'],
+    'one plant-level error, found: ' + noOnt.errors.join(' | '));
+});
+
+test('capacity refuses to pick one of two OLTs', function () {
+  // `stats` and `project.summary` run on projects that were never validated, so the derived numbers
+  // cannot rely on the save having been refused. Reporting the first OLT's ports for a plant with
+  // two of them is how an ambiguous plant reads as healthy on the signal page.
+  const twoRoots = {
+    nodes: [
+      { id: 'n1', type: 'olt', model: 'gpon-c-plus-8' },
+      { id: 'n2', type: 'olt', model: 'gpon-c-plus-16' }
+    ],
+    spans: []
+  };
+  const cap = engine.network.capacity(twoRoots, registry);
+  assert.strictEqual(cap.ports, null, 'capacity must not report the ports of one of two OLTs');
+  assert.strictEqual(cap.theoreticalMaxOnts, null, 'nor a maximum derived from one of them');
+  assert.ok(cap.problems.some(function (p) { return p.indexOf('exactly one olt/headend root') !== -1; }),
+    'capacity should say the plant has two roots, got: ' + cap.problems.join(' | '));
+  assert.ok(engine.network.stats(twoRoots, registry).capacity.problems.length > 0,
+    'stats must carry the same refusal, not a number');
 });
 
 test('unknown models are errors, except a closure which only warns', function () {
