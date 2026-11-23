@@ -5,13 +5,13 @@
   "label": "XGS-PON ONT 1x 10GE",
   "pon": "xgs-pon",
   "txPowerDbmMin": 4,
-  "txPowerDbmMax": 7,
+  "txPowerDbmMax": 9,
   "rxSensitivityDbm": -28,
-  "rxOverloadDbm": -7,
+  "rxOverloadDbm": -9,
   "ports": {
     "ge": 1
   },
-  "notes": "XGS-PON N1-class receiver. A GPON OLT and an XGS-PON ONT cannot share a PON port; the engine refuses the pair.",
+  "notes": "ITU-T G.9807.1 Table B.9.3: ONU sensitivity -28.0 dBm and minimum overload -9.0 dBm for every ODN class (N1/N2/E1/E2), met in the presence of G-PON and video overlay. Upstream mean launch per Table B.9.4: +4.0..+9.0 dBm. The class names describe the ODN loss the pair may span, not a difference in ONU receiver: a -28 dBm ONT is the N2-class receiver as much as the N1 one. A GPON OLT and an XGS-PON ONT cannot share a PON port; the engine refuses the pair. Replace with the bought ONT's datasheet before construction.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-G.9807.1/en",
   "tags": [
     "xgs-pon"
