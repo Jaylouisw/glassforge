@@ -185,3 +185,103 @@ POST /api/design/synthesise { "demand": "...", "headEnd": {...}, "applyToProject
 
 The plant is re-checked after the swap; a design that does not validate is refused and the project is
 left alone.
+
+## Site-to-site links (DC to DC)
+
+`POST /api/design/link` (engine: `link.design`) answers the other question: **two named sites, an
+optic at each end, no splitter and no ONT**. The result is a circuit, not a plant — two paths between
+the same pair of nodes is a cycle, and `network.validate` is right to warn about a cycle in a tree, so a
+link is never squeezed into the plant model.
+
+```
+POST /api/design/link
+{
+  "sites": { "a": { "name": "DC-West", "lat": 51.5000, "lon": -0.1020 },
+             "b": { "name": "DC-East", "lat": 51.5000, "lon": -0.0960 } },
+  "network": { "edges": [ ... imported duct or street geometry ... ] },
+  "optics": { "a": "sfp-plus-10g-er-40km", "b": "sfp-plus-10g-er-40km" },
+  "protection": "diverse",
+  "thirdParty": [ { "provider": "CityFibre", "lengthM": 300, "lossDb": 0.6, "cost": 1200, "leg": "b" } ]
+}
+```
+
+### Both legs are routed along the graph, never a chord
+
+`street.diversePaths` measures every leg on the supplied graph. There is no straight-line fallback while
+a graph is present: a chord for a duct route is the one number in the result nobody could defend, which
+is why `routedM` is the sum of street edges and `route` is the street geometry.
+
+A worked grid — two sites 415.3 m apart on the same latitude, with no street between them, and a north
+and a south street joining them at either end:
+
+| | measured on the graph |
+|---|---|
+| straight line A→B (not used) | 415.3 m |
+| A-leg, south street | **526.5 m** (415.3 + 2 × 55.6) |
+| B-leg, north street | **637.7 m** (415.3 + 2 × 111.2) |
+| shared duct | **0 m** |
+
+The legs are longer than the chord precisely because they went round the junction, and the corner
+points are in `route`, so the drawing and the BOM describe the same cable.
+
+`routeMethod` is `street-graph (N edges, X km)`, and every `runs[]` entry repeats it with its own
+`route`. Without a network the method is `straight-line x1.2`, there is one leg, and the result says
+that no protected pair can be drawn — it does not pretend otherwise.
+
+### Diversity is measured and printed
+
+The pair is the minimum-cost edge-disjoint pair the graph allows (Suurballe: shortest path, reverse its
+arcs at negative cost, shortest path in the residual graph, cancel the arcs used in opposite
+directions). A ring gives two legs of half the ring each and `sharedM: 0`.
+
+Where the graph offers no second route — one corridor into the building, the normal case — the second
+leg is the path that **shares the fewest metres**, and the sharing is reported rather than hidden:
+
+```jsonc
+"diversity": {
+  "achieved": false,
+  "sharedM": 415.32,
+  "shared": [ { "kind": "duct", "edgeId": "e1", "lengthM": 415.32, "from": {...}, "to": {...} } ],
+  "leasedSharedM": 0,
+  "sentence": "diverse except 415.32 m across 1 shared segment(s): 415.32 m of duct 51.500000,-0.102000 -> 51.500000,-0.096000 (e1)"
+}
+```
+
+A protected request whose legs share anything carries a warning quoting the same metres. Site drops
+(the snap distance from each building to the duct) are counted as shared, because both legs enter the
+same building the same way; a leased segment on `leg: "both"` is counted separately in
+`leasedSharedM`.
+
+### One budget per leg, and leased fibre that is not cable
+
+Each leg is its own `budget.pointToPoint` call, so reach, loss budget and overload are three separate
+verdicts **per leg**: an asymmetric circuit gets two answers, not an average. Reasons are prefixed with
+the leg they belong to (`A-leg: the route is 50038 m but the shorter optic reaches 40000 m`).
+
+A leased (third-party) segment carries a provider, a stated length and a stated loss. It is charged to
+the budget it belongs to, counted in the path length and in the cost, and **excluded from the cable
+metres** — nobody buys cable for a duct they rent:
+
+```jsonc
+"bom": { "cableM": 1164.22, "thirdParty": { "totalM": 300, "cost": 1200, "inCableBom": false } }
+```
+
+Lengths are reported three ways, because they answer three questions: `routedM` (measured on the graph),
+`ownM` (routed plus both site drops — the cable you buy) and `lengthM` (everything, leased included —
+the path the light takes).
+
+### Refusals
+
+- A site farther than `maxSnapM` (default 250 m) from the graph, or on another component: `ok: false`
+  with the site named. It is never snapped from afar.
+- A leg that exceeds the optic's reach, or lands above its overload point: `ok: false`, one reason per
+  leg, quoting the measured length and the reach (or the receive power and the overload point).
+- A leased segment with no `lossDb`: thrown. A leased span whose loss is unknown is not a figure, and
+  zero is not a default.
+
+### What it does not do
+
+- No amplifiers or regeneration, no CWDM/DWDM multi-wavelength budgets, no per-segment duct capacity.
+- No per-joint splice count for a fat cable: a joint splices the circuit's fibres (`fibres`, default 2),
+  and that is the budget's splice allowance, not a splice plan.
+- No UI yet: the endpoint and the engine are the contract this landed with.

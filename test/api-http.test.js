@@ -228,6 +228,34 @@ async function main() {
     assert.ok(withRoute.length > 0, 'routed spans carry their street geometry');
   });
 
+  const linkGrid = { edges: [
+    { id: 'north', coords: [{ lat: 51.5010, lon: -0.1020 }, { lat: 51.5010, lon: -0.0960 }] },
+    { id: 'south', coords: [{ lat: 51.4995, lon: -0.1020 }, { lat: 51.4995, lon: -0.0960 }] },
+    { id: 'a-north', coords: [{ lat: 51.5, lon: -0.1020 }, { lat: 51.5010, lon: -0.1020 }] },
+    { id: 'a-south', coords: [{ lat: 51.5, lon: -0.1020 }, { lat: 51.4995, lon: -0.1020 }] },
+    { id: 'b-north', coords: [{ lat: 51.5, lon: -0.0960 }, { lat: 51.5010, lon: -0.0960 }] },
+    { id: 'b-south', coords: [{ lat: 51.5, lon: -0.0960 }, { lat: 51.4995, lon: -0.0960 }] }
+  ] };
+  const dcLink = await request('POST', '/api/design/link', {
+    sites: { a: { name: 'DC-West', lat: 51.5, lon: -0.1020 }, b: { name: 'DC-East', lat: 51.5, lon: -0.0960 } },
+    network: linkGrid,
+    optics: { a: 'sfp-plus-10g-er-40km', b: 'sfp-plus-10g-er-40km' }
+  });
+  test('POST /api/design/link returns a routed, diverse circuit', function () {
+    assert.strictEqual(dcLink.status, 200);
+    assert.strictEqual(dcLink.body.ok, true, JSON.stringify(dcLink.body.reasons));
+    assert.strictEqual(dcLink.body.legs.length, 2);
+    assert.strictEqual(dcLink.body.diversity.sharedM, 0);
+    assert.ok(dcLink.body.routeMethod.indexOf('street-graph') === 0, dcLink.body.routeMethod);
+    assert.strictEqual(dcLink.body.bom.thirdParty.inCableBom, false);
+  });
+
+  const badLink = await request('POST', '/api/design/link', { sites: { a: { lat: 51.5, lon: -0.1 } } });
+  test('a link with one end is a 400 that says which end is missing', function () {
+    assert.strictEqual(badLink.status, 400);
+    assert.ok(badLink.body.error.indexOf('sites.b') !== -1, badLink.body.error);
+  });
+
   const unknown = await request('GET', '/api/nope');
   test('an unknown endpoint answers JSON, not an HTML error page', function () {
     assert.strictEqual(unknown.status, 404);

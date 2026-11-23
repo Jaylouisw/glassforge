@@ -148,3 +148,23 @@ fifty-first edit is the one that becomes permanent. The server persists projects
 
 The rule behind all five: a planner that invents a plausible number produces a design that fails on
 site, weeks later, where the cost is a crew and a drum of cable rather than a stack trace.
+
+## 9. A link is a circuit, not a plant
+
+A site-to-site link has two sites, an optic at each end, and (normally) two legs that must not share
+duct. It is deliberately **not** modelled as a plant: two paths between the same pair of nodes is a
+cycle, and §1 says a plant is a tree with one head-end. `link.design` returns a circuit instead:
+
+- **both legs are measured on the supplied graph** (`street.diversePaths`), never by a straight line
+  while a graph is present, and each leg keeps its street geometry as `route`;
+- **the pair is the minimum-cost edge-disjoint pair** the graph allows (Suurballe), and when the graph
+  allows none, the second leg is the path that shares the fewest metres — with every shared segment
+  reported and its metres, because "diverse except 180 m at the building entry" is the true answer;
+- **each leg is budgeted separately** by `budget.pointToPoint`: reach, loss budget and overload are
+  three verdicts per leg, and a reason is prefixed with the leg it belongs to;
+- **a leased segment is fibre somebody else owns**: its stated length and loss are charged to the leg's
+  budget and to the cost, and it never appears in the cable metres. A leased loss that is missing is an
+  error, not a zero — §8 applies to rented fibre exactly as it applies to bought fibre.
+
+A cable is bought per leg, because a protected circuit is two fibre paths. Nothing here changes the
+PON or active-tree paths: they share `computeOdn`, so a loss is computed once, in one place.

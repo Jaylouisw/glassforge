@@ -384,6 +384,17 @@ async function handle(req, res, ctx) {
     return sendJson(req, res, 200, engine.budget.opticalBudget(body.design || body, registry));
   }
 
+  if (pathname === '/api/design/link' && method === 'POST') {
+    // A site-to-site circuit: two sites, an optic at each end, both legs routed along the supplied
+    // duct graph. Refusals are 400s: a link without two sites is a caller error, not a server fault.
+    const body = await readJsonBody(req, MAX_UPLOAD_BYTES);
+    try {
+      return sendJson(req, res, 200, engine.link.design(body, registry));
+    } catch (err) {
+      throw asBadRequest(err);
+    }
+  }
+
   if (pathname === '/api/design/length' && method === 'POST') {
     const body = await readJsonBody(req);
     if (Array.isArray(body.points)) return sendJson(req, res, 200, engine.length.cableToBuyForRoute(body.points, body));

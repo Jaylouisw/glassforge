@@ -192,3 +192,31 @@ test('a head-end off the network is refused rather than snapped from far away', 
     }, registry);
   }, 'more than');
 });
+
+test('two legs can be found on a ring, and a single corridor reports what it shares', function () {
+  const ring = street.buildGraph({ edges: [
+    { id: 'ab', coords: [{ lat: 51.5, lon: -0.1 }, { lat: 51.5, lon: -0.099 }] },
+    { id: 'bc', coords: [{ lat: 51.5, lon: -0.099 }, { lat: 51.509, lon: -0.099 }] },
+    { id: 'cd', coords: [{ lat: 51.509, lon: -0.099 }, { lat: 51.509, lon: -0.1 }] },
+    { id: 'da', coords: [{ lat: 51.509, lon: -0.1 }, { lat: 51.5, lon: -0.1 }] }
+  ] });
+  const a = street.snap(ring, { lat: 51.5, lon: -0.1 }, { maxSnapM: 20 });
+  const c = street.snap(ring, { lat: 51.509, lon: -0.099 }, { maxSnapM: 20 });
+  const pair = street.diversePaths(ring, a.nodeId, c.nodeId);
+  assert.strictEqual(pair.disjoint, true);
+  assert.strictEqual(pair.sharedM, 0);
+  assert.strictEqual(pair.legs.length, 2);
+  const first = new Set(pair.legs[0].edges.map(function (e) { return e.edgeId; }));
+  const second = new Set(pair.legs[1].edges.map(function (e) { return e.edgeId; }));
+  for (const edgeId of first) assert.ok(!second.has(edgeId), edgeId + ' on both legs');
+
+  // One duct, no alternative: the second "leg" is the same route, and the report says how much of it
+  // is shared - 415.3 m of the 415.3 m, not "0 m, fully diverse".
+  const corridor = street.buildGraph({ edges: [{ id: 'duct', coords: [{ lat: 51.5, lon: -0.1020 }, { lat: 51.5, lon: -0.0960 }] }] });
+  const p = street.snap(corridor, { lat: 51.5, lon: -0.1020 }, { maxSnapM: 20 });
+  const q = street.snap(corridor, { lat: 51.5, lon: -0.0960 }, { maxSnapM: 20 });
+  const only = street.diversePaths(corridor, p.nodeId, q.nodeId);
+  assert.strictEqual(only.disjoint, false);
+  close(only.sharedM, only.legs[0].lengthM, 0.01, 'the whole corridor is shared');
+  assert.strictEqual(only.shared.length, 1);
+});

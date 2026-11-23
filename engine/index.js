@@ -17,6 +17,7 @@ const project = require('./project');
 const demand = require('./demand');
 const design = require('./design');
 const street = require('./street');
+const link = require('./link');
 
 module.exports = {
   fiber: fiber,
@@ -30,6 +31,7 @@ module.exports = {
   demand: demand,
   design: design,
   street: street,
+  link: link,
   createRegistry: parts.createRegistry,
   version: require('../package.json').version
 };

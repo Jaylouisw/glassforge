@@ -79,6 +79,33 @@ one operation (one undo step) *after* validating it; without it, the design is r
 written. Candidates that fail are returned with `feasible: false` and their reasons, never dropped.
 See [AUTO-DESIGN.md](AUTO-DESIGN.md).
 
+## Site-to-site links
+
+```
+POST /api/design/link
+  { sites: { a: { name?, lat, lon }, b: { name?, lat, lon } },
+    optics: { a: transceiver model, b: transceiver model },
+    network?: KML text | [polylines] | { edges: [{ coords }] },
+    protection?: "diverse" (default) | "single",
+    thirdParty?: [{ provider, lengthM, lossDb, leg?: "a"|"b"|"both", cost?, reference? }],
+    fibres?, cable?, ladder?, connectors?, splices?, marginDb?, maxSnapM?, joinToleranceM? }
+  → { ok, mode: "link", routeMethod, sites, legs, paths, runs, diversity, thirdParty, bom, verdict,
+      reasons, warnings, notes }
+```
+
+Two named sites and an optic at each end, with **both legs routed along the supplied duct/street
+graph** — there is no straight-line fallback while a graph is present. With `protection: "diverse"` the
+legs are the minimum-cost edge-disjoint pair (Suurballe) where the graph allows one; where it does not,
+the second leg is the path that shares the fewest metres and `diversity.shared` names every shared
+segment with its metres (`diversity.sharedM` is `null` when there is only one leg: there is nothing to
+compare). Each leg carries its own `budget` from `budget.pointToPoint`, so reach, loss
+budget and overload are three verdicts per leg. `legs[].routedM` is the graph measurement,
+`legs[].ownM` adds both site drops (the cable to buy) and `legs[].lengthM` adds leased segments.
+A leased segment is charged to the budget and the cost and is never in `bom.cableM`
+(`bom.thirdParty.inCableBom === false`). A site off the graph, a leg beyond the optic's reach or an
+overload is `ok: false` with a reason naming the leg; a body without two sites, or a leased segment
+with no `lossDb`, is a 400. See [AUTO-DESIGN.md](AUTO-DESIGN.md#site-to-site-links-dc-to-dc).
+
 ## Design calculations
 
 ```

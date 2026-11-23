@@ -3,6 +3,35 @@
 All notable changes to Glassforge. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-11-23
+
+Site-to-site links: a DC-to-DC circuit with both legs routed along the duct graph, diversity measured
+rather than assumed, and leased segments that are budgeted but never bought as cable.
+
+### Added
+
+- **`engine/link.js`** — `link.design(...)`: two named sites, an optic at each end, no splitter and no
+  ONT. Each leg is routed on the supplied graph and budgeted on its own with `budget.pointToPoint`, so
+  reach, loss budget and overload are three verdicts per leg. Lengths are reported as `routedM` (the
+  graph measurement), `ownM` (plus both site drops — the cable to buy) and `lengthM` (plus leased).
+- **`street.diversePaths`** — minimum-cost edge-disjoint legs (Suurballe with Johnson potentials over
+  the residual graph), falling back to the path that shares the fewest metres when the graph offers no
+  second route. Every shared segment is returned with its metres and its geometry.
+- **Leased (third-party) segments** — `{ provider, lengthM, lossDb, leg, cost }`: charged to the leg's
+  budget and to the cost, excluded from the cable BOM. A segment without a stated loss is refused.
+- **`budget.pointToPoint` third-party loss** — a leased span is a `third-party` line in the breakdown,
+  counted in the ODN loss and in the path length used for the reach check; `fibreLengthM` stays the
+  owned fibre, `leasedLengthM` and `pathLengthM` are reported beside it.
+- **`POST /api/design/link`** — the circuit as JSON: `legs`, `paths`, `runs` (each with `method` and
+  `route`), `diversity` (with a sentence), `thirdParty`, `bom` and a verdict.
+- 18 test suites / 174 assertions (was 17 / 157): `link-design` adds 14, `street-routing` adds
+  `diversePaths` (1), the API suite adds 2.
+
+### Changed
+
+- `docs/API.md`, `docs/AUTO-DESIGN.md` and `docs/SPEC.md` §9 describe the link contract; the README
+  lists what a link does and does not model.
+
 ## [0.3.0] — 2026-11-17
 
 Street routing: runs are measured, and drawn, along the streets instead of a detour factor.

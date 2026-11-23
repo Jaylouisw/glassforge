@@ -139,12 +139,41 @@ function computeOdn(design, wavelength, registry) {
     breakdown.push({ kind: 'splitter', label: 'splitter ' + (i + 1) + ' 1:' + part.ratio + ' ' + part.model, db: round(db, 3) });
   });
 
+  // --- third-party (leased) segments ---------------------------------------------
+  // A leased span is real fibre with a stated length and a stated loss, owned by somebody else. It is
+  // charged to the budget and counted in the path length, and it is not a cable span: nobody buys
+  // cable for a duct they rent. Every field is required - an unknown loss is refused, never zero.
+  let thirdPartyLossDb = 0;
+  let thirdPartyLengthM = 0;
+  const thirdPartyInput = design.thirdParty === undefined ? [] : design.thirdParty;
+  if (!Array.isArray(thirdPartyInput)) throw new TypeError('design.thirdParty must be an array of leased segments');
+  thirdPartyInput.forEach(function (segment, i) {
+    const where = 'design.thirdParty[' + i + ']';
+    if (!segment || typeof segment !== 'object') throw new TypeError(where + ' must be an object');
+    if (!segment.provider) throw new TypeError(where + '.provider is required - a leased segment names who owns it');
+    if (!isNum(segment.lengthM) || segment.lengthM < 0) {
+      throw new TypeError(where + '.lengthM must be a non-negative number (the stated length of the leased segment)');
+    }
+    if (!isNum(segment.lossDb) || segment.lossDb < 0) {
+      throw new TypeError(where + '.lossDb must be a non-negative number - a leased segment states its loss, it is never assumed to be zero');
+    }
+    thirdPartyLossDb += segment.lossDb;
+    thirdPartyLengthM += segment.lengthM;
+    breakdown.push({
+      kind: 'third-party',
+      label: 'leased ' + segment.provider + ' ' + Math.round(segment.lengthM) + ' m (' + segment.lossDb + ' dB)',
+      db: round(segment.lossDb, 3)
+    });
+  });
+
   return {
     fibreDb: fibreDb,
     fibreLengthM: fibreLengthM,
     spliceLossDb: spliceLossDb,
     connectorLossDb: connectorLossDb,
     splitterLossDb: splitterLossDb,
+    thirdPartyLossDb: round(thirdPartyLossDb, 3),
+    thirdPartyLengthM: round(thirdPartyLengthM, 2),
     cascadeRatio: cascadeRatio,
     breakdown: breakdown,
     warnings: [],
@@ -212,7 +241,7 @@ function opticalBudget(design, registry) {
     txDbm = design.txDbm;
   }
 
-  const odnLossDb = round(odn.fibreDb + odn.spliceLossDb + odn.connectorLossDb + odn.splitterLossDb, 3);
+  const odnLossDb = round(odn.fibreDb + odn.spliceLossDb + odn.connectorLossDb + odn.splitterLossDb + odn.thirdPartyLossDb, 3);
   const totalLossDb = round(odnLossDb + allowanceDb, 3);
   const rxPowerDbm = round(txDbm - totalLossDb, 2);
 
@@ -262,6 +291,7 @@ function opticalBudget(design, registry) {
     classHeadroomDb: classHeadroomDb,
     cascadeRatio: odn.cascadeRatio,
     fibreLengthM: round(odn.fibreLengthM, 1),
+    leasedLengthM: round(odn.thirdPartyLengthM, 1),
     breakdown: odn.breakdown,
     reasons: reasons,
     warnings: warnings
@@ -329,7 +359,7 @@ function pointToPoint(design, registry) {
     ? { sensitivity: cpe.rxSensitivityDbm, overload: cpe.rxOverloadDbm, who: 'customer optic ' + cpe.model }
     : { sensitivity: headEnd.rxSensitivityDbm, overload: headEnd.rxOverloadDbm, who: 'head-end optic ' + headEnd.model };
 
-  const odnLossDb = round(odn.fibreDb + odn.spliceLossDb + odn.connectorLossDb + odn.splitterLossDb, 3);
+  const odnLossDb = round(odn.fibreDb + odn.spliceLossDb + odn.connectorLossDb + odn.splitterLossDb + odn.thirdPartyLossDb, 3);
   const totalLossDb = round(odnLossDb + allowanceDb, 3);
   const rxPowerDbm = round(txDbm - totalLossDb, 2);
   const budgetDb = round(headEnd.txPowerDbmMin - cpe.rxSensitivityDbm, 2);
@@ -347,8 +377,9 @@ function pointToPoint(design, registry) {
   if (classHeadroomDb < 0) {
     reasons.push('link loss ' + odnLossDb + ' dB exceeds the ' + budgetDb + ' dB this optic pair can afford');
   }
-  if (odn.fibreLengthM > reachM) {
-    reasons.push('the route is ' + Math.round(odn.fibreLengthM) + ' m but the shorter optic reaches ' + reachM + ' m');
+  const pathLengthM = round(odn.fibreLengthM + odn.thirdPartyLengthM, 2);
+  if (pathLengthM > reachM) {
+    reasons.push('the route is ' + Math.round(pathLengthM) + ' m but the shorter optic reaches ' + reachM + ' m');
   }
 
   const verdict = verdictFor(headroomDb, marginDb, classHeadroomDb, reasons);
@@ -374,6 +405,9 @@ function pointToPoint(design, registry) {
     classHeadroomDb: classHeadroomDb,
     cascadeRatio: 1,
     fibreLengthM: round(odn.fibreLengthM, 1),
+    leasedLengthM: round(odn.thirdPartyLengthM, 1),
+    pathLengthM: round(pathLengthM, 1),
+    thirdPartyLossDb: odn.thirdPartyLossDb,
     reachM: reachM,
     breakdown: odn.breakdown,
     reasons: reasons,

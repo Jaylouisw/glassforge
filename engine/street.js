@@ -536,6 +536,280 @@ function routePath(graph, rootId, nodeId, spt) {
   return pathFromParents(graph, rootId, nodeId, tree.parent);
 }
 
+// ---------------------------------------------------------------- protected (diverse) legs
+
+function nodePoint(graph, nodeId) {
+  const node = graph.nodes.get(nodeId);
+  return { lat: node.lat, lon: node.lon };
+}
+
+/** Every arc of the graph in both directions, grouped by start node, sorted by edge id. */
+function allArcs(graph) {
+  const byNode = new Map();
+  for (const id of graph.nodes.keys()) byNode.set(id, []);
+  for (const edgeId of Array.from(graph.edges.keys()).sort(cmp)) {
+    const edge = graph.edges.get(edgeId);
+    byNode.get(edge.a).push({ to: edge.b, edgeId: edgeId, dir: 0, cost: edge.lengthM });
+    byNode.get(edge.b).push({ to: edge.a, edgeId: edgeId, dir: 1, cost: edge.lengthM });
+  }
+  return byNode;
+}
+
+/**
+ * Dijkstra over an arc map that carries its own costs (the residual graph's costs are not
+ * `edge.lengthM`). Returns `{ arcs, cost }` or null when `toId` is unreachable.
+ */
+function shortestArcs(graph, byNode, fromId, toId) {
+  if (!graph.nodes.has(fromId) || !graph.nodes.has(toId)) return null;
+  const dist = new Map();
+  const arrive = new Map();
+  const visited = new Set();
+  const order = Array.from(graph.nodes.keys()).sort(cmp);
+  for (const id of order) dist.set(id, Infinity);
+  dist.set(fromId, 0);
+
+  while (true) {
+    let current = null;
+    let best = Infinity;
+    for (const id of order) {
+      if (visited.has(id)) continue;
+      const d = dist.get(id);
+      if (d < best - 1e-9) { best = d; current = id; }
+    }
+    if (current === null) break;
+    if (current === toId) break;
+    visited.add(current);
+    const arcs = (byNode.get(current) || []).slice().sort(function (x, y) {
+      return cmp(x.edgeId + ':' + x.dir, y.edgeId + ':' + y.dir);
+    });
+    for (const arc of arcs) {
+      const candidate = dist.get(current) + arc.cost;
+      if (candidate < dist.get(arc.to) - 1e-9) {
+        dist.set(arc.to, candidate);
+        arrive.set(arc.to, { from: current, edgeId: arc.edgeId, dir: arc.dir, cost: arc.cost });
+      }
+    }
+  }
+  if (!isFinite(dist.get(toId))) return null;
+
+  const arcs = [];
+  let cursor = toId;
+  const guard = new Set();
+  while (cursor !== fromId) {
+    if (guard.has(cursor)) throw new Error('cycle in a shortest-path search at ' + cursor);
+    guard.add(cursor);
+    const step = arrive.get(cursor);
+    if (!step) return null;
+    arcs.push({ from: step.from, to: cursor, edgeId: step.edgeId, dir: step.dir, cost: step.cost });
+    cursor = step.from;
+  }
+  arcs.reverse();
+  return { arcs: arcs, cost: dist.get(toId) };
+}
+
+/** Turn a continuous arc chain into `{ nodes, edges, lengthM, route }`. */
+function legFromArcs(graph, fromId, arcs) {
+  const nodes = [fromId];
+  const edges = [];
+  const route = [];
+  let lengthM = 0;
+  let cursor = fromId;
+  for (const arc of arcs) {
+    if (arc.from !== cursor) throw new Error('the routed leg is not continuous at ' + cursor);
+    const edge = graph.edges.get(arc.edgeId);
+    const points = edge.a === arc.from ? edge.geometry : edge.geometry.slice().reverse();
+    for (const point of points) {
+      const last = route[route.length - 1];
+      if (!last || last.lat !== point.lat || last.lon !== point.lon) {
+        route.push({ lat: point.lat, lon: point.lon });
+      }
+    }
+    edges.push({
+      edgeId: edge.id,
+      from: arc.from,
+      to: arc.to,
+      lengthM: round(edge.lengthM, 2),
+      fromPoint: nodePoint(graph, arc.from),
+      toPoint: nodePoint(graph, arc.to)
+    });
+    lengthM += edge.lengthM;
+    cursor = arc.to;
+    nodes.push(arc.to);
+  }
+  return { nodes: nodes, edges: edges, lengthM: round(lengthM, 2), route: route };
+}
+
+/** First path found over a pool of arcs (breadth-first, so it is deterministic), or null. */
+function pathOverArcs(arcs, fromId, toId) {
+  const byNode = new Map();
+  for (const arc of arcs) {
+    if (!byNode.has(arc.from)) byNode.set(arc.from, []);
+    byNode.get(arc.from).push(arc);
+  }
+  for (const list of byNode.values()) {
+    list.sort(function (a, b) { return cmp(a.edgeId + ':' + a.dir, b.edgeId + ':' + b.dir); });
+  }
+  const prev = new Map();
+  prev.set(fromId, null);
+  const queue = [fromId];
+  while (queue.length) {
+    const node = queue.shift();
+    if (node === toId) break;
+    for (const arc of byNode.get(node) || []) {
+      if (prev.has(arc.to)) continue;
+      prev.set(arc.to, { arc: arc, from: node });
+      queue.push(arc.to);
+    }
+  }
+  if (!prev.has(toId)) return null;
+  const path = [];
+  let cursor = toId;
+  while (cursor !== fromId) {
+    const step = prev.get(cursor);
+    path.push(step.arc);
+    cursor = step.from;
+  }
+  return path.reverse();
+}
+
+function legOrderKey(leg) {
+  return leg.lengthM.toFixed(3) + '|' + leg.edges.map(function (e) { return e.edgeId; }).join(',');
+}
+
+/** Legs are ordered by length then by edge-id sequence: a re-run cannot swap them. */
+function orderLegs(legs) {
+  return legs.slice().sort(function (a, b) { return cmp(legOrderKey(a), legOrderKey(b)); });
+}
+
+/**
+ * Two legs between the same pair of nodes, as diverse as the graph allows.
+ *
+ * Suurballe's algorithm: find the shortest path, reverse its arcs at negative cost, find the shortest
+ * path in that residual graph (Johnson potentials, taken from the first shortest-path tree, keep every
+ * residual cost non-negative), then cancel the arcs the two searches used in opposite directions. What
+ * is left decomposes into two edge-disjoint paths - and only then does "protected" mean anything.
+ *
+ * A ring gives two legs of half the ring each and 0 m shared. When the graph offers no second route at
+ * all (one corridor into the building, the normal case), falling back to "two shortest paths" would
+ * have returned the SAME path twice and called it diverse, so the fallback is instead the cheapest path
+ * that minimises *shared metres* (shared edges carry a penalty larger than the whole network) and the
+ * shared segments are returned by name with their metres. "Diverse until the last duct" is a real
+ * answer and it is printed, not hidden.
+ *
+ * Returns null when the graph does not connect the two nodes at all.
+ */
+function diversePaths(graph, fromId, toId, opts) {
+  const o = opts || {};
+  if (!graph || !graph.nodes.has(fromId) || !graph.nodes.has(toId)) return null;
+  if (fromId === toId) throw new Error('a link needs two different points on the network');
+
+  const first = shortestArcs(graph, allArcs(graph), fromId, toId);
+  if (!first) return null;
+
+  const usedByFirst = new Map();
+  for (const arc of first.arcs) usedByFirst.set(arc.edgeId, arc.dir);
+
+  // Residual graph. A first-path arc is only available reversed and at negative cost; every other
+  // edge is available both ways. Potentials h() are the first-path distances.
+  const tree = dijkstra(graph, fromId);
+  const residual = new Map();
+  for (const id of graph.nodes.keys()) residual.set(id, []);
+  function pushResidual(edge, dir, cost) {
+    const from = dir === 0 ? edge.a : edge.b;
+    const to = dir === 0 ? edge.b : edge.a;
+    const hFrom = tree.dist.get(from);
+    const hTo = tree.dist.get(to);
+    if (!isFinite(hFrom) || !isFinite(hTo)) return;
+    residual.get(from).push({ to: to, edgeId: edge.id, dir: dir, cost: cost + hFrom - hTo });
+  }
+  for (const edgeId of Array.from(graph.edges.keys()).sort(cmp)) {
+    const edge = graph.edges.get(edgeId);
+    if (usedByFirst.has(edgeId)) {
+      pushResidual(edge, 1 - usedByFirst.get(edgeId), -edge.lengthM);
+    } else {
+      pushResidual(edge, 0, edge.lengthM);
+      pushResidual(edge, 1, edge.lengthM);
+    }
+  }
+
+  const second = shortestArcs(graph, residual, fromId, toId);
+  if (second) {
+    // Cancel arcs the two searches used in opposite directions.
+    const byEdge = new Map();
+    for (const arc of first.arcs.concat(second.arcs)) {
+      if (!byEdge.has(arc.edgeId)) byEdge.set(arc.edgeId, []);
+      byEdge.get(arc.edgeId).push(arc);
+    }
+    const pool = [];
+    for (const edgeId of Array.from(byEdge.keys()).sort(cmp)) {
+      const group = byEdge.get(edgeId);
+      if (group.length === 2 && group[0].dir !== group[1].dir) continue;
+      pool.push(group[0]);
+    }
+    const firstLeg = pathOverArcs(pool, fromId, toId);
+    if (firstLeg) {
+      const rest = pool.filter(function (arc) { return firstLeg.indexOf(arc) === -1; });
+      const secondLeg = pathOverArcs(rest, fromId, toId);
+      if (secondLeg) {
+        const legs = orderLegs([
+          legFromArcs(graph, fromId, firstLeg),
+          legFromArcs(graph, fromId, secondLeg)
+        ]);
+        const seen = new Set();
+        let disjoint = true;
+        for (const leg of legs) {
+          for (const edge of leg.edges) {
+            if (seen.has(edge.edgeId)) disjoint = false;
+            seen.add(edge.edgeId);
+          }
+        }
+        if (disjoint) {
+          return { legs: legs, shared: [], sharedM: 0, disjoint: true, method: 'suurballe' };
+        }
+      }
+    }
+  }
+
+  // No edge-disjoint pair exists. Take the cheapest path that shares the fewest metres with the first
+  // one: a shared edge costs more than the entire network, so the search avoids sharing before it
+  // shortens itself.
+  let totalM = 0;
+  for (const edge of graph.edges.values()) totalM += edge.lengthM;
+  const weighted = allArcs(graph);
+  for (const list of weighted.values()) {
+    for (const arc of list) if (usedByFirst.has(arc.edgeId)) arc.cost += totalM + 1;
+  }
+  const alternate = shortestArcs(graph, weighted, fromId, toId);
+  if (!alternate) {
+    return { legs: [legFromArcs(graph, fromId, first.arcs)], shared: [], sharedM: 0, disjoint: false, method: 'single-route' };
+  }
+
+  const alternateEdges = new Set(alternate.arcs.map(function (a) { return a.edgeId; }));
+  const shared = [];
+  let sharedM = 0;
+  for (const arc of first.arcs) {
+    if (!alternateEdges.has(arc.edgeId)) continue;
+    const edge = graph.edges.get(arc.edgeId);
+    shared.push({
+      kind: 'duct',
+      edgeId: edge.id,
+      lengthM: round(edge.lengthM, 2),
+      from: nodePoint(graph, arc.from),
+      to: nodePoint(graph, arc.to),
+      route: edge.a === arc.from ? edge.geometry.slice() : edge.geometry.slice().reverse()
+    });
+    sharedM += edge.lengthM;
+  }
+
+  return {
+    legs: orderLegs([legFromArcs(graph, fromId, first.arcs), legFromArcs(graph, fromId, alternate.arcs)]),
+    shared: shared,
+    sharedM: round(sharedM, 2),
+    disjoint: sharedM === 0,
+    method: o.method || 'fewest-shared-metres'
+  };
+}
+
 module.exports = {
   VERTEX_PRECISION: VERTEX_PRECISION,
   DEFAULT_JOIN_M: DEFAULT_JOIN_M,
@@ -549,5 +823,6 @@ module.exports = {
   snap: snap,
   dijkstra: dijkstra,
   routedTree: routedTree,
-  routePath: routePath
+  routePath: routePath,
+  diversePaths: diversePaths
 };
