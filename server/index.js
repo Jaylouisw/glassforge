@@ -469,8 +469,17 @@ async function handle(req, res, ctx) {
     const isKmz = /kmz/.test(type) || (buf.length > 4 && buf.readUInt32LE(0) === 0x04034b50);
     const isJson = /json/.test(type);
     let input;
-    if (isKmz) input = engine.kml.kmzToKml(buf);
-    else if (isJson) {
+    if (isKmz) {
+      // A zip we cannot read - no central directory, or no .kml inside it - is the uploader's file,
+      // not a broken server. `/api/import/kml` already answers 400 for these bytes; leaving this
+      // call outside a try sent the zip parser's sentence through the generic handler as a 500,
+      // so one endpoint called the same upload "your mistake" and the other "the server broke".
+      try {
+        input = engine.kml.kmzToKml(buf);
+      } catch (err) {
+        throw asBadRequest(err);
+      }
+    } else if (isJson) {
       try {
         input = JSON.parse(buf.toString('utf8'));
       } catch (err) {

@@ -295,6 +295,23 @@ async function main() {
     assert.ok(/kml/i.test(notKml.body.error), notKml.body.error);
   });
 
+  // A KMZ is a zip the caller uploads. Bytes that are not a zip are the caller's mistake, exactly like
+  // text that is not KML - and `/api/import/kml` already answers 400 for them. The network importer
+  // decoded the same bytes outside its try, so the zip parser's sentence ("not a zip archive...")
+  // reached the generic handler and came back as 500: the caller was told the server had broken when
+  // their file had. Two importers, one contract.
+  const corruptKmz = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.from('not a zip archive')]);
+  const badKmzKml = await request('POST', '/api/import/kml', corruptKmz, { 'Content-Type': 'application/vnd.google-earth.kmz' });
+  const badKmzNetwork = await request('POST', '/api/import/network', corruptKmz, { 'Content-Type': 'application/vnd.google-earth.kmz' });
+  test('an undecodable KMZ is a 400 from both importers, not a 500', function () {
+    assert.strictEqual(badKmzKml.status, 400, 'status ' + badKmzKml.status + ': ' + JSON.stringify(badKmzKml.body));
+    assert.strictEqual(badKmzNetwork.status, 400,
+      'status ' + badKmzNetwork.status + ': ' + JSON.stringify(badKmzNetwork.body));
+    assert.ok(/zip/i.test(badKmzNetwork.body.error), badKmzNetwork.body.error);
+    assert.strictEqual(badKmzNetwork.body.error, badKmzKml.body.error,
+      'the two importers must give the same reason for the same bytes');
+  });
+
   const linkGrid = { edges: [
     { id: 'north', coords: [{ lat: 51.5010, lon: -0.1020 }, { lat: 51.5010, lon: -0.0960 }] },
     { id: 'south', coords: [{ lat: 51.4995, lon: -0.1020 }, { lat: 51.4995, lon: -0.0960 }] },
