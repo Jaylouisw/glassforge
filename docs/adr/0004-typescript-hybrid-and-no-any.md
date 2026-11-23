@@ -22,8 +22,10 @@ touched for another reason.
 - `tsconfig.json` compiles in place: `engine/foo.ts` → `engine/foo.js`. The emitted `.js` is **committed**,
   so a clone still runs with no install and no build.
 - CI installs the compiler, builds, and fails when the committed output disagrees with its source
-  (`npm run build && git diff --exit-code`). Generated code that is not reproducible is a lie about
-  what was reviewed.
+  (`npm run build && test -z "$(git status --porcelain -- '*.js' '*.d.ts')"`). The check is porcelain on
+  the emitted extensions rather than `git diff --exit-code`, because a brand-new emitted file is
+  *untracked*: a branch that adds a `.ts` and forgets its `.js` changes no tracked file and sails
+  through a diff check. Generated code that is not reproducible is a lie about what was reviewed.
 - A `.ts` module reaches a legacy `.js` module with `require()` plus a local interface. Mixing `allowJs`
   with an in-place `outDir` makes tsc try to overwrite its own inputs (TS5055), and the alternative —
   a `src/`→`dist/` split — would break every existing `require('./engine/...')` path for no gain.

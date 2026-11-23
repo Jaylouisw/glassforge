@@ -20,7 +20,9 @@ Read `docs/SPEC.md` for the model and `GLOSSARY.md` for the vocabulary before ch
 - **TypeScript for new modules, and never `any`.** New code is written `.ts`; legacy `.js` migrates as it
   is touched (`allowJs` is off, so a `.ts` module reaches a `.js` one with `require()` plus a local
   interface). The emitted `.js` is committed — build before you push, or CI fails on
-  `npm run build && git diff --exit-code`. `any` is refused by `scripts/check-no-any.js`; use `unknown`
+  `npm run build && test -z "$(git status --porcelain -- '*.js' '*.d.ts')"`. It is a porcelain check, not
+  `git diff --exit-code`: a brand-new emitted file is *untracked*, so a branch that adds a `.ts` and
+  forgets its `.js` passes a diff check. `any` is refused by `scripts/check-no-any.js`; use `unknown`
   and narrow it. See `docs/adr/0004-typescript-hybrid-and-no-any.md`.
 
 ## Work
