@@ -228,6 +228,47 @@ async function main() {
     assert.ok(withRoute.length > 0, 'routed spans carry their street geometry');
   });
 
+  // A design calculator is handed a design by the caller, not a saved project, so a design it cannot
+  // use is the caller's mistake: 400 with the field named. A 500 told the caller the server was broken
+  // when their request was, which is exactly the confusion `asBadRequest` exists to end.
+  const badBudget = await request('POST', '/api/design/budget', { design: {} });
+  test('a budget with no OLT is a 400 naming the field, not a 500', function () {
+    assert.strictEqual(badBudget.status, 400, 'status ' + badBudget.status + ': ' + JSON.stringify(badBudget.body));
+    assert.ok(badBudget.body.error.indexOf('design.olt.model') !== -1, badBudget.body.error);
+  });
+
+  const badLength = await request('POST', '/api/design/length', {});
+  const goodLength = await request('POST', '/api/design/length', { routeM: 3000 });
+  test('a cable calculation with no route is a 400, and a real one still answers', function () {
+    assert.strictEqual(badLength.status, 400, 'status ' + badLength.status + ': ' + JSON.stringify(badLength.body));
+    assert.ok(badLength.body.error.indexOf('routeM') !== -1, badLength.body.error);
+    // 3.0 km + 3% overlength = 3090 m, which is two 2000 m drums
+    assert.strictEqual(goodLength.status, 200);
+    assert.strictEqual(goodLength.body.designM, 3090);
+    assert.strictEqual(goodLength.body.drums, 2);
+  });
+
+  const splitOk = await request('GET', '/api/design/splitter?ratio=8');
+  const splitZero = await request('GET', '/api/design/splitter?ratio=0');
+  const splitText = await request('GET', '/api/design/splitter?ratio=abc');
+  const splitEmpty = await request('GET', '/api/design/splitter?ratio=');
+  test('a split ratio that is not a positive integer is refused, not answered with null', function () {
+    assert.strictEqual(splitOk.status, 200);
+    assert.strictEqual(splitOk.body.idealSplitLossDb, 9.03, '10 x log10(8) = 9.03 dB');
+    // JSON.stringify(-Infinity) is `null`: the old endpoint answered 200 with a null loss figure,
+    // and `Number('')` is 0, so an empty parameter became a 1:0 splitter.
+    for (const bad of [splitZero, splitText, splitEmpty]) {
+      assert.strictEqual(bad.status, 400, 'status ' + bad.status + ': ' + JSON.stringify(bad.body));
+      assert.ok(bad.body.error.indexOf('ratio') !== -1, bad.body.error);
+    }
+  });
+
+  const notKml = await request('POST', '/api/import/kml', Buffer.from('definitely not a kml document'), { 'Content-Type': 'text/plain' });
+  test('a file that is not KML is a 400, the same answer the network importer gives', function () {
+    assert.strictEqual(notKml.status, 400, 'status ' + notKml.status + ': ' + JSON.stringify(notKml.body));
+    assert.ok(/kml/i.test(notKml.body.error), notKml.body.error);
+  });
+
   const linkGrid = { edges: [
     { id: 'north', coords: [{ lat: 51.5010, lon: -0.1020 }, { lat: 51.5010, lon: -0.0960 }] },
     { id: 'south', coords: [{ lat: 51.4995, lon: -0.1020 }, { lat: 51.4995, lon: -0.0960 }] },
@@ -253,8 +294,7 @@ async function main() {
   const badLink = await request('POST', '/api/design/link', { sites: { a: { lat: 51.5, lon: -0.1 } } });
   test('a link with one end is a 400 that says which end is missing', function () {
     assert.strictEqual(badLink.status, 400);
-    assert.ok(badLink.body.error.indexOf('sites.b') !== -1, badLink.body.error);
-  });
+    assert.ok(badLink.body.error.indexOf('sites.b') !== -1, badLink.body.error);  });
 
   const unknown = await request('GET', '/api/nope');
   test('an unknown endpoint answers JSON, not an HTML error page', function () {

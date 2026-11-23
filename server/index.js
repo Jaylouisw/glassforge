@@ -380,8 +380,17 @@ async function handle(req, res, ctx) {
   }
 
   if (pathname === '/api/design/budget' && method === 'POST') {
+    // The caller hands us a design, not a saved project: a design with no OLT model is their
+    // mistake, so it is a 400 that names the field. Letting the engine's TypeError escape said
+    // "internal error" and told the caller the server was broken when their request was.
     const body = await readJsonBody(req);
-    return sendJson(req, res, 200, engine.budget.opticalBudget(body.design || body, registry));
+    let result;
+    try {
+      result = engine.budget.opticalBudget(body.design || body, registry);
+    } catch (err) {
+      throw asBadRequest(err);
+    }
+    return sendJson(req, res, 200, result);
   }
 
   if (pathname === '/api/design/link' && method === 'POST') {
@@ -397,12 +406,28 @@ async function handle(req, res, ctx) {
 
   if (pathname === '/api/design/length' && method === 'POST') {
     const body = await readJsonBody(req);
-    if (Array.isArray(body.points)) return sendJson(req, res, 200, engine.length.cableToBuyForRoute(body.points, body));
-    return sendJson(req, res, 200, engine.length.cableToBuy(body));
+    let result;
+    try {
+      result = Array.isArray(body.points)
+        ? engine.length.cableToBuyForRoute(body.points, body)
+        : engine.length.cableToBuy(body);
+    } catch (err) {
+      throw asBadRequest(err);
+    }
+    return sendJson(req, res, 200, result);
   }
 
   if (pathname === '/api/design/splitter') {
-    const ratio = Number(url.searchParams.get('ratio') || 8);
+    // A split ratio is an integer division factor. `Number('')` is 0 and `Math.log10(0)` is
+    // -Infinity, which JSON turns into `null`, so the old endpoint answered 200 with no loss
+    // figure at all for ratio=0, ratio=abc and a bare `?ratio=`. A figure that cannot be
+    // computed is refused by name, never returned as null.
+    const raw = url.searchParams.get('ratio');
+    const ratio = raw === null ? 8 : Number(raw);
+    if (!Number.isInteger(ratio) || ratio < 2) {
+      return fail(req, res, 400, 'ratio must be a whole split ratio of 2 or more (e.g. 8, 16, 32), got "' +
+        (raw === null ? '' : raw) + '"');
+    }
     const ideal = 10 * Math.log10(ratio);
     return sendJson(req, res, 200, { ratio: ratio, idealSplitLossDb: Math.round(ideal * 100) / 100 });
   }
@@ -442,8 +467,17 @@ async function handle(req, res, ctx) {
     const buf = await readBody(req, MAX_UPLOAD_BYTES);
     const isKmz = /kmz/.test(String(req.headers['content-type'] || '')) ||
       (buf.length > 4 && buf.readUInt32LE(0) === 0x04034b50);
-    const parsed = isKmz ? engine.kml.parseKmz(buf) : engine.kml.parseKml(buf.toString('utf8'));
-    const classified = engine.kml.classify(parsed, {});
+    // A file that is not KML is the uploader's mistake, and `/api/import/network` already says so
+    // with a 400 for the same bytes. This endpoint answered 500, which reads as "the importer is
+    // broken" - it is not, the file is.
+    let parsed;
+    let classified;
+    try {
+      parsed = isKmz ? engine.kml.parseKmz(buf) : engine.kml.parseKml(buf.toString('utf8'));
+      classified = engine.kml.classify(parsed, {});
+    } catch (err) {
+      throw asBadRequest(err);
+    }
     return sendJson(req, res, 200, Object.assign({ name: parsed.name, unsupported: parsed.unsupported }, classified));
   }
 
