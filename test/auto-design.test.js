@@ -204,3 +204,23 @@ test('a cost model changes the objective, and the output says which one it used'
   assert.strictEqual(byCost.objective, 'cost');
   assert.ok(byCost.best.metrics.cost > 0);
 });
+
+test('the design BOM buys each cable on its own drum length, rounded once', function () {
+  const out = engine.design.synthesise(street(30, 0.0008), { headEnd: HEAD_END }, registry);
+  const candidate = out.candidates.filter(function (c) { return c.feasible; })[0];
+  assert.ok(candidate, 'a feasible candidate');
+  assert.ok(candidate.bom.lines.length > 0, 'the winner has a cable to buy');
+  let sawShortDrum = false;
+  for (const line of candidate.bom.lines) {
+    const part = registry.get('cable', line.model);
+    // The drum length is a property of the cable: 1-fibre drop cable ships on a 1 km drum. The design
+    // BOM used to hardcode 2 km for every model, so 915 m of drop was bought as 2000 m - a drum of a
+    // product this cable is not sold on - and a 2500 m run would have been bought as 4000 m.
+    assert.strictEqual(line.drumM, part.drumM, line.model + ' drum length');
+    const drums = Math.ceil(line.designM / part.drumM);
+    assert.strictEqual(line.drums, drums, line.model + ' drums for ' + line.designM + ' m');
+    assert.strictEqual(line.purchaseM, drums * part.drumM, line.model + ' purchased metres');
+    if (part.drumM !== 2000) sawShortDrum = true;
+  }
+  assert.ok(sawShortDrum, 'the winner carries a cable whose drum is not 2 km, or this test proves nothing');
+});

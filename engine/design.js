@@ -786,21 +786,26 @@ function bomOf(plant, registry, opts) {
     // Cable is priced roughly with its fibre count, so the objective is fibre-metres, not metres: a
     // 24-fibre trunk is not the same purchase as a 12-fibre distribution run of the same length.
     fibreMetres += span.lengthM * bundles * cable.fiberCount;
-    const prev = byModel.get(cable.model) || { model: cable.model, label: cable.label, fiberCount: cable.fiberCount, routeM: 0, fibres: 0 };
+    const prev = byModel.get(cable.model) || { model: cable.model, label: cable.label, fiberCount: cable.fiberCount, routeM: 0, fibres: 0, drumM: cable.drumM };
     prev.routeM = round(prev.routeM + span.lengthM * bundles, 1);
     prev.fibres += span.strands ? span.strands.length : 0;
     byModel.set(cable.model, prev);
   }
   const lines = Array.from(byModel.values()).map(function (row) {
-    const calc = lengthModule.cableToBuy({ routeM: row.routeM, overlengthPct: opts.overlengthPct, splices: 0, closures: 0, drumM: 2000 });
+    // The drum is the cable's own: 1-fibre drop ships on 1 km, trunk on 2 km. A hardcoded 2 km here
+    // bought 915 m of drop as 2000 m - a drum of a product that cable is not sold on - and charged a
+    // 2500 m run as 4000 m. Rounding stays once per model, on the aggregate.
+    const calc = lengthModule.cableToBuy({ routeM: row.routeM, overlengthPct: opts.overlengthPct, splices: 0, closures: 0, drumM: row.drumM });
     return {
       model: row.model,
       label: row.label,
       fiberCount: row.fiberCount,
       routeM: row.routeM,
       designM: calc.designM,
+      drumM: calc.drumM,
       drums: calc.drums,
-      purchaseM: calc.purchaseM
+      purchaseM: calc.purchaseM,
+      spareM: calc.spareM
     };
   }).sort(function (a, b) { return cmpIds(a.model, b.model); });
 

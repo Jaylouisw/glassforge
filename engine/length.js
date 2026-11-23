@@ -165,6 +165,10 @@ function billOfMaterials(plant, registry, opts) {
       drumM: cable.drumM || o.drumM,
       minimumPurchaseM: o.minimumPurchaseM
     });
+    // Metres only. A span line is here to trace the aggregate back to the map; the drum count and the
+    // purchase belong to the per-model row below, because rounding each span would buy a drum per run.
+    // (This line used to carry `drums`/`purchaseM`/`spareM` computed per span, so two 500 m runs of one
+    // cable read as "1 drum, 2000 m bought" each while the model line correctly said one drum.)
     lines.push({
       span: span.id || '#' + i,
       from: span.from,
@@ -172,10 +176,7 @@ function billOfMaterials(plant, registry, opts) {
       cable: cable.model,
       fiberCount: cable.fiberCount,
       routeM: calc.routeM,
-      designM: calc.designM,
-      drums: calc.drums,
-      purchaseM: calc.purchaseM,
-      spareM: calc.spareM
+      designM: calc.designM
     });
     const prev = byModel.get(cable.model) || { model: cable.model, label: cable.label, fiberCount: cable.fiberCount, designM: 0, drumM: cable.drumM || o.drumM || 0, lengths: 0 };
     prev.designM = round(prev.designM + calc.designM, 2);

@@ -111,9 +111,13 @@ purchase      = ceil(design length / drum) × drum
   lengths that have to reach the tray and come back out.
 - **Drums are rounded once per cable model**, on the total. Rounding per span buys a spare drum for
   every short run on the map.
+- **The drum is the cable's own** (`parts/cable/*.json` `drumM`): 1-fibre drop ships on 1 km, trunk on
+  2 km. A drum length assumed from the trunk ladder buys drop cable on a drum nobody sells it on.
 
-The BOM is per cable model, with `designM`, `drums`, `purchaseM` and `spareM`, plus a per-span line so
-the total can be traced back to the map.
+The BOM is per cable model, with `designM`, `drumM`, `drums`, `purchaseM` and `spareM`, plus a
+per-span line so the total can be traced back to the map. The per-span line carries **metres only**:
+a drum count per span would contradict the model total it sits under, which is the rounding rule
+above stated as a shape.
 
 ## 6. Strands are addressed the way the tray is
 

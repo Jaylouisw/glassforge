@@ -685,9 +685,11 @@ function printPage(req, res, project, registry) {
         { text: metres(row.spareM), cls: 'num' }];
     })));
     out.push('<h3>Per span</h3>');
-    out.push(tableHtml(['Span', 'From', 'To', 'Cable', 'Route m', 'Design m', 'Drums'], bom.lines.map(function (line) {
+    // Metres only: drums are rounded once per cable model, on the table above, so a drum count printed
+    // here would contradict it (two short runs of one cable would each claim a drum of their own).
+    out.push(tableHtml(['Span', 'From', 'To', 'Cable', 'Route m', 'Design m'], bom.lines.map(function (line) {
       return [line.span, line.from, line.to, line.cable, { text: metres(line.routeM), cls: 'num' },
-        { text: metres(line.designM), cls: 'num' }, { text: String(line.drums), cls: 'num' }];
+        { text: metres(line.designM), cls: 'num' }];
     })));
   }
 

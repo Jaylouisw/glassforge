@@ -69,6 +69,35 @@ test('the BOM aggregates per cable model across spans', function () {
   close(bom.byCable[0].spareM, 817, 0.01, 'spare on site');
 });
 
+test('a per-span line carries metres, never a drum count', function () {
+  // Two short runs of the same cable. Rounding each span on its own buys a drum per span - the exact
+  // bug the per-model round exists to prevent - and this line used to carry that second, contradictory
+  // purchase: span A said "1 drum, 2000 m bought" and span B said the same, while the model line said
+  // one drum in total. A span line is for tracing metres back to the map, so it reports metres only.
+  const plant = {
+    nodes: [
+      { id: 'n1', type: 'olt', model: 'gpon-c-plus-8' },
+      { id: 'n2', type: 'closure', model: 'nap-8' },
+      { id: 'n3', type: 'ont', model: 'gpon-ont-1ge' }
+    ],
+    spans: [
+      { id: 's1', from: 'n1', to: 'n2', cable: 'g652d-loose-12', lengthM: 500 },
+      { id: 's2', from: 'n2', to: 'n3', cable: 'g652d-loose-12', lengthM: 500 }
+    ]
+  };
+  const bom = length.billOfMaterials(plant, registry, { overlengthPct: 0 });
+  // 500 + 500 = 1000 m, one 2000 m drum.
+  assert.strictEqual(bom.byCable[0].designM, 1000);
+  assert.strictEqual(bom.byCable[0].drums, 1);
+  assert.strictEqual(bom.byCable[0].purchaseM, 2000);
+  for (const line of bom.lines) {
+    close(line.designM, 500, 0.01, 'span ' + line.span + ' design length');
+    assert.strictEqual(line.drums, undefined, 'span ' + line.span + ' must not report a drum count');
+    assert.strictEqual(line.purchaseM, undefined, 'span ' + line.span + ' must not report a purchase');
+    assert.strictEqual(line.spareM, undefined, 'span ' + line.span + ' must not report spare metres');
+  }
+});
+
 test('a span with no measured length stops the BOM instead of buying zero metres', function () {
   throws(function () {
     length.billOfMaterials({ nodes: [], spans: [{ id: 's1', from: 'a', to: 'b', cable: 'g652d-loose-24' }] }, registry, {});

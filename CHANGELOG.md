@@ -5,7 +5,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 Each suite count below is what `node scripts/run-tests.js` printed at that release's commit — the
 chain is 13 / 107 (0.1.0) → 16 / 141 (0.2.0) → 17 / 156 (0.3.0) → 18 / 174 (0.4.0), and `main`
-today reports **21 suites / 215 assertions**. A count in a section is a snapshot, never a promise.
+today reports **22 suites / 222 assertions**. A count in a section is a snapshot, never a promise.
 
 ## [Unreleased]
 
@@ -35,6 +35,14 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 - `docs/API.md` documents the print route and the PNG scale arithmetic; the README lists plan export
   and no longer says there is none.
+- **Drums are rounded once per model at that cable's own drum length, everywhere the number is
+  printed.** Two places disagreed with the rule: `length.billOfMaterials` gave each span line its own
+  `drums`/`purchaseM`/`spareM` (two 500 m runs of one cable read as two 2000 m purchases while the
+  model line said one drum, and the printable plan showed the same contradiction as a "Drums" column),
+  and the auto-design BOM hardcoded a 2000 m drum, so 915 m of 1-fibre drop cable — sold on a 1 km
+  drum — was bought as 2000 m. Span lines now carry metres only, `design.candidates[].bom.lines[]`
+  carries `drumM`/`spareM`, and the print page's per-span table has no drum column. Tests:
+  `length-and-bom` and `auto-design` add one each.
 
 Merged after 0.4.0 while the version stays at 0.4.0:
 

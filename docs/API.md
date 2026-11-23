@@ -119,6 +119,8 @@ POST /api/projects/:id/budget   { ontId?, direction?, marginDb?, wavelength? }
   → { budgets: [ { ont, name, result } | { ont, name, error } ] }
 
 GET  /api/projects/:id/bom       → { lines: [...per span], byCable: [...per model], spanCount }
+                                   lines[]   { span, from, to, cable, fiberCount, routeM, designM }
+                                   byCable[] { model, label, fiberCount, designM, lengths, drumM, drums, purchaseM, spareM }
 GET  /api/projects/:id/strands   → { rows: [...per span], totalStrands, totalUsed, utilisation, overbooked }
 
 POST /api/design/budget          { design: { olt, ont, spans, splitters, splices, connectors, ... } }
