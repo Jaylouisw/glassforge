@@ -7,8 +7,8 @@
   "ports": 16,
   "spliceCapacity": 48,
   "trays": 4,
-  "notes": "16 drop ports.",
-  "sourceUrl": "https://www.itu.int/rec/T-REC-L.110/en",
+  "notes": "16 drop ports, 48 splice positions in 4 trays - typical of a 16-port NAP rather than a datasheet figure. IEC 61753-1 defines the qualification categories the closure has to survive, not its capacity. Replace with the bought closure's datasheet.",
+  "sourceUrl": "https://webstore.iec.ch/en/publication/31424",
   "tags": [
     "nap"
   ]

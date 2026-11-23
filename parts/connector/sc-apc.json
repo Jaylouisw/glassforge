@@ -5,8 +5,8 @@
   "label": "SC/APC connector pair",
   "lossDb": 0.3,
   "maxLossDb": 0.5,
-  "notes": "0.3 dB typical per mated pair; grade B IEC 61753-1 allows 0.25 dB mean. The engine charges one connector per mating.",
-  "sourceUrl": "https://webstore.iec.ch/publication/6172",
+  "notes": "0.30 dB is typical for a mated SC/APC pair and 0.50 dB is the ceiling it is held to, which is IEC 61753-1 attenuation grade C (0.25 dB mean, 0.50 dB max for random mating); grade B is 0.12 dB mean and 0.25 dB max. Typical values, not one vendor's test report. The engine charges one connector per mating. Replace with the purchased connector's measured loss.",
+  "sourceUrl": "https://webstore.iec.ch/en/publication/31424",
   "tags": [
     "connector"
   ],

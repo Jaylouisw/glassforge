@@ -5,7 +5,7 @@
   "label": "Mechanical splice",
   "lossDb": 0.3,
   "maxLossDb": 0.5,
-  "notes": "Field-installable mechanical splice, used where a fusion splicer is not on site.",
+  "notes": "0.30 dB typical for a field-installable mechanical splice, 0.50 dB as the acceptance limit typically written into a contract (G.671 caps a mechanical splice at 0.50 dB). Used where a fusion splicer is not on site. Replace with the limits in the contract you build to and the loss measured on the splices you install.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-L.400/en",
   "tags": [
     "splice"

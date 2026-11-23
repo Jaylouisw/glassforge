@@ -11,7 +11,7 @@
   "ports": {
     "ge": 1
   },
-  "notes": "Class B+ ONT receiver. Upstream burst transmit 0.5-5 dBm.",
+  "notes": "Class B+ ONT receiver: upstream burst transmit 0.5-5 dBm and -27 dBm sensitivity against the published G.984.2 class limits; one GE port, as the model says. Typical of a basic class B+ ONT, not a datasheet. Replace with the ONT actually installed - the budget moves with its measured sensitivity.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
   "tags": [
     "gpon"

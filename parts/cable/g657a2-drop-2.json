@@ -16,7 +16,7 @@
     "1490": 0.22,
     "1550": 0.21
   },
-  "notes": "Two-fibre drop: blue and orange, per TIA-598.",
+  "notes": "Two fibres, blue and orange per TIA-598, tight-buffered (T01-F01 and F02). Attenuation here is typical installed performance, not a G.652.D limit: 0.35 dB/km at 1310 nm sits under the recommendation's 0.40 dB/km maximum (1310-1625 nm), and 0.21 dB/km at 1550 nm under its 0.30 dB/km maximum (1530-1565 nm). 1490 nm is a typical, interpolated value: no ITU-T recommendation publishes a 1490 nm attenuation figure of its own (G.652.D's 0.40 dB/km maximum spans 1310-1625 nm but is not a 1490 nm specification), so 0.22 dB/km bridges the two published windows and is not a citation. This row is the same G.652.D row the feeder cables carry, and that is deliberate: G.657.A2 publishes the same attenuation maxima as G.652.D (0.40 dB/km 1310-1625 nm, 0.30 dB/km 1530-1565 nm), so the two families do not differ in attenuation and one row is justified. What the shared row understates is the thing a drop is bought for: macrobending. G.657.A2 allows 0.1 dB at a 10 mm radius for one turn at 1550 nm (0.5 dB at 7.5 mm), and this catalogue budgets no bend loss at all. G.652.D's own NOTE 1 says its coefficient should not be applied to drop cable, and IEC 60794-2-11 allows 1.0 dB/km for indoor cable. 0.35 / 0.22 / 0.21 are typical values, the 1490 nm one typical and interpolated as above. Replace with the purchased drop cable's test report.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-G.657/en",
   "tags": [
     "generic",

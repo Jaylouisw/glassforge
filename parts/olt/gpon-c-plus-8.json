@@ -12,7 +12,7 @@
   "budgetDb": 32,
   "ports": 8,
   "maxSplitRatio": 128,
-  "notes": "Class C+ per G.984.2: 32 dB budget, 1:128. The usual choice for a suburban FTTH build.",
+  "notes": "Class C+ per ITU-T G.984.2: a published 32 dB budget and 1:128. The 3-7 dBm launch and -30 dBm sensitivity are typical of class C+ line cards, not one vendor's datasheet; the usual choice for a suburban FTTH build. Replace with the line card actually purchased.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
   "tags": [
     "gpon",

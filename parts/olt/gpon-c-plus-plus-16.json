@@ -12,7 +12,7 @@
   "budgetDb": 35,
   "ports": 16,
   "maxSplitRatio": 128,
-  "notes": "Class C++ (G.984.2 Amendment 1): 35 dB budget for long rural spans.",
+  "notes": "Class C++ (G.984.2 Amendment 1): a published 35 dB budget for long rural spans. The 5-9 dBm launch and -33 dBm sensitivity are typical of class C++ optics rather than a named card's datasheet. Replace with the line card actually purchased.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
   "tags": [
     "gpon",

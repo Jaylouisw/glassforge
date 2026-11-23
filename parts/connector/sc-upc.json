@@ -5,8 +5,8 @@
   "label": "SC/UPC connector pair",
   "lossDb": 0.3,
   "maxLossDb": 0.5,
-  "notes": "UPC polish. Never mate it with APC: the physical contact is different and the return loss collapses.",
-  "sourceUrl": "https://webstore.iec.ch/publication/6172",
+  "notes": "0.30 dB typical for a mated SC/UPC pair, with 0.50 dB as the IEC 61753-1 grade C maximum for random mating (grade B: 0.12 dB mean, 0.25 dB max). Typical values, not a datasheet. UPC polish: never mate it with APC - the physical contact is different and the return loss collapses. Replace with the purchased connector's measured loss.",
+  "sourceUrl": "https://webstore.iec.ch/en/publication/31424",
   "tags": [
     "connector"
   ],

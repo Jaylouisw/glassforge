@@ -5,8 +5,8 @@
   "label": "LC/APC connector pair",
   "lossDb": 0.25,
   "maxLossDb": 0.5,
-  "notes": "Small-form-factor connector used in OLT line cards and ODF panels.",
-  "sourceUrl": "https://webstore.iec.ch/publication/6172",
+  "notes": "0.25 dB is a typical loss for a mated LC/APC pair, not a figure taken from one datasheet. IEC 61753-1 grades random-mated single-mode connectors by attenuation: grade B is 0.12 dB mean and 0.25 dB max, grade C is 0.25 dB mean and 0.50 dB max, so this row's 0.25 dB typical and 0.5 dB ceiling are grade B typical / grade C max. Small-form-factor connector used in OLT line cards and ODF panels. The engine charges one connector per mating. Replace with the loss measured on the patch cords you buy.",
+  "sourceUrl": "https://webstore.iec.ch/en/publication/31424",
   "tags": [
     "connector"
   ],

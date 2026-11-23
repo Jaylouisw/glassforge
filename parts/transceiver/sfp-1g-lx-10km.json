@@ -12,7 +12,7 @@
   "rxOverloadDbm": -3,
   "polish": "upc",
   "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
-  "notes": "1000BASE-LX class figures: launch -9.5..-3 dBm, receiver sensitivity -20 dBm, overload -3 dBm (a 10.5 dB link budget over 10 km of G.652). Module datasheets vary by a dB or two - use the one you buy.",
+  "notes": "1000BASE-LX class figures from IEEE 802.3: launch -9.5..-3 dBm at 1310 nm, receiver sensitivity -20 dBm, overload -3 dBm (a 10.5 dB link budget over 10 km of G.652). Published class figures, but module datasheets vary by a dB or two - replace with the module actually purchased.",
   "tags": [
     "1000",
     "1310nm"

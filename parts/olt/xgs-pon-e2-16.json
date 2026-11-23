@@ -12,7 +12,7 @@
   "budgetDb": 35,
   "ports": 16,
   "maxSplitRatio": 128,
-  "notes": "ITU-T G.9807.1 Table B.9.3 (9.95328 Gbit/s downstream): OLT mean launched power +8.0..+11.0 dBm for class E2, ONU sensitivity -28.0 dBm. Upstream OLT receiver per Table B.9.4: -32.0 dBm sensitivity, -11.0 dBm overload. The 2023 edition's main body table splits E2 into E2a (+8..+12 dBm) and E2b (+14.5..+16.5 dBm); this part is the E2a variant quoting Table B.9.3. Class E2 assumes 20-35 dB of ODN loss (Table B.9.2), so an 8 dBm launch into a short test span arrives above the ONT overload point: attenuate, do not add reach. Replace with the OLT's own datasheet before construction.",
+  "notes": "ITU-T G.9807.1 Table B.9.3 (9.95328 Gbit/s downstream): OLT mean launched power +8.0..+11.0 dBm for class E2, ONU sensitivity -28.0 dBm. Upstream OLT receiver per Table B.9.4: -32.0 dBm sensitivity, -11.0 dBm overload. The 2023 edition's main body table splits E2 into E2a (+8..+12 dBm) and E2b (+14.5..+16.5 dBm); this part is the E2a variant quoting Table B.9.3. Class E2 assumes 20-35 dB of ODN loss (Table B.9.2), so an 8 dBm launch into a short test span arrives above the ONT overload point: attenuate, do not add reach. Replace with the OLT's own datasheet for the line card actually purchased before construction.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-G.9807.1/en",
   "tags": [
     "xgs-pon",

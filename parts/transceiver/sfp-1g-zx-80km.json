@@ -11,8 +11,8 @@
   "rxSensitivityDbm": -24,
   "rxOverloadDbm": -3,
   "polish": "upc",
-  "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
-  "notes": "1000BASE-ZX class figures: launch 0..5 dBm at 1550 nm, sensitivity -24 dBm (24 dB of budget, enough for 80 km at 0.25 dB/km plus splices). A long rural span, or a link that needs 13 dB more than LX.",
+  "sourceUrl": "https://www.cisco.com/c/en/us/products/collateral/interfaces-modules/gigabit-ethernet-gbic-sfp-modules/product_data_sheet0900aecd8033f885.html",
+  "notes": "IEEE 802.3 does not define 1000BASE-ZX: \"ZX\" is a vendor convention for a 1550 nm extended-reach 1G optic, so this row cites the convention as a vendor publishes it (Cisco 1000BASE-ZX: 1500-1580 nm, launch 0..+5 dBm, receive -3..-23 dBm, 21 dB channel budget, about 70 km on single-mode fibre). The -24 dBm sensitivity and 80 km here are typical of third-party ZX-compatible modules rather than of that datasheet. Vendor-defined class, not a standard one: replace these figures with the module you buy.",
   "tags": [
     "1000",
     "1550nm"

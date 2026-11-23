@@ -12,7 +12,7 @@
   "rxOverloadDbm": 0.5,
   "polish": "upc",
   "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
-  "notes": "IEEE 802.3 10GBASE-LR: launch -8.2..0.5 dBm, receiver sensitivity -14.4 dBm, overload 0.5 dBm - a 6.2 dB link budget, which is what 10 km of G.652 at 0.35 dB/km plus a few splices actually needs. The default active optic in this catalogue.",
+  "notes": "IEEE 802.3 10GBASE-LR: launch -8.2..0.5 dBm, receiver sensitivity -14.4 dBm, overload 0.5 dBm - a 6.2 dB link budget, which is what 10 km of G.652 at 0.35 dB/km plus a few splices actually needs. The default active optic in this catalogue, on published class figures; replace with the module actually purchased.",
   "tags": [
     "10000",
     "1310nm"

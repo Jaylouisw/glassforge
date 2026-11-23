@@ -7,8 +7,8 @@
   "ports": 4,
   "spliceCapacity": 12,
   "trays": 1,
-  "notes": "Small pedestal closure for a drop fan-out.",
-  "sourceUrl": "https://www.itu.int/rec/T-REC-L.110/en",
+  "notes": "IEC 61753-1 is the performance standard a closure is qualified against - it names the test severities per environment category - and it publishes no port count, tray count or splice capacity. 4 ports, 12 splices and 1 tray are typical of a small pedestal handhole in that category, not a datasheet. Replace with the bought closure's datasheet before ordering.",
+  "sourceUrl": "https://webstore.iec.ch/en/publication/31424",
   "tags": [
     "handhole"
   ]

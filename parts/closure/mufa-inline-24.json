@@ -7,8 +7,8 @@
   "ports": 4,
   "spliceCapacity": 24,
   "trays": 2,
-  "notes": "Underground in-line splice closure.",
-  "sourceUrl": "https://www.itu.int/rec/T-REC-L.110/en",
+  "notes": "Underground in-line splice closure. IEC 61753-1 sets the qualification categories for the closure but publishes no port or capacity figure: 4 ports, 24 splices and 2 trays are typical of a 24-fibre in-line (mufa) closure. Replace with the bought closure's datasheet before ordering.",
+  "sourceUrl": "https://webstore.iec.ch/en/publication/31424",
   "tags": [
     "mufa"
   ]

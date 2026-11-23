@@ -5,7 +5,7 @@
   "label": "Fusion splice",
   "lossDb": 0.1,
   "maxLossDb": 0.15,
-  "notes": "0.1 dB typical for a single-fibre fusion splice; 0.15 dB is the acceptance limit most contracts use.",
+  "notes": "0.1 dB typical for a single-fibre fusion splice; 0.15 dB is the acceptance limit most contracts use. ITU-T L.400 is the splice recommendation and states the acceptance regime rather than a single loss figure, so both numbers are contract values: replace them with the acceptance limits in the contract you build to and the loss measured on the splices you install.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-L.400/en",
   "tags": [
     "splice"

@@ -12,7 +12,7 @@
   "rxOverloadDbm": -1,
   "polish": "upc",
   "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
-  "notes": "IEEE 802.3 10GBASE-ER: launch -4.7..4 dBm at 1550 nm, receiver sensitivity -15.8 dBm, overload -1.0 dBm - an 11.1 dB budget for a 40 km span.",
+  "notes": "IEEE 802.3 10GBASE-ER: launch -4.7..4 dBm at 1550 nm, receiver sensitivity -15.8 dBm, overload -1.0 dBm - an 11.1 dB budget for a 40 km span. Published class figures; module datasheets vary, so replace with the module actually purchased.",
   "tags": [
     "10000",
     "1550nm"

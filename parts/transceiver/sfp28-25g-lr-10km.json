@@ -12,7 +12,7 @@
   "rxOverloadDbm": 2.4,
   "polish": "upc",
   "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
-  "notes": "25GBASE-LR class figures: launch -4.5..2.0 dBm, sensitivity -11.4 dBm, overload 2.4 dBm (6.9 dB). Check the module datasheet before designing to the edge of it.",
+  "notes": "25GBASE-LR class figures from IEEE 802.3: launch -4.5..2.0 dBm, sensitivity -11.4 dBm, overload 2.4 dBm (6.9 dB). Published class figures - check the module datasheet before designing to the edge of it, and replace these with the module actually purchased.",
   "tags": [
     "25000",
     "1310nm"

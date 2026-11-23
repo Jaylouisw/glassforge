@@ -12,7 +12,7 @@
   "budgetDb": 28,
   "ports": 8,
   "maxSplitRatio": 64,
-  "notes": "Class B+ per ITU-T G.984.2: 28 dB ODN budget, 1:64 practical limit. Downstream OLT transmit 1.5-5 dBm.",
+  "notes": "Class B+ per ITU-T G.984.2: a published 28 dB ODN budget and a practical 1:64 limit. The OLT downstream launch of 1.5-5 dBm is typical of a class B+ line card, not a named card's datasheet. Replace with the line card actually purchased - the budget moves with its optics.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
   "tags": [
     "gpon",

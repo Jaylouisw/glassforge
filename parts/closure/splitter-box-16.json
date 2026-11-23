@@ -7,8 +7,8 @@
   "ports": 16,
   "spliceCapacity": 48,
   "trays": 4,
-  "notes": "Holds one 1:8 or 1:16 cassette plus the feeder splice.",
-  "sourceUrl": "https://www.itu.int/rec/T-REC-L.110/en",
+  "notes": "Holds one 1:8 or 1:16 cassette plus the feeder splice: 16 ports, 48 splice positions in 4 trays, typical of the class rather than a datasheet. IEC 61753-1 covers the closure's qualification categories, not its capacity. Replace with the bought closure's datasheet.",
+  "sourceUrl": "https://webstore.iec.ch/en/publication/31424",
   "tags": [
     "splitter-box"
   ]

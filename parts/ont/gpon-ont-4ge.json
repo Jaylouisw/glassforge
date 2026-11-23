@@ -9,9 +9,9 @@
   "rxSensitivityDbm": -30,
   "rxOverloadDbm": -8,
   "ports": {
-    "ge": 1
+    "ge": 4
   },
-  "notes": "Class C+ capable ONT receiver: -30 dBm sensitivity, the extra 3 dB C+ buys.",
+  "notes": "Class C+ capable ONT receiver: -30 dBm sensitivity, the extra 3 dB C+ buys against the published G.984.2 class limit, and four GE ports as the model says. Typical of the class rather than a datasheet. Replace with the ONT actually installed - the budget moves with its measured sensitivity.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
   "tags": [
     "gpon"
