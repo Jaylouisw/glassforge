@@ -3,6 +3,10 @@
 All notable changes to Glassforge. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+Each suite count below is what `node scripts/run-tests.js` printed at that release's commit — the
+chain is 13 / 107 (0.1.0) → 16 / 141 (0.2.0) → 17 / 156 (0.3.0) → 18 / 174 (0.4.0), and `main`
+today reports **21 suites / 215 assertions**. A count in a section is a snapshot, never a promise.
+
 ## [Unreleased]
 
 The plan leaves the browser: a printable page with the drawing, the cable to buy, the splice schedule
@@ -32,6 +36,16 @@ and the checks, and a PNG of the drawing at a stated scale.
 - `docs/API.md` documents the print route and the PNG scale arithmetic; the README lists plan export
   and no longer says there is none.
 
+Merged after 0.4.0 while the version stays at 0.4.0:
+
+- **A caller's bad input to the design calculators is a 400, not a 500** — `POST /api/design/budget`
+  with no `design.olt.model`, and the other design endpoints, now answer `{"error":"…"}` with a 400
+  naming the field (#17).
+- **XGS-PON optics follow G.9807.1** launch and receive tables (#22).
+- **An ops edit that leaves the plant invalid is refused** instead of being saved (#26).
+- **`scripts/push-branch.sh`** — the one push recipe that works on this forge, plus
+  `scripts/repo-state.js` for a one-call view of the repo (#23).
+- **Test gaps the mutation audit found are closed**: 20 suites / 197 assertions (was 18 / 174).
 
 ## [0.4.0] — 2026-11-23
 
@@ -54,8 +68,8 @@ rather than assumed, and leased segments that are budgeted but never bought as c
   owned fibre, `leasedLengthM` and `pathLengthM` are reported beside it.
 - **`POST /api/design/link`** — the circuit as JSON: `legs`, `paths`, `runs` (each with `method` and
   `route`), `diversity` (with a sentence), `thirdParty`, `bom` and a verdict.
-- 18 test suites / 174 assertions (was 17 / 157): `link-design` adds 14, `street-routing` adds
-  `diversePaths` (1), the API suite adds 2.
+- 18 test suites / 174 assertions (was 17 / 156): `link-design` adds 14, `street-routing` adds
+  `diversePaths` (1), the API suite adds 2, `auto-design` adds 1.
 
 ### Changed
 
@@ -80,7 +94,7 @@ Street routing: runs are measured, and drawn, along the streets instead of a det
   network length it loaded.
 - **Refusals that name the address**: a property more than `maxSnapM` (default 250 m) from the network,
   or disconnected from the head-end, makes the candidate infeasible with the address ids listed.
-- 18 test suites / 153 assertions (was 16 / 141).
+- 17 test suites / 156 assertions (was 16 / 141).
 
 ### Changed
 
@@ -122,7 +136,7 @@ Active optical networks, and auto-design from a list of addresses.
   with its verdict and numbers, read the rationale, and apply the winner to the open project.
 - **`docs/AUTO-DESIGN.md`** — the pipeline, the algorithms, the objective function, and what the
   synthesiser deliberately does not model.
-- 16 test suites / 137 assertions (was 13 / 107).
+- 16 test suites / 141 assertions (was 13 / 107).
 
 ### Fixed
 

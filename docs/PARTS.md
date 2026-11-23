@@ -115,8 +115,9 @@ against, instead of a PON class.
 }
 ```
 
-`type`: `nap`, `mufa`, `inline`, `handhole`, `cabinet`, `splitter-box`. `ports` above the cable count
-into the closure warns; `spliceCapacity` is what stops an over-stuffed tray.
+`type`: `nap`, `mufa`, `inline`, `handhole`, `cabinet`, `splitter-box`. A closure whose `ports` are
+outnumbered by the cables running into it warns (the code compares cables into the node against
+`ports`); `spliceCapacity` is what stops an over-stuffed tray.
 
 ## connector and splice
 

@@ -18,7 +18,8 @@ node server/index.js          # then open http://127.0.0.1:8000
 ```
 
 Node 18 or newer. No `npm install`, because there is nothing to install: the server is `http` and
-`fs`, the UI is one HTML file and two scripts, and the engine is plain CommonJS.
+`fs`, the UI is one HTML file and three scripts (`app.js`, `scene.js`, `dom.js`), and the engine is
+plain CommonJS.
 
 <!-- parts:start -->
 **38 parts across 8 kinds** — 8 cables, 7 splitters, 5 OLTs, 3 ONTs, 5 transceiver, 5 closures, 3 connectors, 2 splices.
@@ -49,16 +50,24 @@ curl -s http://127.0.0.1:8000/api/design/synthesise -H 'Content-Type: applicatio
 ```
 
 It returns every candidate with its metrics and the reason it lost, the winner's plant and runs, and a
-`rationale` quoting the numbers the ranking used:
+`rationale` quoting the numbers the ranking used. That request, run against this build, returns:
 
 ```
-Chosen: PON 1:8 with 3 splitter site(s): 24 ONT(s), 2987.7 m of cable (26987.7 fibre-metres),
-        3 splitter(s), 21 closure(s), worst headroom 20.7 dB.
-Rejected PON 1:16 with 2 splitter site(s): feasible but needs 2857.2 m of cable and 28188.9
-        fibre-metres (1.04x)
-Rejected Active Ethernet over a shared cable tree, 1 Gb/s 1G-LX-10KM: feasible but needs 1788.5 m
-        of cable and 58969.6 fibre-metres (2.19x)
+Chosen: Active Ethernet over a shared cable tree, 1 Gb/s 1G-LX-10KM: 3 ONT(s), 343.5 m of cable
+        (3404 fibre-metres), 0 splitter(s), 3 closure(s), worst headroom 9.48 dB.
+Rejected PON 1:8 with 1 splitter site(s): feasible but needs 414.1 m of cable and 3411.6
+        fibre-metres (1x)
+Rejected Active Ethernet, one cable per customer, 1 Gb/s 1G-LX-10KM: feasible but needs 814.5 m
+        of cable and 5030 fibre-metres (1.48x)
+Rejected Active Ethernet over a shared cable tree, 10 Gb/s PLUS-10G-LR-10KM: feasible but needs
+        343.5 m of cable and 3404 fibre-metres (1x)
+5 further ratio/optic variant(s) scored worse or were infeasible; every one is in the candidate
+        table with its numbers.
 ```
+
+Three addresses do not justify a splitter, so the winner here is active Ethernet over a shared tree;
+give it a few hundred addresses and the PON candidates start winning. Every number above is that
+same request — nothing in this sample is illustrative.
 
 Supply a street or duct network and the runs are **routed along it**; without one they are
 straight-line × `routeFactor` (default 1.2). Every response says which it used (`routeMethod`), and
@@ -83,17 +92,21 @@ Being explicit, because a planner that quietly lacks a feature is worse than one
 ## How it is put together
 
 ```
-engine/     pure functions — fibre colours, parts registry, budget, lengths, plant, KML, projects
+engine/     the planning model — fibre colours, parts registry, budget, lengths, plant, KML, projects
 parts/      the catalogue, one JSON file per part (add a model = drop a file, no code change)
 server/     HTTP surface and project storage: http + fs, nothing else
-web/        the UI: index.html, app.js, scene.js, style.css — no framework, no build step
+web/        the UI: index.html, app.js, scene.js, dom.js, style.css — no framework, no build step
 test/       one suite per behaviour, discovered by scripts/run-tests.js
 docs/       SPEC.md (the model), AUTO-DESIGN.md (topology synthesis), OPTICAL.md (the numbers),
             PARTS.md, FIBRE-COLOURS.md, API.md
 ```
 
-The engine has no HTTP, no disk and no clock in it. That is what lets the whole planning model be
-exercised in milliseconds, and it is why `server/` is the only file that knows what a port is.
+The engine has no HTTP and no sockets in it: `server/` is the only thing that knows what a port is.
+Two places in `engine/` do touch the outside world, both deliberately: `engine/parts.js` reads the
+catalogue off disk (`fs.readdirSync`/`readFileSync` over `parts/`, in `loadSpecs`), and
+`engine/project.js` timestamps each undo step with `new Date()` (a `clock` argument can be passed in,
+which is what the tests do). Everything else is a pure function of its arguments, which is what lets
+the whole planning model be exercised in milliseconds.
 
 Read [docs/SPEC.md](docs/SPEC.md) before changing behaviour, [docs/AUTO-DESIGN.md](docs/AUTO-DESIGN.md)
 before touching the synthesiser, and [docs/OPTICAL.md](docs/OPTICAL.md) before changing a loss figure.

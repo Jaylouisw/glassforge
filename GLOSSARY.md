@@ -11,8 +11,10 @@ customer's ONT: cable, closures, splices, connectors, splitters.
 **Plant** — the tree the engine designs: nodes joined by spans, each node a type (`olt`, `headend`,
 `splitter`, `closure`, `ont`).
 
-**Span** — one cable run between two nodes, with a `lengthM` and a `purpose` (`feeder`, `distribution`,
-`drop`, `splitter-tail`).
+**Span** — one cable run between two nodes, with a `lengthM` and a `purpose`: `feeder`, `distribution`,
+`drop`, `splitter-tail` (a 1 m tail into a splitter site), `tree` (an auto-design tree edge),
+`home-run` (one active cable per customer) or `link` (a leg of a site-to-site circuit, from
+`engine/link.js`).
 
 **Head end** — where the provider's signal starts. `olt` for a PON, `headend` for an active
 point-to-point or active-over-tree design. The root node type selects the budget that is applied.
@@ -20,8 +22,10 @@ point-to-point or active-over-tree design. The root node type selects the budget
 **Splitter site** — a closure that holds a splitter, reached by a 1 m **splitter tail** so a feeder
 cable passing three sites is not mistaken for three cascaded splitters.
 
-**Cascade** — the number of splitters on the deepest root-to-leaf path. `maxCascade` is that path, not
-the product of every splitter in the plant.
+**Cascade** — the number of splitters on the deepest root-to-leaf path, not the product of every
+splitter in the plant. On a plant's `capacity()` result the exposed field is **`splitterCascade`**;
+`maxCascade` is the local variable inside `engine/network.js` that computes it and is not part of any
+returned object. Report `splitterCascade`, read `maxCascade` only if you are editing that file.
 
 ## Money and cable
 
@@ -60,6 +64,27 @@ without saying so.
 **Diversity** — for a two-site link, how much of the second leg shares geometry with the first, reported
 in metres and naming every shared segment. A third-party segment is a leased circuit: it carries a stated
 length and loss, and stays out of the cable-to-buy.
+
+## Links and circuits
+
+**Circuit** — a site-to-site link (`link.design`, `POST /api/design/link`): two sites, an optic at each
+end, no splitter and no ONT. Deliberately not a plant: two paths between the same pair of nodes is a
+cycle, and a plant is a tree. The response says `mode: "link"`.
+
+**Leg** — one of the circuit's two routes between the sites, `legs[].id` `"a"` or `"b"` (labelled
+`A-leg` / `B-leg`). Each leg is budgeted on its own with `budget.pointToPoint`, so a circuit whose legs
+are asymmetric gets two verdicts, never an average. A leased segment is assigned to a leg with
+`leg: "a" | "b" | "both"`.
+
+**Protection** — whether the circuit is protected: `protection.requested` is `"diverse"` (default) or
+`"single"`, `protection.achieved` is true only when the two legs share no graph edge and no leased
+segment, and `protection.legs` is how many legs the graph actually allowed (1 means unprotected).
+
+**`routedM` / `ownM` / `lengthM`** — the same leg measured three ways, because they answer three
+different questions: `routedM` is what the graph measured between the two snapped site nodes;
+`spurM` is the site-to-edge drops; `ownM` is `routedM + spurM` — the cable you buy, and what the BOM
+carries; `lengthM` is `ownM + leasedM`, everything the light travels along. A leased segment moves
+`lengthM` and the budget, never `ownM` and never `bom.cableM`.
 
 ## Design and refusal
 

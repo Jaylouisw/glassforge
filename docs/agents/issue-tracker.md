@@ -42,11 +42,17 @@ curl -sS -X PATCH -H "Authorization: token $TOK" -H 'Content-Type: application/j
 CI run on the head SHA, then a squash merge:
 
 ```bash
-git -c credential.helper= push -u origin HEAD
+bash scripts/push-branch.sh <branch>
 curl -sS -X POST -H "Authorization: token $TOK" -H 'Content-Type: application/json' \
   -d '{"head":"jaylouisw:<branch>","base":"main","title":"...","body":"Closes #12"}' \
   http://odin:3000/api/v1/repos/jaylouisw/glassforge/pulls
 ```
+
+`scripts/push-branch.sh` is the only supported push: it reads the token file, pushes
+`HEAD:refs/heads/<branch>` to the forge and prints the compare URL. Do **not** use
+`git -c credential.helper= push` — it clears the credential store and dies with
+`could not read Username for 'http://odin:3000'`, losing the work tail. `$TOK` is the one defined in
+the Reading section above.
 
 The `head` must be owner-qualified or Forgejo answers `bad revision`. Status-check gating is off on
 purpose: the runner appends `(push)` / `(pull_request)` to context names, so a fixed required-check

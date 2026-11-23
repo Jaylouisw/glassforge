@@ -12,7 +12,16 @@ label strings used in this repo's tracker.
 | `wontfix`              | `wontfix`            | Will not be actioned                     |
 
 When a skill mentions a role ("apply the AFK-ready triage label"), use the label string from the right
-column. The labels exist on the repo already; creating them again is not part of triage.
+column. The five labels live on the **Forgejo repo** (`http://odin:3000/api/v1/repos/jaylouisw/glassforge/labels`,
+ids 13–17, created through the API on 2026-11-23); creating them again is not part of triage, and
+`GET /labels` is the authority on what exists.
+
+`.github/labels.yml` is **not** the list above and not the tracker's truth: it declares issue
+*category* labels (`bug`, `enhancement`, `parts`, `docs`, `ci`), which the issue templates apply and
+which none of the five triage roles map to — and it is stale besides: a `GET /labels` on the repo
+returns the five triage labels and none of those five. It sits under `.github/` because that is where
+forge tooling and templates look, not because GitHub is a tracker here — Forgejo is the only tracker.
+If you need to know which labels exist, ask the API, not that file.
 
 An issue is only `ready-for-agent` when it names the behaviour that is wrong, the file or module it
 lives in, and how to tell a fix from a non-fix. "Improve the UI" is `needs-info`, always.

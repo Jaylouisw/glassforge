@@ -122,11 +122,17 @@ GET  /api/projects/:id/bom       → { lines: [...per span], byCable: [...per mo
 GET  /api/projects/:id/strands   → { rows: [...per span], totalStrands, totalUsed, utilisation, overbooked }
 
 POST /api/design/budget          { design: { olt, ont, spans, splitters, splices, connectors, ... } }
-                                 or { design: { headEnd: { model }, cpe: { model }, spans, ... } } for an active link
 POST /api/design/length          { routeM, overlengthPct?, splices?, closures?, drumM? }
                                  or { points: [{lat, lon}, ...], ... }
 GET  /api/design/splitter?ratio=8 → { ratio, idealSplitLossDb }
 ```
+
+`/api/design/budget` runs the **PON** budget and nothing else: it calls `budget.opticalBudget`, so
+`design.olt.model` is required. A design with no OLT model — including a point-to-point body of
+`{ headEnd, cpe }` — is a `400` naming the missing field (`{"error":"design.olt.model is required"}`),
+not a `500` and not a link budget. Point-to-point is `POST /api/design/link` (§ Site-to-site links),
+which calls `budget.pointToPoint` per leg; there is no endpoint that budgets `headEnd`/`cpe` from a
+hand-written body.
 
 A budget `result` carries: `verdict` (`ok`/`marginal`/`fail`), `reasons`, `rxPowerDbm`,
 `headroomDb`, `odnLossDb`, `budgetDb`, `classHeadroomDb`, `cascadeRatio`, `wavelength`, `direction`
