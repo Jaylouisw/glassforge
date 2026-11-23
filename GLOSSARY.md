@@ -80,6 +80,11 @@ are asymmetric gets two verdicts, never an average. A leased segment is assigned
 `"single"`, `protection.achieved` is true only when the two legs share no graph edge and no leased
 segment, and `protection.legs` is how many legs the graph actually allowed (1 means unprotected).
 
+**Attenuator (pad)** — an inline loss fitted because the receiver is *too loud*: `attenuator` on a
+budget result, `null` when the receiver is at or below its overload point. `overDb` is how far above
+overload the link lands, `padDb` the smallest whole-dB pad that clears it, and `maxPadDb` the most the
+design margin and the class budget can absorb, because a pad is ODN loss like any other.
+
 **`routedM` / `ownM` / `lengthM`** — the same leg measured three ways, because they answer three
 different questions: `routedM` is what the graph measured between the two snapped site nodes;
 `spurM` is the site-to-edge drops; `ownM` is `routedM + spurM` — the cable you buy, and what the BOM

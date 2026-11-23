@@ -114,6 +114,29 @@ verdict    = ok
 That is `test/budget-optics.test.js`, to the digit. If you change a loss figure, that test is where
 the disagreement surfaces.
 
+## Too loud: the pad the link needs
+
+Overload is the one failure that more power cannot fix. A long-reach optic on a short duct run, or an
+OLT patched into a nearby ONT, delivers more than the receiver tolerates, and the remedy is an inline
+attenuator — not a shorter budget, not more reach. Every budget therefore reports the pad:
+
+```
+overDb   = P(rx) − overload                      how far above the receiver's limit it lands
+padDb    = ceil(overDb)                          the pad to buy (pads come in whole dB)
+maxPadDb = floor(min(class headroom, headroom − marginDb))
+```
+
+`maxPadDb` exists because **a pad is ODN loss**: it spends the same budget the route spends. A 5 dB pad
+on a link with 4 dB of class headroom does not pass. When `maxPadDb < padDb` the design is
+contradictory — too loud *and* too tight — so no pad satisfies both and the reason says so instead of
+naming a number that would fail on site. `attenuator` is `null` when the receiver is at or below its
+overload point; "0 dB" would be a plate somebody orders.
+
+The EX example in `test/parts-long-reach-optics.test.js`: +2.05 dBm at a receiver whose overload is
++1 dBm is 1.05 dB too loud, so 2 dB is the smallest pad that clears it, and 20 dB is the most the
+21 dB link budget (less 0.95 dB of loss) and the 3 dB margin allow. Cisco's own 5 dB pad sits inside
+that window.
+
 ## What this model does not include
 
 - **Chromatic and polarisation-mode dispersion budgets** — a reach question, not a loss question.

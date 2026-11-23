@@ -188,6 +188,52 @@ function verdictFor(headroomDb, marginDb, classHeadroomDb, reasons) {
 }
 
 /**
+ * The pad a link needs when it is too loud.
+ *
+ * Overload is the one failure more power cannot fix: a long-reach optic on a short duct run receives
+ * more than its own receiver tolerates, and the remedy is an inline attenuator. Naming the fault
+ * without naming the fix leaves the planner to work the pad out by hand, which is the subtract-and-
+ * buy arithmetic the engine exists to do. Three numbers and a verdict, because each answers a
+ * different question:
+ *
+ *   overDb    how far the receiver is above its overload point - the loss that has to be added
+ *   padDb     the smallest whole-dB pad that gets there (pads are sold in 1 dB steps, so 1.05 dB of
+ *             overload needs a 2 dB pad, and a pad is never a fractional thing you can buy)
+ *   maxPadDb  the most pad that still leaves `marginDb` of headroom and the class budget intact -
+ *             a pad is ODN loss, so it spends the same budget the route spends
+ *
+ * `fits` is false when the design is contradictory: too loud *and* too tight, so no pad satisfies both
+ * and the answer is a shorter reach optic or a different split, not a number.
+ *
+ * Returns null when the receiver is at or below its overload point - a healthy link needs no pad, and
+ * reporting "0 dB" would be a plate somebody orders.
+ */
+function attenuatorFor(rxPowerDbm, rxSpec, headroomDb, marginDb, classHeadroomDb) {
+  if (!(rxPowerDbm > rxSpec.overload)) return null;
+  const overDb = round(rxPowerDbm - rxSpec.overload, 2);
+  const padDb = Math.ceil(overDb);
+  // Floor as well as min: the pad itself is a whole number of dB, so a 14.6 dB allowance funds 14 dB.
+  const maxPadDb = Math.floor(round(Math.min(classHeadroomDb, headroomDb - marginDb), 2));
+  return {
+    overDb: overDb,
+    padDb: padDb,
+    maxPadDb: maxPadDb,
+    fits: maxPadDb >= padDb
+  };
+}
+
+/** The clause an overload reason carries, so the refusal says what to do about it. */
+function attenuatorClause(pad, marginDb) {
+  if (!pad) return '';
+  if (!pad.fits) {
+    return '; no inline pad clears the overload point without breaking the ' + marginDb +
+      ' dB margin, so this needs a shorter-reach optic or a different split';
+  }
+  return '; fit a ' + pad.padDb + ' dB inline pad (up to ' + pad.maxPadDb +
+    ' dB still passes the ' + marginDb + ' dB margin and the class budget)';
+}
+
+/**
  * Run a PON budget.
  *
  * `design` (all lengths in metres):
@@ -254,8 +300,10 @@ function opticalBudget(design, registry) {
   const classHeadroomDb = round(budgetDb - odnLossDb, 2);
 
   const reasons = [];
-  if (rxPowerDbm > rxSpec.overload) {
-    reasons.push(rxPowerDbm + ' dBm at the ' + rxSpec.who + ' is above its overload point ' + rxSpec.overload + ' dBm - too much power');
+  // A pad is ODN loss, so the same figures that decide headroom decide how much of it fits.
+  const attenuator = attenuatorFor(rxPowerDbm, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  if (attenuator) {
+    reasons.push(rxPowerDbm + ' dBm at the ' + rxSpec.who + ' is above its overload point ' + rxSpec.overload + ' dBm - too much power' + attenuatorClause(attenuator, marginDb));
   }
   if (headroomDb < marginDb) {
     reasons.push('headroom ' + headroomDb + ' dB is below the ' + marginDb + ' dB design margin (sensitivity ' + rxSpec.sensitivity + ' dBm)');
@@ -289,6 +337,7 @@ function opticalBudget(design, registry) {
     odnLossDb: odnLossDb,
     totalLossDb: totalLossDb,
     classHeadroomDb: classHeadroomDb,
+    attenuator: attenuator,
     cascadeRatio: odn.cascadeRatio,
     fibreLengthM: round(odn.fibreLengthM, 1),
     leasedLengthM: round(odn.thirdPartyLengthM, 1),
@@ -374,8 +423,10 @@ function pointToPoint(design, registry) {
   const reachM = Math.min(headEnd.reachM, cpe.reachM);
 
   const reasons = [];
-  if (rxPowerDbm > rxSpec.overload) {
-    reasons.push(rxPowerDbm + ' dBm at the ' + rxSpec.who + ' is above its overload point ' + rxSpec.overload + ' dBm - too much power');
+  // A pad is ODN loss, so the same figures that decide headroom decide how much of it fits.
+  const attenuator = attenuatorFor(rxPowerDbm, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  if (attenuator) {
+    reasons.push(rxPowerDbm + ' dBm at the ' + rxSpec.who + ' is above its overload point ' + rxSpec.overload + ' dBm - too much power' + attenuatorClause(attenuator, marginDb));
   }
   if (headroomDb < marginDb) {
     reasons.push('headroom ' + headroomDb + ' dB is below the ' + marginDb + ' dB design margin (sensitivity ' + rxSpec.sensitivity + ' dBm)');
@@ -409,6 +460,7 @@ function pointToPoint(design, registry) {
     odnLossDb: odnLossDb,
     totalLossDb: totalLossDb,
     classHeadroomDb: classHeadroomDb,
+    attenuator: attenuator,
     cascadeRatio: 1,
     fibreLengthM: round(odn.fibreLengthM, 1),
     leasedLengthM: round(odn.thirdPartyLengthM, 1),

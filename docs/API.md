@@ -140,6 +140,11 @@ A budget `result` carries: `verdict` (`ok`/`marginal`/`fail`), `reasons`, `rxPow
 `headroomDb`, `odnLossDb`, `budgetDb`, `classHeadroomDb`, `cascadeRatio`, `wavelength`, `direction`
 and `breakdown` (one line per loss element). See [SPEC.md](SPEC.md) §2–3.
 
+`attenuator` is `null` when the receiver is at or below its overload point, and otherwise
+`{ overDb, padDb, maxPadDb, fits }` — how far above overload the link lands, the smallest whole-dB
+inline pad that clears it, the most pad the margin and class budget can absorb, and whether `padDb`
+is achievable. The overload reason quotes the pad, so `reasons` alone is enough to act on.
+
 ## Printed plan and PNG
 
 ```

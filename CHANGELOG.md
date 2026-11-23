@@ -5,7 +5,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 Each suite count below is what `node scripts/run-tests.js` printed at that release's commit — the
 chain is 13 / 107 (0.1.0) → 16 / 141 (0.2.0) → 17 / 156 (0.3.0) → 18 / 174 (0.4.0), and `main`
-today reports **22 suites / 222 assertions**. A count in a section is a snapshot, never a promise.
+today reports **23 suites / 228 assertions**. A count in a section is a snapshot, never a promise.
 
 ## [Unreleased]
 
@@ -51,6 +51,14 @@ Merged after 0.4.0 while the version stays at 0.4.0:
   naming the field (#17).
 - **XGS-PON optics follow G.9807.1** launch and receive tables (#22).
 - **An ops edit that leaves the plant invalid is refused** instead of being saved (#26).
+- **A link that is too loud says which inline pad fixes it.** `budget.opticalBudget` and
+  `budget.pointToPoint` now report `attenuator: { overDb, padDb, maxPadDb, fits }` (or `null` when the
+  receiver is at or below its overload point) and the overload reason quotes the pad, because
+  "2.05 dBm is above its overload point" named the fault but left the remedy — subtract, round up,
+  buy — to the reader. `fits: false` says a design is both too loud and too tight, so no pad
+  satisfies both. A pad is ODN loss, so `maxPadDb` is capped by the margin and the class budget.
+  Tests: `budget-optics` adds two (the PON pad, and the contradictory design) and
+  `parts-long-reach-optics` adds five assertions to the EX short-run case.
 - **`scripts/push-branch.sh`** — the one push recipe that works on this forge, plus
   `scripts/repo-state.js` for a one-call view of the repo (#23).
 - **Test gaps the mutation audit found are closed**: 20 suites / 197 assertions (was 18 / 174).

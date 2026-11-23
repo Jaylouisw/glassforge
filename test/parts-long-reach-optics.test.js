@@ -90,6 +90,13 @@ test('a short EX span on a hot transmitter fails on overload - an attenuator, no
   assert.strictEqual(short.verdict, 'fail');
   assert.ok(short.reasons.some(function (r) { return r.indexOf('above its overload point 1 dBm') !== -1; }), short.reasons.join(' | '));
   assert.ok(short.reasons.length === 1, 'overload is the only reason: ' + short.reasons.join(' | '));
+  // The pad: 2.05 dBm against a +1 dBm overload is 1.05 dB too loud, so 2 dB is the smallest pad that
+  // clears it, and 20 dB is the most the design can absorb - headroom 24.05 - 3 dB margin = 21.05, and
+  // the pair's budget 21 dB - 0.95 dB of loss = 20.05 dB is the tighter of the two, floored to 20.
+  assert.strictEqual(short.attenuator.padDb, 2, 'the smallest whole-dB pad that clears overload');
+  close(short.attenuator.overDb, 1.05, 0.001, 'how far above overload');
+  assert.strictEqual(short.attenuator.maxPadDb, 20, 'the most pad the budget and margin allow');
+  assert.strictEqual(short.attenuator.fits, true, "Cisco's 5 dB pad is inside the window");
 });
 
 test('the two parts are on different rates, so they cannot form a link with each other', function () {

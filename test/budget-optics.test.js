@@ -132,6 +132,48 @@ test('a transmit power outside the part\'s range is a warning, not a silent clam
   close(r.rxPowerDbm, 12 - 12.16, 0.001, 'receive power with the requested transmit power');
 });
 
+test('a link that is too loud says which pad fixes it, and how much pad fits', function () {
+  // A C++ OLT at its +9 dBm ceiling patched into an ONT through 5 m of drop cable: 5 m x 0.22 dB/km =
+  // 0.0011 dB, so the ONT sees 9.00 dBm against an overload point of -8 dBm - 17.00 dB too loud.
+  // Pads are sold in whole dB, so 17.00 dB of overload needs a 17 dB pad.
+  const loud = budget.opticalBudget({
+    olt: { model: 'gpon-c-plus-plus-16' },
+    ont: { model: 'gpon-ont-1ge' },
+    wavelength: '1490',
+    spans: [{ cable: 'g657a2-drop-1', lengthM: 5 }],
+    txDbm: 9,
+    splitters: [],
+    splices: 0,
+    connectors: 0
+  }, registry);
+  assert.ok(loud.attenuator, 'an overloaded budget reports the pad');
+  close(loud.attenuator.overDb, 17, 0.01, 'how far above the overload point');
+  assert.strictEqual(loud.attenuator.padDb, 17, 'a 17 dB pad');
+  // The pad is ODN loss, so it spends the same budget the route spends. Headroom is 9 - (-27) = 36 dB,
+  // less the 3 dB margin = 33; the class budget is 35 - 0.0011 = 34.99 dB. The tighter of the two wins
+  // and a pad is a whole number, so 34.99 dB of class headroom funds 34 dB but the margin caps it at 33.
+  assert.strictEqual(loud.attenuator.maxPadDb, 33, 'the most pad the margin and class budget allow');
+  assert.strictEqual(loud.attenuator.fits, true);
+  assert.ok(loud.reasons.some(function (x) { return x.indexOf('fit a 17 dB inline pad') !== -1; }), loud.reasons.join(' | '));
+
+  // The worked example is quiet: -9.16 dBm at the ONT, so there is no pad to buy. "0 dB" would be a
+  // plate somebody orders.
+  const healthy = budget.opticalBudget(design(), registry);
+  assert.strictEqual(healthy.attenuator, null, 'a healthy link needs no pad');
+});
+
+test('when no pad can fix a too-loud design, the refusal says so instead of naming one', function () {
+  // 24.05 dB of headroom against a 26 dB margin: -1.95 dB to spare, so every pad that clears the
+  // +1 dBm overload point would break the margin. The design is contradictory, not under-attenuated.
+  const r = budget.pointToPoint({
+    headEnd: { model: 'sfp-1g-ex-40km' }, cpe: { model: 'sfp-1g-ex-40km' }, txDbm: 3, marginDb: 26,
+    spans: [{ cable: 'g652d-loose-12', lengthM: 1000 }], splices: 0, connectors: 2
+  }, registry);
+  assert.strictEqual(r.attenuator.fits, false);
+  assert.ok(r.attenuator.maxPadDb < r.attenuator.padDb, 'no whole-dB pad satisfies both limits');
+  assert.ok(r.reasons.some(function (x) { return x.indexOf('no inline pad clears the overload point') !== -1; }), r.reasons.join(' | '));
+});
+
 test('overload is caught: too much power is a failure too', function () {
   const r = budget.opticalBudget({
     olt: { model: 'gpon-c-plus-plus-16' },
