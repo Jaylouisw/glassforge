@@ -155,6 +155,64 @@
     return metres;
   }
 
+
+  /**
+   * A scale bar for a drawing: the largest 1-2-5 x 10^n number of metres that still fits inside
+   * `maxPx`. A printed plan with no scale bar is a picture, not a plan; a scale bar computed from a
+   * missing projection would be a lie, so a non-positive metresPerPixel throws instead of drawing 0.
+   */
+  function scaleBar(metresPerPixel, maxPx) {
+    const mpp = Number(metresPerPixel);
+    if (!isFinite(mpp) || mpp <= 0) {
+      throw new TypeError('scaleBar needs a positive metresPerPixel, got ' + metresPerPixel);
+    }
+    const limit = isFinite(maxPx) && maxPx > 0 ? maxPx : 120;
+    const maxM = limit * mpp;
+    let metres = 0;
+    for (let exp = -9; exp <= 9; exp++) {
+      for (const step of [1, 2, 5]) {
+        const candidate = step * Math.pow(10, exp);
+        if (candidate <= maxM) metres = candidate;
+      }
+    }
+    return { metres: metres, pixels: metres / mpp, label: metresLabel(metres) };
+  }
+
+  function metresLabel(metres) {
+    if (metres >= 1000) return trimNumber(metres / 1000) + ' km';
+    if (metres >= 1) return trimNumber(metres) + ' m';
+    return trimNumber(metres * 100) + ' cm';
+  }
+
+  function trimNumber(n) {
+    return String(Number(n.toFixed(3)));
+  }
+
+  /**
+   * The size and scale of a raster export of a projected canvas. The PNG is drawn at `zoom` device
+   * pixels per canvas pixel, so one exported pixel covers `metresPerPixel / zoom` metres and the
+   * figure printed on the drawing has to say so.
+   */
+  function exportPlan(transform, zoom) {
+    const t = transform || {};
+    const mpp = Number(t.metresPerPixel);
+    if (!isFinite(mpp) || mpp <= 0) {
+      throw new TypeError('exportPlan needs transform.metresPerPixel (project() provides it)');
+    }
+    const z = zoom === undefined ? 2 : Number(zoom);
+    if (!isFinite(z) || z <= 0) throw new TypeError('exportPlan zoom must be a positive number, got ' + zoom);
+    const width = t.width || 900;
+    const height = t.height || 560;
+    const exportedMpp = mpp / z;
+    return {
+      zoom: z,
+      width: Math.round(width * z),
+      height: Math.round(height * z),
+      metresPerPixel: exportedMpp,
+      label: '1 px = ' + trimNumber(exportedMpp) + ' m at ' + trimNumber(z) + '\u00d7'
+    };
+  }
+
   return {
     distanceM: distanceM,
     bounds: bounds,
@@ -163,6 +221,8 @@
     unproject: unproject,
     nodeColour: nodeColour,
     nodeLabel: nodeLabel,
-    spanLabel: spanLabel
+    spanLabel: spanLabel,
+    scaleBar: scaleBar,
+    exportPlan: exportPlan
   };
 });

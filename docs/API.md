@@ -132,6 +132,30 @@ A budget `result` carries: `verdict` (`ok`/`marginal`/`fail`), `reasons`, `rxPow
 `headroomDb`, `odnLossDb`, `budgetDb`, `classHeadroomDb`, `cascadeRatio`, `wavelength`, `direction`
 and `breakdown` (one line per loss element). See [SPEC.md](SPEC.md) §2–3.
 
+## Printed plan and PNG
+
+```
+GET /print/project/:id      → text/html: the plan, the cable to buy, the splice schedule, the checks
+```
+
+This is the page a crew takes to site. It carries the drawing with a **scale bar and its `1 px = … m`
+figure**, the validation errors and warnings as they stand, the cable-to-buy table (per model and per
+span), and a splice schedule for every closure and splitter: each strand on each touching cable, the
+engine's TIA-598 address and colour, and the strand it is spliced to (or `parked` when it arrives on
+one cable and leaves on none). The browser's own **Print → Save as PDF** is the PDF path; nothing is
+rendered into a PDF on the server and no library is loaded.
+
+Everything the page prints is HTML-escaped, and the page contains no `<script>` and no remote
+`src`/`href`, so it renders on a machine with no network. An unknown id answers a **404 HTML page**.
+A project whose cable models cannot be priced still prints: the cable section names the error
+(`Cable to buy unavailable: …`) instead of the page turning into a 500.
+
+The PNG of the drawing is made in the browser from the same SVG the canvas shows, at 2× (1800 × 1120
+device pixels for the 900 × 560 canvas). Its metres-per-pixel figure comes from `scene.exportPlan` —
+`metresPerPixel / zoom`, so 0.5 m/px on screen is 0.25 m per exported pixel at 2× — and that
+arithmetic is asserted in `test/print-export.test.js`, not checked by eye.
+
+
 ## Import
 
 ```

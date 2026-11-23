@@ -3,6 +3,36 @@
 All notable changes to Glassforge. The format follows [Keep a Changelog](https://keepachangelog.com/),
 and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+The plan leaves the browser: a printable page with the drawing, the cable to buy, the splice schedule
+and the checks, and a PNG of the drawing at a stated scale.
+
+### Added
+
+- **`GET /print/project/:id`** — server-rendered HTML built from the engine's own numbers: the plan
+  SVG (same projection as the canvas) with a 1-2-5 scale bar and its `1 px = … m` figure, the
+  validation errors and warnings, the cable-to-buy table per model and per span, and a splice schedule
+  for every closure and splitter. No `<script>`, no remote asset; an unknown id is a 404 HTML page and
+  an unpriceable cable model names the error in the cable section instead of a 500.
+- **`engine.network.spliceTable`** — per splice point, each strand on each touching cable with its
+  TIA-598 address and colour and the strand it is spliced to (`parked` when it is on one cable only).
+  Non-positive or non-integer strand indices are skipped rather than throwing.
+- **`scene.scaleBar` / `scene.exportPlan`** — the scale-bar metres for a given metres-per-pixel, and
+  the size and metres-per-pixel of a 2× PNG export; both refuse a missing projection instead of
+  drawing or printing zero.
+- **Print / PDF and PNG controls** in the toolbar; the PNG is rasterised from the canvas SVG and
+  carries the `exportPlan` label on the drawing.
+- Tests: `print-export` adds 9 assertions (scale bar, export arithmetic, splice schedule), `api-http`
+  adds 5 (the page, its escaping, an empty plant, a missing id, an unpriceable cable) and
+  `ui-dom-contract` adds 1 (the two toolbar controls are wired). The repository total is the runner's.
+
+### Changed
+
+- `docs/API.md` documents the print route and the PNG scale arithmetic; the README lists plan export
+  and no longer says there is none.
+
+
 ## [0.4.0] — 2026-11-23
 
 Site-to-site links: a DC-to-DC circuit with both legs routed along the duct graph, diversity measured

@@ -636,6 +636,65 @@
     else reader.readAsText(file);
   }
 
+  function printPlan() {
+    if (!state.project) { banner('Open a project before printing'); return; }
+    // The page is server-rendered HTML: the browser's own Print / Save as PDF is the whole export
+    // path, so there is no PDF library and nothing to install on the machine that reads it.
+    window.open('/print/project/' + encodeURIComponent(state.project.id), '_blank');
+  }
+
+  function exportPng() {
+    if (!state.project || !state.lastScene) { banner('Open a project before exporting'); return; }
+    let size;
+    try {
+      // exportPlan is the tested arithmetic: a 2x drawing means half the metres per pixel, and the
+      // figure written on the PNG is the one the projection actually used.
+      size = GFScene.exportPlan(
+        { width: 900, height: 560, metresPerPixel: state.lastScene.metresPerPixel }, 2);
+    } catch (err) {
+      banner(err.message);
+      return;
+    }
+
+    const drawing = $('#canvas').cloneNode(true);
+    drawing.setAttribute('xmlns', GFDom.SVG_NS);
+    drawing.setAttribute('width', size.width);
+    drawing.setAttribute('height', size.height);
+    // The canvas is transparent so the dark page shows through; a PNG on a white sheet needs its
+    // own background, and the scale note has to survive the trip out of the browser.
+    drawing.insertBefore(el('rect', { x: 0, y: 0, width: 900, height: 560, fill: '#0b0f13' }), drawing.firstChild);
+    drawing.appendChild(el('text', { x: 18, y: 546, fill: '#93a1b0', 'font-size': '12', text: size.label }));
+
+    const blob = new Blob([new XMLSerializer().serializeToString(drawing)], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const image = new Image();
+    image.onload = function () {
+      const canvas = document.createElement('canvas');
+      canvas.width = size.width;
+      canvas.height = size.height;
+      canvas.getContext('2d').drawImage(image, 0, 0, size.width, size.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(function (png) {
+        if (!png) { banner('PNG export failed: the browser produced no image'); return; }
+        const link = document.createElement('a');
+        const safeName = String(state.project.name || 'glassforge').replace(/[^a-z0-9._-]+/gi, '-');
+        link.href = URL.createObjectURL(png);
+        link.download = safeName + '-plan-' + size.width + 'x' + size.height + '.png';
+        document.body.appendChild(link);
+        link.click();
+        // Keep the object URL alive until the download has started; revoking it and pulling the
+        // anchor out of the document in the same tick cancels the save in some browsers.
+        setTimeout(function () { URL.revokeObjectURL(link.href); link.remove(); }, 1000);
+        banner('Exported ' + size.width + ' \u00d7 ' + size.height + ' px \u2014 ' + size.label, 'ok');
+      }, 'image/png');
+    };
+    image.onerror = function () {
+      URL.revokeObjectURL(url);
+      banner('PNG export failed: the drawing could not be rasterised');
+    };
+    image.src = url;
+  }
+
   function bind() {
     document.querySelectorAll('.tool').forEach(function (tool) {
       tool.addEventListener('click', function () {
@@ -655,6 +714,8 @@
     $('#canvas').addEventListener('click', onCanvasClick);
     $('#undo').addEventListener('click', undo);
     $('#new-project').addEventListener('click', newProject);
+    $('#print-plan').addEventListener('click', printPlan);
+    $('#export-png').addEventListener('click', exportPng);
     $('#auto-run').addEventListener('click', runAutoDesign);
     $('#network-file').addEventListener('change', function (event) {
       if (event.target.files && event.target.files[0]) importNetwork(event.target.files[0]);

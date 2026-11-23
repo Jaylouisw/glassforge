@@ -21,6 +21,7 @@ const zlib = require('zlib');
 const crypto = require('crypto');
 
 const engine = require('../engine');
+const scene = require('../web/scene');
 const store = require('./store');
 
 const WEB_DIR = path.join(__dirname, '..', 'web');
@@ -511,8 +512,211 @@ async function handle(req, res, ctx) {
 
   if (pathname.startsWith('/api/')) return fail(req, res, 404, 'no such endpoint: ' + pathname);
   if (method !== 'GET' && method !== 'HEAD') return fail(req, res, 405, 'method not allowed');
+  if (pathname.indexOf('/print/project/') === 0) {
+    const id = pathname.slice('/print/project/'.length);
+    let project;
+    try {
+      project = store.readProject(id, ctx.dataRoot);
+    } catch (err) {
+      const html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Project not found</title></head>' +
+        '<body><h1>Project not found</h1><p>' + escapeHtml(err.message) + '</p></body></html>';
+      res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Length': Buffer.byteLength(html) });
+      return res.end(html);
+    }
+    return printPage(req, res, project, registry);
+  }
+
   if (pathname === '/fiber.js') return serveEngineFile(req, res, 'fiber.js');
   return serveStatic(req, res, pathname);
+}
+
+// ---------------------------------------------------------------- printed plan
+
+function escapeHtml(value) {
+  return String(value === undefined || value === null ? '' : value).replace(/[&<>"']/g, function (ch) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+  });
+}
+
+function metres(n) {
+  return String(Number(Number(n).toFixed(1)));
+}
+
+function planSvg(project) {
+  const width = 900, height = 560;
+  const transform = scene.project(project.nodes || [], { width: width, height: height, pad: 46 });
+  const placed = new Map(transform.nodes.map(function (n) { return [n.id, n]; }));
+  const parts = [];
+
+  parts.push('<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="#ffffff"/>');
+
+  for (const span of project.spans || []) {
+    const a = placed.get(span.from);
+    const b = placed.get(span.to);
+    if (!a || !b || !a.placed || !b.placed) continue;
+    if (Array.isArray(span.route) && span.route.length > 2) {
+      // A routed span is drawn along its street geometry, exactly as the canvas draws it.
+      const points = scene.projectPoints(span.route, {
+        width: width, height: height, scale: transform.scale, centre: transform.centre
+      }).map(function (p) { return p.x + ',' + p.y; }).join(' ');
+      parts.push('<polyline points="' + points + '" fill="none" stroke="#3d4b5a" stroke-width="2.5" ' +
+        'stroke-linecap="round" stroke-linejoin="round"/>');
+    } else {
+      parts.push('<line x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '" ' +
+        'stroke="#3d4b5a" stroke-width="2.5" stroke-linecap="round"/>');
+    }
+    parts.push('<text x="' + ((a.x + b.x) / 2) + '" y="' + ((a.y + b.y) / 2 - 5) + '" fill="#4a5568" ' +
+      'font-size="11" text-anchor="middle">' + escapeHtml(scene.spanLabel(span)) + '</text>');
+  }
+
+  for (const node of transform.nodes) {
+    const radius = node.type === 'olt' ? 14 : node.type === 'splitter' ? 10 : node.type === 'ont' ? 8 : 11;
+    parts.push('<circle cx="' + node.x + '" cy="' + node.y + '" r="' + radius + '" fill="' +
+      scene.nodeColour(node) + '" stroke="#0b0f13" stroke-width="1.5"/>');
+    parts.push('<text x="' + node.x + '" y="' + (node.y + radius + 14) + '" fill="#1a202c" font-size="11" ' +
+      'text-anchor="middle">' + escapeHtml(scene.nodeLabel(node)) + '</text>');
+  }
+
+  // The scale bar is the difference between a plan and a picture. A projection with no scale would
+  // make the bar meaningless, so it is only drawn when project() produced a metresPerPixel.
+  let scaleText = 'scale unavailable: no placed nodes';
+  if (transform.metresPerPixel) {
+    const bar = scene.scaleBar(transform.metresPerPixel, 160);
+    const x = 28, y = 524;
+    parts.push('<line x1="' + x + '" y1="' + y + '" x2="' + (x + bar.pixels) + '" y2="' + y +
+      '" stroke="#1a202c" stroke-width="3"/>');
+    parts.push('<line x1="' + x + '" y1="' + (y - 6) + '" x2="' + x + '" y2="' + (y + 6) + '" stroke="#1a202c" stroke-width="3"/>');
+    parts.push('<line x1="' + (x + bar.pixels) + '" y1="' + (y - 6) + '" x2="' + (x + bar.pixels) + '" y2="' + (y + 6) +
+      '" stroke="#1a202c" stroke-width="3"/>');
+    parts.push('<text x="' + x + '" y="' + (y - 10) + '" fill="#1a202c" font-size="12">' + escapeHtml(bar.label) + '</text>');
+    scaleText = '1 px = ' + metres(transform.metresPerPixel) + ' m on this drawing (scale bar: ' + bar.label + ')';
+  }
+
+  return {
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + width + ' ' + height + '" ' +
+      'width="100%" role="img" aria-label="Plan of ' + escapeHtml(project.name || project.id) + '">' +
+      parts.join('') + '</svg>',
+    scaleText: scaleText
+  };
+}
+
+function tableHtml(headers, rows, opts) {
+  const o = opts || {};
+  const head = '<thead><tr>' + headers.map(function (h) { return '<th>' + escapeHtml(h) + '</th>'; }).join('') + '</tr></thead>';
+  const body = rows.length
+    ? rows.map(function (row) {
+      return '<tr>' + row.map(function (cell) {
+        const c = cell && typeof cell === 'object' ? cell : { text: cell };
+        return '<td' + (c.cls ? ' class="' + c.cls + '"' : '') + '>' + (c.html !== undefined ? c.html : escapeHtml(c.text)) + '</td>';
+      }).join('') + '</tr>';
+    }).join('')
+    : '<tr><td colspan="' + headers.length + '" class="muted">' + escapeHtml(o.empty || 'nothing to show') + '</td></tr>';
+  return '<table>' + head + '<tbody>' + body + '</tbody></table>';
+}
+
+function printPage(req, res, project, registry) {
+  const stats = engine.network.stats(project, registry);
+  const check = engine.project.check(project, registry);
+  const plan = planSvg(project);
+  const root = (project.nodes || []).find(function (n) { return n.type === 'olt' || n.type === 'headend'; });
+  const technology = root ? (root.type === 'olt' ? 'PON' : 'active') : 'no head-end';
+
+  let bom = null, bomError = null;
+  try {
+    bom = engine.length.billOfMaterials(project, registry, {});
+  } catch (err) {
+    bomError = err.message;
+  }
+
+  const splice = engine.network.spliceTable(project, registry);
+
+  const meta = [
+    'project ' + (project.id || '?'),
+    technology + (root && root.model ? ' (' + root.model + ')' : ''),
+    stats.nodes + ' node(s)',
+    stats.spans + ' span(s)',
+    metres(stats.routeM) + ' m of route',
+    stats.onts + ' ONT(s)'
+  ].join(' \u00b7 ');
+
+  const out = [];
+  out.push('<!DOCTYPE html>');
+  out.push('<html lang="en"><head><meta charset="utf-8">');
+  out.push('<title>' + escapeHtml(project.name || project.id) + ' \u2014 plan</title>');
+  out.push('<style>' +
+    'body{font:12px/1.45 "Helvetica Neue",Arial,sans-serif;color:#111;background:#fff;margin:0;padding:24px;max-width:1000px}' +
+    'h1{font-size:20px;margin:0 0 2px}h2{font-size:15px;margin:18px 0 6px;border-bottom:1px solid #999;padding-bottom:2px}' +
+    'h3{font-size:13px;margin:14px 0 4px}.meta{color:#444;margin:0 0 12px}' +
+    '.muted{color:#666}table{border-collapse:collapse;width:100%;margin:4px 0 12px}' +
+    'th,td{border:1px solid #999;padding:3px 6px;text-align:left;vertical-align:top}' +
+    'th{background:#eee;font-weight:600}.num{text-align:right}.err{color:#a00}.warn{color:#8a5a00}' +
+    '.swatch{display:inline-block;width:10px;height:10px;border:1px solid #333;margin-right:4px;vertical-align:middle}' +
+    '.drawing{border:1px solid #999}footer{margin-top:18px;color:#666;font-size:10px}' +
+    '@page{margin:14mm}@media print{body{padding:0;max-width:none}thead{display:table-header-group}' +
+    'tr{page-break-inside:avoid}h2{page-break-after:avoid}.drawing{page-break-inside:avoid}}' +
+    '</style></head><body>');
+
+  out.push('<h1>' + escapeHtml(project.name || project.id) + '</h1>');
+  out.push('<p class="meta">' + escapeHtml(meta) + '</p>');
+  out.push('<div class="drawing">' + plan.svg + '</div>');
+  out.push('<p class="muted">' + escapeHtml(plan.scaleText) + '</p>');
+
+  out.push('<h2>Checks</h2>');
+  if (!check.errors.length && !check.warnings.length) {
+    out.push('<p class="muted">No errors and no warnings.</p>');
+  } else {
+    if (check.errors.length) {
+      out.push('<ul class="err">' + check.errors.map(function (e) { return '<li>' + escapeHtml(e) + '</li>'; }).join('') + '</ul>');
+    }
+    if (check.warnings.length) {
+      out.push('<ul class="warn">' + check.warnings.map(function (w) { return '<li>' + escapeHtml(w) + '</li>'; }).join('') + '</ul>');
+    }
+  }
+
+  out.push('<h2>Cable to buy</h2>');
+  if (bomError) {
+    out.push('<p class="err">Cable to buy unavailable: ' + escapeHtml(bomError) + '</p>');
+  } else if (!bom.byCable.length) {
+    out.push('<p class="muted">This project has no spans, so there is no cable to buy.</p>');
+  } else {
+    out.push(tableHtml(['Cable', 'Fibres', 'Design m', 'Drums', 'Buy m', 'Spare m'], bom.byCable.map(function (row) {
+      return [row.model, { text: String(row.fiberCount), cls: 'num' }, { text: metres(row.designM), cls: 'num' },
+        { text: String(row.drums), cls: 'num' }, { text: metres(row.purchaseM), cls: 'num' },
+        { text: metres(row.spareM), cls: 'num' }];
+    })));
+    out.push('<h3>Per span</h3>');
+    out.push(tableHtml(['Span', 'From', 'To', 'Cable', 'Route m', 'Design m', 'Drums'], bom.lines.map(function (line) {
+      return [line.span, line.from, line.to, line.cable, { text: metres(line.routeM), cls: 'num' },
+        { text: metres(line.designM), cls: 'num' }, { text: String(line.drums), cls: 'num' }];
+    })));
+  }
+
+  out.push('<h2>Splice schedule</h2>');
+  if (!splice.points.length) {
+    out.push('<p class="muted">No closure or splitter carries assigned strands yet.</p>');
+  } else {
+    for (const point of splice.points) {
+      out.push('<h3>' + escapeHtml(point.name) + ' <span class="muted">(' + escapeHtml(point.type) + ', ' +
+        point.spans.length + ' cable(s), ' + point.rows.length + ' strand(s))</span></h3>');
+      out.push(tableHtml(['Span', 'Strand', 'Address', 'Colour', 'Splices to'], point.rows.map(function (row) {
+        return [row.span, { text: String(row.strand), cls: 'num' }, row.address,
+          { html: '<span class="swatch" style="background:' + escapeHtml(row.hex) + '"></span>' + escapeHtml(row.colour) },
+          row.splicedTo.length ? row.splicedTo.join(', ') : 'parked'];
+      })));
+    }
+  }
+
+  out.push('<footer>Generated by Glassforge ' + escapeHtml(engine.version) + ' on ' +
+    new Date().toISOString().slice(0, 10) + '. A plan is only as good as the measured lengths it carries.</footer>');
+  out.push('</body></html>');
+
+  const html = out.join('\n');
+  res.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Content-Length': Buffer.byteLength(html)
+  });
+  res.end(req.method === 'HEAD' ? undefined : html);
 }
 
 function withDerived(project, registry) {

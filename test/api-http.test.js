@@ -322,6 +322,73 @@ async function main() {
     assert.strictEqual(badLink.status, 400);
     assert.ok(badLink.body.error.indexOf('sites.b') !== -1, badLink.body.error);  });
 
+  // ---- the printed plan ------------------------------------------------------
+  // A crew gets paper: the plan drawing with a scale bar, the cable to buy, the splice schedule and
+  // the warnings. It is HTML so a browser can save it as PDF with no export library.
+
+  const printProject = await request('POST', '/api/projects', { name: 'Print <script>alert(1)</script> & sons' });
+  const printId = printProject.body.id;
+  let printed = await request('POST', '/api/projects/' + printId + '/ops', {
+    op: 'add-node', node: { type: 'olt', model: 'gpon-c-plus-8', name: 'OLT-Central', lat: 51.5, lon: -0.1 }
+  });
+  const printOlt = printed.body.nodes.find(function (n) { return n.type === 'olt'; }).id;
+  printed = await request('POST', '/api/projects/' + printId + '/ops', {
+    op: 'add-node', node: { type: 'closure', model: 'inline-closure-24', name: 'NAP-1', lat: 51.5005, lon: -0.0998 }
+  });
+  const printClosure = printed.body.nodes.find(function (n) { return n.type === 'closure'; }).id;
+  printed = await request('POST', '/api/projects/' + printId + '/ops', {
+    op: 'add-node', node: { type: 'ont', model: 'gpon-ont-4ge', name: 'House 1', lat: 51.501, lon: -0.0995 }
+  });
+  const printOnt = printed.body.nodes.find(function (n) { return n.type === 'ont'; }).id;
+  printed = await request('POST', '/api/projects/' + printId + '/ops', {
+    op: 'add-node', node: { type: 'closure', model: 'inline-closure-24', name: 'NAP-Orphan', lat: 51.4995, lon: -0.1005 }
+  });
+  await request('POST', '/api/projects/' + printId + '/ops', {
+    op: 'add-span', span: { from: printOlt, to: printClosure, cable: 'g652d-loose-12', lengthM: 800, strands: [1, 2, 3] }
+  });
+  await request('POST', '/api/projects/' + printId + '/ops', {
+    op: 'add-span', span: { from: printClosure, to: printOnt, cable: 'g657a2-drop-2', lengthM: 45, strands: [2, 3] }
+  });
+
+  const printPage = await request('GET', '/print/project/' + printId);
+  const printHtml = printPage.raw.toString('utf8');
+  test('GET /print/project/:id is a printable page with the plan, the BOM and the splice schedule', function () {
+    assert.strictEqual(printPage.status, 200);
+    assert.ok(/text\/html/.test(printPage.headers['content-type']), printPage.headers['content-type']);
+    assert.ok(printHtml.indexOf('<svg') !== -1, 'the plan drawing must be on the page');
+    assert.ok(printHtml.indexOf('Cable to buy') !== -1, 'no cable table');
+    assert.ok(printHtml.indexOf('g652d-loose-12') !== -1, 'the BOM does not name the cable to buy');
+    assert.ok(printHtml.indexOf('Splice schedule') !== -1, 'no splice schedule');
+    assert.ok(printHtml.indexOf('T01-F01') !== -1, 'the splice schedule has no TIA-598 address');
+    assert.ok(printHtml.indexOf('1 px =') !== -1, 'the drawing must state its scale');
+    assert.ok(printHtml.indexOf('not connected') !== -1, 'the validation warnings are missing');
+  });
+
+  test('the printed page escapes the project name and loads nothing from outside', function () {
+    assert.ok(printHtml.indexOf('Print &lt;script&gt;alert(1)&lt;/script&gt; &amp; sons') !== -1,
+      'the project name was not HTML-escaped');
+    assert.ok(printHtml.indexOf('<script>alert(1)') === -1, 'the project name executed as markup');
+    assert.ok(printHtml.indexOf('<script') === -1, 'the print page must not need a script');
+    assert.ok(printHtml.indexOf('src="http') === -1 && printHtml.indexOf('href="http') === -1,
+      'a printed plan must render with no network access');
+  });
+
+  const emptyProject = await request('POST', '/api/projects', { name: 'Empty plan' });
+  const emptyPrint = await request('GET', '/print/project/' + emptyProject.body.id);
+  test('an empty project still prints: zero counts, no crash, no invented cable', function () {
+    assert.strictEqual(emptyPrint.status, 200);
+    const html = emptyPrint.raw.toString('utf8');
+    assert.ok(html.indexOf('no spans') !== -1, 'an empty plant should say so rather than print an empty table');
+    assert.ok(html.indexOf('<svg') !== -1, 'the plan area is still drawn');
+  });
+
+  const missingPrint = await request('GET', '/print/project/does-not-exist');
+  test('printing an unknown project is a 404 page, not a stack trace', function () {
+    assert.strictEqual(missingPrint.status, 404);
+    assert.ok(/text\/html/.test(missingPrint.headers['content-type']));
+    assert.ok(missingPrint.raw.toString('utf8').indexOf('not found') !== -1);
+  });
+
   const unknown = await request('GET', '/api/nope');
   test('an unknown endpoint answers JSON, not an HTML error page', function () {
     assert.strictEqual(unknown.status, 404);

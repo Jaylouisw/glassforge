@@ -14,6 +14,7 @@
  */
 
 const budget = require('./budget');
+const fiber = require('./fiber');
 
 const NODE_TYPES = ['olt', 'headend', 'closure', 'splitter', 'ont'];
 
@@ -492,12 +493,80 @@ function stats(plant, registry) {
   };
 }
 
+
+/**
+ * The splice schedule: for every splice point (a closure or a splitter), the strands arriving on each
+ * cable and which strand on the other side each one is joined to.
+ *
+ * This is what a crew works from on paper, and it is derived from the same `span.strands` the strand
+ * ledger and the canvas address. A strand that arrives on a single cable is parked, not spliced, and
+ * its `splicedTo` is empty - saying so is the point: an empty list is a decision, not a missing row.
+ * Indices that are not positive integers are skipped, so one bad hand-edited project cannot make the
+ * print page die.
+ */
+function spliceTable(plant, registry) {
+  const nodes = (plant && plant.nodes) || [];
+  const spans = (plant && plant.spans) || [];
+  const idOf = new Map();
+  spans.forEach(function (span, i) { idOf.set(span, span.id || '#' + i); });
+
+  const points = [];
+  let totalStrands = 0;
+
+  for (const node of nodes) {
+    if (node.type !== 'closure' && node.type !== 'splitter') continue;
+    const local = spans.filter(function (s) { return s.from === node.id || s.to === node.id; });
+    const byStrand = new Map();
+    for (const span of local) {
+      const seen = new Set();
+      for (const raw of Array.isArray(span.strands) ? span.strands : []) {
+        const index = Number(raw);
+        if (!Number.isInteger(index) || index < 1) continue;
+        if (seen.has(index)) continue;
+        seen.add(index);
+        const list = byStrand.get(index) || [];
+        list.push(idOf.get(span));
+        byStrand.set(index, list);
+      }
+    }
+    if (!byStrand.size) continue;
+
+    const rows = [];
+    Array.from(byStrand.keys()).sort(function (a, b) { return a - b; }).forEach(function (index) {
+      const carriers = byStrand.get(index).slice().sort();
+      const address = fiber.addressFor(index);
+      carriers.forEach(function (spanId) {
+        rows.push({
+          span: spanId,
+          strand: index,
+          address: address.label,
+          colour: address.fiberColor.name,
+          hex: address.fiberColor.hex,
+          splicedTo: carriers.filter(function (id) { return id !== spanId; })
+        });
+      });
+    });
+    totalStrands += rows.length;
+    points.push({
+      node: node.id,
+      name: node.name || node.id,
+      type: node.type,
+      model: node.model || null,
+      spans: local.map(function (s) { return idOf.get(s); }),
+      rows: rows
+    });
+  }
+
+  return { points: points, totalStrands: totalStrands };
+}
+
 module.exports = {
   NODE_TYPES: NODE_TYPES,
   trace: trace,
   designForOnt: designForOnt,
   allOntBudgets: allOntBudgets,
   strandLedger: strandLedger,
+  spliceTable: spliceTable,
   capacity: capacity,
   validate: validate,
   stats: stats

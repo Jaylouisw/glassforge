@@ -36,6 +36,7 @@ Node 18 or newer. No `npm install`, because there is nothing to install: the ser
 | **Cable to buy** | Route length + 3% overlength + 30 m per splice + 20 m per closure, itemised, rounded up to whole drums **per cable model**. |
 | **Splice diagram** | TIA-598 colours and `T03-F07` addresses, from the same table the engine uses, with per-span strand usage and overbooking detection. |
 | **KML / KMZ import** | Bring in a route drawn in Google Earth. Reports routes, points, duplicates skipped, and what it did not understand. |
+| **Plan export** | Print the plan, the cable to buy, the splice schedule and the checks from `/print/project/:id` — the browser's Print / Save as PDF is the whole PDF path. A PNG of the drawing exports at 2× with its metres-per-pixel figure printed on it. |
 | **Projects** | Saved as JSON under `data/`, with 50 steps of undo. Nothing leaves the machine. |
 
 ## Design from a list of addresses
@@ -76,7 +77,7 @@ Being explicit, because a planner that quietly lacks a feature is worse than one
 - **No active-equipment sizing.** Active designs count fibres and optics, not switch ports or uplinks.
 - **No accounts, roles or multi-user editing.** One machine, one user, one file per project.
 - **No OLT integration.** SmartOLT-style ONU synchronisation is not implemented and is not faked.
-- **No PDF/PNG plan export.** The BOM and the splice table are on screen and in the API.
+- **No server-rendered PDF or PNG file.** The plan prints from the browser (Save as PDF) and a snapshot PNG comes from the canvas at 2×; there is no export worker and no PDF library.
 - **No field app.** A phone can open the UI, but there is no offline field mode.
 
 ## How it is put together

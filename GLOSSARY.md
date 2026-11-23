@@ -31,6 +31,10 @@ so 24 fibres × 1 km is not the same purchase as 24 runs of 1 fibre × 1 km.
 **Cable-to-buy** — every span resolved onto a purchasable cable part, with the drum lengths and the
 total metres.
 
+**Splice schedule** — the per-closure sheet a crew works from: every strand arriving on each cable,
+its TIA-598 address and colour, and the strand on the other side it is spliced to (`parked` when it
+arrives and leaves on no cable). Built from the same `span.strands` the strand ledger counts.
+
 **Drop cable** — the small 1–2 fibre cable used on the last leg, only at or below `DROP_CABLE_MAX_M`
 (300 m). Anything longer goes to the 12-fibre ladder whatever the fibre count.
 

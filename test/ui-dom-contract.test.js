@@ -67,6 +67,20 @@ test('the SVG tag list is not empty and has no duplicates', function () {
   assert.strictEqual(new Set(dom.SVG_TAGS).size, dom.SVG_TAGS.length);
 });
 
+
+test('the plan can leave the browser: print page and a scaled PNG are wired to the toolbar', function () {
+  const fs = require('fs');
+  const path = require('path');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf8');
+  assert.ok(html.indexOf('id="print-plan"') !== -1, 'no Print / PDF control');
+  assert.ok(html.indexOf('id="export-png"') !== -1, 'no PNG control');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'web', 'app.js'), 'utf8');
+  assert.ok(app.indexOf("'/print/project/'") !== -1, 'the print control does not open the print route');
+  assert.ok(app.indexOf('GFScene.exportPlan(') !== -1,
+    'the PNG export must use the tested scale arithmetic, not its own');
+  assert.ok(app.indexOf('toBlob') !== -1, 'the PNG export never rasterises the drawing');
+});
+
 test('the served UI loads the modules the app expects', function () {
   const fs = require('fs');
   const path = require('path');
