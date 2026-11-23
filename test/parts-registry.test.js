@@ -1,7 +1,8 @@
 'use strict';
 // The catalogue is the thing that grows, so its guard rails are load-bearing.
-const { test, assert, throws, done } = require('./harness');
+const { test, assert, throws, close, done } = require('./harness');
 const parts = require('../engine/parts');
+const engine = require('../engine');
 
 const registry = parts.createRegistry();
 
@@ -80,6 +81,37 @@ test('search finds a part by label and by model', function () {
 test('an unknown model names what does exist', function () {
   throws(function () { registry.get('cable', 'no-such-cable'); }, 'unknown cable model', 'get');
   throws(function () { registry.get('nonsense', 'x'); }, 'unknown part kind', 'get kind');
+});
+
+test('the splitter ladder reaches every ratio an OLT advertises', function () {
+  // buildPon resolves a splitter by name - 'plc-1x' + ratio + '-sca' - so an OLT whose maxSplitRatio has
+  // no part is a dead end: the candidate is skipped with a note and the advertised ratio cannot be built.
+  for (const olt of registry.all('olt')) {
+    const model = 'plc-1x' + olt.maxSplitRatio + '-sca';
+    assert.ok(registry.has('splitter', model),
+      olt.model + ' advertises 1:' + olt.maxSplitRatio + ' but the catalogue has no splitter "' + model + '"');
+  }
+});
+
+test('a 1:128 PON budgets on the 1x128 cassette', function () {
+  // 1.0 km of G.652.D at 1490 nm = 0.22; 2 splices = 0.20; 2 connectors = 0.60;
+  // 1:128 splitter = 10*log10(128) = 21.07 split + 2.73 excess = 23.80  ->  ODN 24.82 dB
+  const r = engine.budget.opticalBudget({
+    olt: { model: 'gpon-c-plus-8' },
+    ont: { model: 'gpon-ont-4ge' },
+    wavelength: '1490',
+    spans: [{ cable: 'g652d-loose-12', lengthM: 1000 }],
+    splitters: [{ model: 'plc-1x128-sca' }],
+    splices: 2,
+    connectors: 2
+  }, registry);
+  close(r.odnLossDb, 24.82, 0.001, 'ODN loss');
+  // C+ launches 3.0 dBm: 3.0 - 24.82 = -21.82 dBm into a -30 dBm receiver = 8.18 dB of headroom,
+  // and 32 - 24.82 = 7.18 dB inside the class budget
+  close(r.rxPowerDbm, -21.82, 0.001, 'receive power');
+  close(r.headroomDb, 8.18, 0.001, 'headroom');
+  close(r.classHeadroomDb, 7.18, 0.001, 'class headroom');
+  assert.strictEqual(r.verdict, 'ok');
 });
 
 done();

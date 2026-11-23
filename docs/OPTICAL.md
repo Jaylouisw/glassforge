@@ -53,10 +53,12 @@ The engine stores both and sums them, so a 1:8 cassette with 10.5 dB insertion l
 | 1:16 | 13.8 dB | 12.04 | 1.76 |
 | 1:32 | 17.1 dB | 15.05 | 2.05 |
 | 1:64 | 20.5 dB | 18.06 | 2.44 |
+| 1:128 | 23.8 dB | 21.07 | 2.73 |
 
 These are typical values for a good PLC cassette, not a guarantee: replace them with the purchased
-part's datasheet. A splitter with 1.2 dB of excess loss where you assumed 0.5 dB is half a kilometre
-of reach.
+part's datasheet. The 1:128 row is the one that needs it most: published figures for that ratio span
+23.5 to 24.5 dB, because it is the last single-chip ratio and some vendors build it as two chips.
+A splitter with 1.2 dB of excess loss where you assumed 0.5 dB is half a kilometre of reach.
 
 ## PON classes
 

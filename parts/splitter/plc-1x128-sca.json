@@ -1,0 +1,17 @@
+{
+  "kind": "splitter",
+  "model": "plc-1x128-sca",
+  "vendor": "generic",
+  "label": "PLC 1x128 spliced",
+  "ratio": 128,
+  "splitLossDb": 21.07,
+  "excessLossDb": 2.73,
+  "termination": "spliced",
+  "technology": "plc",
+  "notes": "Insertion loss 23.8 dB for a 1:128 spliced module (ideal split 10*log10(128) = 21.07 dB plus 2.73 dB excess). 23.8 dB is Precision OT's published 1x128 figure without connectors; the vendor band is wide at this ratio - DMS quotes <=24.0 dB standard grade, Browave 23.5 dB typical and Montclair 24.5 dB typical - so treat +/-1 dB as the real spread. Notes are datasheet typicals, not a limit: replace with the part actually purchased before construction. A 1:128 is the last single-chip ratio and usually the last doubling before a two-chip module.",
+  "sourceUrl": "https://www.precisionot.com/wp-content/uploads/PLC-Splitter-Datasheet-100424-1.pdf",
+  "tags": [
+    "plc",
+    "1x128"
+  ]
+}

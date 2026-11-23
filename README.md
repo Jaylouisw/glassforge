@@ -21,7 +21,7 @@ Node 18 or newer. No `npm install`, because there is nothing to install: the ser
 `fs`, the UI is one HTML file and two scripts, and the engine is plain CommonJS.
 
 <!-- parts:start -->
-**37 parts across 8 kinds** — 8 cables, 6 splitters, 5 OLTs, 3 ONTs, 5 transceiver, 5 closures, 3 connectors, 2 splices.
+**38 parts across 8 kinds** — 8 cables, 7 splitters, 5 OLTs, 3 ONTs, 5 transceiver, 5 closures, 3 connectors, 2 splices.
 <!-- parts:end -->
 
 ## What it does today
