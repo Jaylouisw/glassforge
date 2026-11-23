@@ -22,7 +22,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const SKIP_DIRS = new Set(['node_modules', '.git', 'research', 'examples', 'dist', 'coverage']);
-const EXTS = new Set(['.js', '.mjs', '.cjs']);
+const EXTS = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts']);
 
 // Anything added after Node 18. Each entry: needle, the version it appeared, and the shape to
 // suggest instead. Keep the suggestions concrete - the point is to tell a contributor what to type.

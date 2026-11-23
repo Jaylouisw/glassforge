@@ -1,0 +1,35 @@
+{
+  // Hybrid TypeScript: new modules are `.ts` and are compiled in place (engine/foo.ts -> engine/foo.js).
+  // Legacy modules stay `.js` and are not compiled or type-checked yet; they migrate as they are touched.
+  // A `.ts` module reaches a legacy `.js` module with require() plus a local interface, because mixing
+  // allowJs with an in-place outDir makes tsc try to overwrite its own inputs (TS5055).
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "rootDir": ".",
+    "outDir": ".",
+    "allowJs": false,
+    "checkJs": false,
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "useUnknownInCatchVariables": true,
+    "skipLibCheck": true,
+    "noEmitOnError": true,
+    "declaration": false,
+    "sourceMap": false,
+    "removeComments": false,
+    "newLine": "lf",
+    "types": ["node"]
+  },
+  "include": ["engine/**/*.ts", "server/**/*.ts", "web/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules"]
+}

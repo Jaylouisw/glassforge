@@ -12,7 +12,11 @@
     "check:urls": "node scripts/check-canonical-urls.js",
     "check:parts": "node scripts/count-parts.js",
     "smoke": "node scripts/smoke-http.js",
-    "parts:audit": "node scripts/audit-parts.js"
+    "parts:audit": "node scripts/audit-parts.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check:any": "node scripts/check-no-any.js",
+    "verify": "npm test && node scripts/syntax-check.js && node scripts/check-canonical-urls.js && node scripts/audit-parts.js && node scripts/check-dockerfile.js && node scripts/check-no-any.js && npm run build"
   },
   "keywords": [
     "ftth",
@@ -43,5 +47,9 @@
     "server",
     "web",
     "parts"
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "^18.19.130",
+    "typescript": "^5.9.3"
+  }
 }

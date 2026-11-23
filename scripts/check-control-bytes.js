@@ -16,7 +16,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const SKIP_DIRS = new Set(['.git', 'node_modules', '.github-cache', 'dist', 'coverage']);
-const EXTS = ['.js', '.json', '.md', '.yml', '.yaml', '.css', '.html', '.sh'];
+const EXTS = ['.js', '.ts', '.mts', '.cts', '.json', '.md', '.yml', '.yaml', '.css', '.html', '.sh'];
 
 // Tab (9), LF (10), CR (13) are legitimate. Everything else below 0x20 is not.
 function badBytes(buf) {

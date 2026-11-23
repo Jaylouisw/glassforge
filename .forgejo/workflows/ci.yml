@@ -34,8 +34,24 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
+      - name: Install the compiler
+        # TypeScript is the project's only dependency and it is a devDependency: nothing here ships to
+        # a user, and `node server/index.js` still runs with no install because the emitted `.js` is
+        # committed. `npm ci` needs the committed package-lock.json.
+        run: npm ci
+
       - name: Syntax check (every JS file)
         run: node scripts/syntax-check.js
+
+      - name: No `any` in TypeScript sources
+        # `any` switches off the checking that is the reason for writing TypeScript at all.
+        run: node scripts/check-no-any.js
+
+      - name: Compiled output matches its source
+        # Hybrid rule: `.ts` is the source, the emitted `.js` is committed so the server runs without a
+        # build. If the two disagree, either the output was edited by hand or `npm run build` was
+        # forgotten - and then the code CI just tested is not the code anyone reviewed.
+        run: npm run build && git diff --exit-code
 
       - name: No control bytes in source
         # A backslash collapsed by a scripted edit turns \b into a literal backspace: a valid regex
