@@ -1,0 +1,21 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp28-100g-lr4-10km",
+  "vendor": "generic",
+  "label": "QSFP28 100GBASE-LR4 10 km",
+  "speedMbps": 100000,
+  "wavelengthNm": 1310,
+  "reachM": 10000,
+  "txPowerDbmMin": -4.3,
+  "txPowerDbmMax": 4.5,
+  "rxSensitivityDbm": -10.6,
+  "rxOverloadDbm": 4.5,
+  "polish": "upc",
+  "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
+  "notes": "IEEE 802.3 Clause 88 (100GBASE-LR4), per-lane averages: launch -4.3..4.5 dBm, receive average power -10.6..4.5 dBm, a 6.3 dB budget over 10 km of G.652 - read with the same min-launch minus min-receive convention as the 10GBASE and 25GBASE rows. Two caveats. First, 10 km is a class reach with only 2 dB of that budget reserved as margin; Glassforge's default margin is 3 dB, and at 0.35 dB/km a bare 10 km span leaves 2.8 dB of headroom and reads fail (measured: budget 6.3 minus fibre 3.5). 9.4 km is the last length inside the default margin, and ok (5 dB of headroom) ends at 3.7 km, so treat LR4 as an 8-9 km optic here or lower marginDb deliberately. Second, LR4 is four 25.78 Gb/s lanes over the LAN-WDM grid (1294.53-1296.59, 1299.02-1301.09, 1303.54-1305.63, 1308.09-1310.19 nm); this engine models a link at one wavelength, so the row says 1310 nm - the top lane, and the window the cables publish attenuation for. The per-lane figures above are the worst-lane figures, so the single-wavelength budget errs conservative. Vendor sheets corroborate: Cisco CPAK-100G-LR4 (4.5/-4.3 launch, 4.5/-10.6 receive) and Finisar FTLC1154RDPL (same per-lane values). Class figures, not one measured module: replace the row with the module actually purchased.",
+  "tags": [
+    "100000",
+    "1310nm",
+    "100g"
+  ]
+}

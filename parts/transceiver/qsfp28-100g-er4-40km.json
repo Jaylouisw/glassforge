@@ -1,0 +1,22 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp28-100g-er4-40km",
+  "vendor": "generic",
+  "label": "QSFP28 100GBASE-ER4 40 km",
+  "speedMbps": 100000,
+  "wavelengthNm": 1310,
+  "reachM": 40000,
+  "txPowerDbmMin": -2.9,
+  "txPowerDbmMax": 2.9,
+  "rxSensitivityDbm": -20.9,
+  "rxOverloadDbm": 4.5,
+  "polish": "upc",
+  "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
+  "notes": "IEEE 802.3 Clause 88 (100GBASE-ER4), per-lane averages: launch -2.9..2.9 dBm, receive average power -20.9..4.5 dBm, an 18.0 dB budget over 40 km of G.652 (2.9 - (-20.9) = 18.0). The launch ceiling is 2.9 dBm rather than LR4's 4.5 because ER4 is a cooled EML design - Huawei QSFP-100G-ER4 and the FS QSFP28 100GBASE-ER4 sheet agree. Overload: 4.5 dBm is the IEEE average receive power maximum, where Huawei's sheet quotes -3.5 dBm; the stricter vendor figure is the one to design to if that module is bought. ER4 transmits at 1310 nm, so the budget uses the cable's 0.35 dB/km figure and not 0.21: 40 km is 14.0 dB of the 18.0, not 8.4, which leaves 4.0 dB for every splice, connector and the margin - ten fusion splices at 0.1 dB take it to 3.0 dB, the default margin exactly, so a bare 40 km run is marginal even before a patch panel. Same four-lane caveat as the LR4 row: the engine budgets one 1310 nm wavelength and the per-lane figures are the worst-lane ones. Class figures, not one measured module: replace the row with the part actually purchased.",
+  "tags": [
+    "100000",
+    "1310nm",
+    "100g",
+    "long-reach"
+  ]
+}

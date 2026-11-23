@@ -12,7 +12,7 @@
   "rxOverloadDbm": 0.5,
   "polish": "upc",
   "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
-  "notes": "IEEE 802.3 10GBASE-LR: launch -8.2..0.5 dBm, receiver sensitivity -14.4 dBm, overload 0.5 dBm - a 6.2 dB link budget, which is what 10 km of G.652 at 0.35 dB/km plus a few splices actually needs. The default active optic in this catalogue, on published class figures; replace with the module actually purchased.",
+  "notes": "IEEE 802.3 10GBASE-LR: launch -8.2..0.5 dBm, receiver sensitivity -14.4 dBm, overload 0.5 dBm - a 6.2 dB link budget. That 6.2 dB is a class budget, not a promise about 10 km. At 0.35 dB/km (G.652.D, worst-case 1310 nm) 10 km of fibre is 3.5 dB, so 2.7 dB is left for every splice, connector and the margin at once; IEEE reserves 2 dB of the 6.2 as margin where Glassforge's default is 3 dB, so a bare 10 km span reads fail at 2.7 dB of headroom (measured by driving budget.pointToPoint) and the last length inside the default margin is 9.1 km. Treat this as a 9 km optic in this tool, or lower marginDb on purpose. The default active optic in this catalogue, on published class figures; replace with the module actually purchased.",
   "tags": [
     "10000",
     "1310nm"

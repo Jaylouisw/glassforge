@@ -145,7 +145,7 @@ test('a missing optic is refused by name', function () {
   throws(function () { budget.pointToPoint({ headEnd: { model: 'nope' }, cpe: { model: 'sfp-1g-lx-10km' } }, registry); }, 'unknown transceiver model');
 });
 
-test('the catalogue carries optics for 1G, 10G and 25G with published figures', function () {
+test('the catalogue carries optics for 1G, 10G, 25G and 100G with published figures', function () {
   const optics = registry.all('transceiver');
   assert.ok(optics.length >= 4);
   for (const optic of optics) {
@@ -154,5 +154,9 @@ test('the catalogue carries optics for 1G, 10G and 25G with published figures', 
     assert.ok(/^https:\/\//.test(optic.sourceUrl));
   }
   const speeds = optics.map(function (o) { return o.speedMbps; });
-  assert.ok(speeds.indexOf(1000) !== -1 && speeds.indexOf(10000) !== -1 && speeds.indexOf(25000) !== -1);
+  // One optic at each rung a site-to-site link is actually bought at. 100G was the gap: a metro
+  // DC-to-DC run is 100GBASE-LR4/ER4, and a ladder that stopped at 25G could not describe one.
+  assert.ok(speeds.indexOf(1000) !== -1 && speeds.indexOf(10000) !== -1 && speeds.indexOf(25000) !== -1,
+    'the catalogue has 1G, 10G and 25G optics');
+  assert.ok(speeds.indexOf(100000) !== -1, 'the catalogue has a 100G optic');
 });
