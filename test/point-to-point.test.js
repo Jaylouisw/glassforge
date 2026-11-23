@@ -123,6 +123,17 @@ test('upstream uses the customer optic as the transmitter', function () {
   close(up.rxPowerDbm, -3.95, 0.001, 'upstream receive power');
   close(up.headroomDb, 10.45, 0.001, 'upstream headroom against -14.4 dBm');
 
+  // The pair's own budget flips with the direction too: upstream it is B's launch into A's receiver,
+  // -3 - (-14.4) = 11.4 dB, not the downstream 9.8 dB. The engine used to read the head-end launch in
+  // both directions, so an upstream leg reported the other end's 9.8 dB (and 8.85 dB of class
+  // headroom) while its own headroom said 10.45 dB.
+  close(down.budgetDb, 9.8, 0.001, 'downstream budget (A launches, B receives)');
+  close(up.budgetDb, 11.4, 0.001, 'upstream budget (B launches, A receives)');
+  // With no design allowance, a point-to-point link's class headroom *is* its loss headroom: both are
+  // budget - ODN. Two different figures for one question is the symptom this test exists for.
+  close(down.classHeadroomDb, down.headroomDb, 0.001, 'downstream class headroom equals headroom');
+  close(up.classHeadroomDb, up.headroomDb, 0.001, 'upstream class headroom equals headroom');
+
   // Reach is the shorter of the two datasheets, in both directions: A reaches 10 km, B reaches 40 km.
   assert.strictEqual(down.reachM, 10000, 'downstream reach');
   assert.strictEqual(up.reachM, 10000, 'upstream reach');

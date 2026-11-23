@@ -362,7 +362,13 @@ function pointToPoint(design, registry) {
   const odnLossDb = round(odn.fibreDb + odn.spliceLossDb + odn.connectorLossDb + odn.splitterLossDb + odn.thirdPartyLossDb, 3);
   const totalLossDb = round(odnLossDb + allowanceDb, 3);
   const rxPowerDbm = round(txDbm - totalLossDb, 2);
-  const budgetDb = round(headEnd.txPowerDbmMin - cpe.rxSensitivityDbm, 2);
+  // Which end launches depends on the direction, so the pair's own budget does too: upstream it is the
+  // customer optic's worst-case launch into the head-end receiver. Reading the head-end launch in both
+  // directions reported the downstream budget as the upstream figure - a link budgeted inside 9.8 dB
+  // while B was actually launching 11.4 dB of headroom, or the reverse for a weak customer laser.
+  const budgetDb = direction === 'down'
+    ? round(headEnd.txPowerDbmMin - cpe.rxSensitivityDbm, 2)
+    : round(cpe.txPowerDbmMin - headEnd.rxSensitivityDbm, 2);
   const headroomDb = round(rxPowerDbm - rxSpec.sensitivity, 2);
   const classHeadroomDb = round(budgetDb - odnLossDb, 2);
   const reachM = Math.min(headEnd.reachM, cpe.reachM);
