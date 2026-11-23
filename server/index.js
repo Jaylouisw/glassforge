@@ -277,6 +277,19 @@ async function handle(req, res, ctx) {
       const candidate = applied.project;
       candidate.updatedAt = new Date().toISOString();
       const check = engine.project.check(candidate, registry);
+      // An edit that leaves the plant invalid is refused here, for the same reason `PUT` refuses one:
+      // the point of validating a write is that nothing un-budgetable reaches the disk. Returning 200
+      // and letting `derived.errors` carry the objection made the check advisory — the caller has the
+      // new project and no reason to read `derived`, so a span with an unknown cable model, or a PON
+      // cascaded past its OLT's split limit, was saved and only failed days later on site. Both of
+      // those are now 400s naming the span and the field. Warnings stay warnings and ride along on the
+      // 200 (`warnings` below), because a 25 km span is a question, not a contradiction.
+      if (!check.ok) {
+        return fail(req, res, 400, 'the edit would leave the plant invalid: ' + check.errors.join('; '), {
+          errors: check.errors,
+          warnings: check.warnings
+        });
+      }
       store.writeProject(candidate, ctx.dataRoot);
       return sendJson(req, res, 200, Object.assign(withDerived(candidate, registry), { warnings: check.warnings }));
     }
