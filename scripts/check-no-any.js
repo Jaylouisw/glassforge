@@ -3,11 +3,14 @@
  * Refuse the `any` type in TypeScript sources.
  *
  * Jay's rule is that `any` is never used: it switches off the checking that is the entire reason for
- * writing TypeScript. `unknown` plus a narrowing guard is the replacement, and a library's own
- * declaration files are the only place an `any` is allowed to exist (skipLibCheck handles those).
+ * writing TypeScript. `unknown` plus a narrowing guard is the replacement.
  *
- * This is a deterministic check rather than a sentence in a style guide, because a style guide relies
- * on someone reading the diff carefully at 3am.
+ * This started life as six regular expressions and had two measured false negatives — `satisfies any`
+ * and `${value as any}` — because a type position cannot be found reliably by looking at punctuation.
+ * In TypeScript the word `any` almost never appears as anything other than the type, so the check now
+ * walks the file as a small state machine, ignores comments and string text, and reports the bare
+ * identifier anywhere else. Template literals are the one subtlety: `${...}` inside them is code again,
+ * which is exactly how `as any` escaped a line-based regex.
  *
  *   node scripts/check-no-any.js
  *   node scripts/check-no-any.js --list     # print every scanned file
@@ -18,16 +21,6 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const EXTS = new Set(['.ts', '.mts', '.cts']);
 const SKIP_DIRS = new Set(['node_modules', '.git', 'data']);
-
-// Patterns are applied after comments are stripped, so `// never use any` does not trip the check.
-const BANNED = [
-  { name: 'type annotation', re: /:\s*any\b/g },
-  { name: 'assertion', re: /\bas\s+any\b/g },
-  { name: 'generic argument', re: /<\s*any\s*(?:,|>)/g },
-  { name: 'array of any', re: /\bany\s*\[\]/g },
-  { name: 'Array<any>', re: /\bArray\s*<\s*any\s*>/g },
-  { name: 'Record with any', re: /\bRecord\s*<[^>]*\bany\b[^>]*>/g }
-];
 
 function walk(dir, out) {
   let entries;
@@ -47,53 +40,117 @@ function walk(dir, out) {
   return out;
 }
 
-/** Remove comments but keep line numbering stable, so a finding points at the real line. */
-function stripComments(source) {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
-    .replace(/(^|[^:])\/\/.*$/gm, (line, prefix) => prefix + ' '.repeat(Math.max(0, line.length - prefix.length)));
-}
+const IDENT = /[A-Za-z0-9_$]/;
 
-function check(file) {
-  const source = fs.readFileSync(file, 'utf8');
-  const stripped = stripComments(source);
-  const lines = stripped.split('\n');
-  const findings = [];
-  for (let i = 0; i < lines.length; i++) {
-    for (const rule of BANNED) {
-      rule.re.lastIndex = 0;
-      if (rule.re.test(lines[i])) {
-        findings.push({
-          line: i + 1,
-          rule: rule.name,
-          text: source.split('\n')[i].trim()
-        });
-      }
+/**
+ * Return `{ line, column, text }` for every occurrence of the identifier `any` that is not inside a
+ * comment or a string.
+ */
+function findAny(source) {
+  const hits = [];
+  const lines = source.split('\n');
+  const inTemplateExpr = [];
+  let state = 'code';
+  let line = 1;
+  let column = 0;
+  let ident = '';
+  let identStart = null;
+  let braceDepth = 0;
+
+  function record() {
+    if (ident === 'any' && identStart !== null) {
+      hits.push({ line: line, column: identStart + 1, text: (lines[line - 1] || '').trim() });
     }
+    ident = '';
+    identStart = null;
   }
-  return findings;
+
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    const next = source[i + 1];
+
+    if (ch === '\n') {
+      record();
+      line++;
+      column = 0;
+      if (state === 'line-comment') state = 'code';
+      continue;
+    }
+    column++;
+
+    if (state === 'line-comment') continue;
+
+    if (state === 'block-comment') {
+      if (ch === '*' && next === '/') { state = 'code'; i++; column++; }
+      continue;
+    }
+
+    if (state === 'single' || state === 'double') {
+      if (ch === '\\') { i++; column++; continue; }
+      if ((state === 'single' && ch === "'") || (state === 'double' && ch === '"')) state = 'code';
+      continue;
+    }
+
+    if (state === 'template') {
+      if (ch === '\\') { i++; column++; continue; }
+      if (ch === '`') { state = 'code'; continue; }
+      if (ch === '$' && next === '{') { inTemplateExpr.push(braceDepth); braceDepth = 0; state = 'code'; i++; column++; }
+      continue;
+    }
+
+    // state === 'code'
+    if (ch === '/' && next === '/') { record(); state = 'line-comment'; i++; column++; continue; }
+    if (ch === '/' && next === '*') { record(); state = 'block-comment'; i++; column++; continue; }
+    if (ch === "'") { record(); state = 'single'; continue; }
+    if (ch === '"') { record(); state = 'double'; continue; }
+    if (ch === '`') { record(); state = 'template'; continue; }
+    if (ch === '{') { record(); braceDepth++; continue; }
+    if (ch === '}') {
+      record();
+      if (braceDepth === 0 && inTemplateExpr.length) {
+        braceDepth = inTemplateExpr.pop();
+        state = 'template';
+      } else if (braceDepth > 0) {
+        braceDepth--;
+      }
+      continue;
+    }
+    if (IDENT.test(ch)) {
+      if (identStart === null) identStart = column - 1;
+      ident += ch;
+      continue;
+    }
+    record();
+  }
+  record();
+  return hits;
 }
 
 function main(argv) {
   const list = argv.indexOf('--list') !== -1;
   const files = walk(ROOT, []).sort();
-  const results = files.map((f) => ({ file: path.relative(ROOT, f).split(path.sep).join('/'), findings: check(f) }));
-  const bad = results.filter((r) => r.findings.length);
+  if (list) for (const file of files) console.log('  ' + path.relative(ROOT, file).split(path.sep).join('/'));
 
-  if (list) for (const r of results) console.log('  ' + r.file);
+  let bad = 0;
+  let total = 0;
+  for (const file of files) {
+    const relative = path.relative(ROOT, file).split(path.sep).join('/');
+    const hits = findAny(fs.readFileSync(file, 'utf8'));
+    if (!hits.length) continue;
+    bad++;
+    for (const hit of hits) {
+      total++;
+      console.log(relative + ':' + hit.line + ':' + hit.column + '  ' + JSON.stringify(hit.text));
+    }
+  }
 
-  if (!bad.length) {
+  if (!bad) {
     console.log('No `any` in ' + files.length + ' TypeScript file(s).');
     return 0;
   }
-  for (const r of bad) {
-    for (const f of r.findings) {
-      console.log(r.file + ':' + f.line + '  ' + f.rule + '  ' + JSON.stringify(f.text));
-    }
-  }
-  console.log('\n' + bad.length + ' file(s) use `any`. Use `unknown` and narrow it, or name the real type.');
+  console.log('\n' + total + ' use(s) of `any` in ' + bad + ' file(s). Use `unknown` and narrow it, or name the real type.');
   return 1;
 }
 
 if (require.main === module) process.exit(main(process.argv.slice(2)));
-module.exports = { main: main };
+module.exports = { main: main, findAny: findAny };
