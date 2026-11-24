@@ -160,4 +160,65 @@ test('the N2b ONU is only safe at or above the class floor, and the pad is sized
     'the verdict must name the ONT and the overload point: ' + r.reasons.join(' | '));
 });
 
+test('the XG-PON E1 and E2 rows publish G.987.2 Table 9-3/9-4 and claim Table 6-1 budgets', function () {
+  // Table 9-3: E1 launches +6..+10 dBm, E2a +8..+12 dBm; both pair with the shared -28.0 dBm ONU.
+  // Table 9-4: OLT receiver E1 -31.5 / -11 dBm, E2 -33.5 / -13 dBm.
+  // Table 6-1: E1 is 18-33 dB of ODN loss, E2 is 20-35 dB.
+  const e1 = registry.get('olt', 'xg-pon-e1-16');
+  assert.strictEqual(e1.txPowerDbmMin, 6, 'E1 launch MIN is +6.0 dBm');
+  assert.strictEqual(e1.txPowerDbmMax, 10, 'E1 launch MAX is +10.0 dBm');
+  assert.strictEqual(e1.rxSensitivityDbm, -31.5, 'E1 OLT receiver sensitivity is -31.5 dBm');
+  assert.strictEqual(e1.rxOverloadDbm, -11, 'E1 OLT receiver overload is -11.0 dBm');
+  assert.strictEqual(e1.budgetDb, 33, 'E1 class is 33 dB');
+
+  const e2 = registry.get('olt', 'xg-pon-e2-16');
+  assert.strictEqual(e2.txPowerDbmMin, 8, 'E2a launch MIN is +8.0 dBm');
+  assert.strictEqual(e2.txPowerDbmMax, 12, 'E2a launch MAX is +12.0 dBm');
+  assert.strictEqual(e2.rxSensitivityDbm, -33.5, 'E2 OLT receiver sensitivity is -33.5 dBm');
+  assert.strictEqual(e2.rxOverloadDbm, -13, 'E2 OLT receiver overload is -13.0 dBm');
+  assert.strictEqual(e2.budgetDb, 35, 'E2 class is 35 dB');
+
+  // The class table is what made these rows unenterable before: it had xg-pon N1/N2 only, so an
+  // `xg-pon` part with class E1 failed validation on a class the recommendation publishes.
+  assert.strictEqual(parts.classBudgetDb('xg-pon', 'E1'), 33);
+  assert.strictEqual(parts.classBudgetDb('xg-pon', 'E2'), 35);
+
+  // Upstream tightening, the same half-dB of slack every row here carries:
+  // ONU launch floor +2.0 dBm -> 2.0 - (-31.5) = 33.5 dB against the 33 dB class; 2.0 - (-33.5) = 35.5 > 35.
+  assert.ok(2 - e1.rxSensitivityDbm > e1.budgetDb, 'E1 upstream headroom exceeds its class');
+  assert.ok(2 - e2.rxSensitivityDbm > e2.budgetDb, 'E2 upstream headroom exceeds its class');
+  // Downstream at the launch ceiling the ONT overload point lands exactly on the class floor:
+  // 10.0 + 8.0 = 18.0 dB = E1's minimum ODN loss, 12.0 + 8.0 = 20.0 dB = E2's.
+  const ont = registry.get('ont', 'xg-pon-ont-1xge');
+  assert.strictEqual(e1.txPowerDbmMax - ont.rxOverloadDbm, 18, 'E1 ceiling meets the E1 floor');
+  assert.strictEqual(e2.txPowerDbmMax - ont.rxOverloadDbm, 20, 'E2 ceiling meets the E2 floor');
+});
+
+test('a 1:64 XG-PON at class E2 over 20 km budgets green, and E1 is the tighter class', function () {
+  // 1:64 splitter = 10*log10(64) = 18.06 split + 2.44 excess = 20.50.
+  // 20 km of G.652.D at 1490 nm = 4.40; 2 splices = 0.20; 2 connector pairs = 0.60 -> ODN 25.70 dB.
+  // E2a launches +8.0 dBm -> -17.70 dBm at the ONT: 28 - 17.70 = 10.30 dB of headroom, and
+  // 35 - 25.70 = 9.30 dB inside the E2 class. E1 is the same ODN against 33 dB: 7.30 dB left.
+  const design = {
+    olt: { model: 'xg-pon-e2-16' },
+    ont: { model: 'xg-pon-ont-1xge' },
+    wavelength: '1490',
+    spans: [{ cable: 'g652d-loose-12', lengthM: 20000 }],
+    splitters: [{ model: 'plc-1x64-sca' }],
+    splices: 2,
+    connectors: 2
+  };
+  const r = budget.opticalBudget(design, registry);
+  close(r.odnLossDb, 25.70, 0.001, 'ODN loss');
+  close(r.headroomDb, 10.30, 0.01, 'headroom into the -28 dBm ONT');
+  close(r.classHeadroomDb, 9.30, 0.01, 'class headroom at E2');
+  assert.strictEqual(r.oltClass, 'E2');
+  assert.strictEqual(r.verdict, 'ok', r.reasons.join(' | '));
+
+  const e1 = budget.opticalBudget(Object.assign({}, design, { olt: { model: 'xg-pon-e1-16' } }), registry);
+  close(e1.headroomDb, 8.30, 0.01, 'E1 headroom is 2 dB less on the same ODN');
+  close(e1.classHeadroomDb, 7.30, 0.01, 'E1 class headroom');
+  assert.strictEqual(e1.verdict, 'ok', e1.reasons.join(' | '));
+});
+
 done();

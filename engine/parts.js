@@ -43,6 +43,8 @@ const CLASS_BUDGET_DB = {
   'gpon-c++': 35,
   'xg-pon-n1': 29,
   'xg-pon-n2': 31,
+  'xg-pon-e1': 33,
+  'xg-pon-e2': 35,
   'xgs-pon-n1': 29,
   'xgs-pon-n2': 31,
   'xgs-pon-e1': 33,

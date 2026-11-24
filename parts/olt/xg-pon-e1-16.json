@@ -1,0 +1,22 @@
+{
+  "kind": "olt",
+  "model": "xg-pon-e1-16",
+  "vendor": "generic",
+  "label": "XG-PON1 OLT class E1, 16 ports",
+  "pon": "xg-pon",
+  "class": "E1",
+  "txPowerDbmMin": 6,
+  "txPowerDbmMax": 10,
+  "rxSensitivityDbm": -31.5,
+  "rxOverloadDbm": -11,
+  "budgetDb": 33,
+  "ports": 16,
+  "maxSplitRatio": 64,
+  "notes": "ITU-T G.987.2 (02/2023). Downstream 9.95328 Gbit/s, Table 9-3, class E1: OLT mean launched power +6.0..+10.0 dBm, and the ONU receiver that goes with it is -28.0 dBm sensitivity / -8.0 dBm overload - the one receiver N1, N2a, E1 and E2a all share, which is why xg-pon-ont-1xge is the correct ONT for this row. Upstream 2.48832 Gbit/s, Table 9-4, class E1: OLT receiver sensitivity -31.5 dBm, minimum overload -11 dBm. Class E1 is 33 dB of ODN loss with an attenuation range of 18-33 dB (Table 6-1). Why this row did not exist before 2026-11-24: CLASS_BUDGET_DB in engine/parts.js carried only xg-pon-n1 (29 dB) and xg-pon-n2 (31 dB), and the validator refuses a class it has no published budget for ('no published budget for xg-pon class \"E1\"'), so a 33 dB XG-PON port - a standard class since the first edition - could not be entered at all. The table now carries E1 33 / E2 35 from the same Table 6-1. The class budget is again the tighter of the two verdicts: 2.0 - (-31.5) = 33.5 dB upstream (ONU launch floor +2.0 dBm, Table 9-4) against the class's 33 dB, and downstream 6.0 + 28.0 = 34.0 dB against 33. The overload direction costs a pad, never reach: at the +10.0 dBm ceiling of the launch window, 10.0 + 8.0 = 18.0 dB lands exactly on E1's published minimum ODN loss, so any ODN shorter than 18 dB overdrives the ONT - the budget's attenuator verdict names the smallest pad that clears the receiver, and it has to be checked against that 18 dB floor before ordering. Split ratio 64 is G.987.1 clause 8.5's minimum requirement for XG-PON; 1:128+ is an operator option the line card has to state for itself, and 33 dB does not fund it on a 20 km feeder. Ports 16 is a line-card size, not a standards figure. Wavelength: XG-PON1 transmits 1575-1580 nm downstream and 1260-1280 nm upstream; the engine budgets one wavelength and defaults to 1490 down / 1310 up, whose cable attenuation (0.22 / 0.35 dB/km) sits within 0.01-0.02 dB/km of the real windows. Class figures from the recommendation, not one measured card: replace the row with the line card actually purchased before construction.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.987.2/en",
+  "tags": [
+    "xg-pon",
+    "e1",
+    "long-reach"
+  ]
+}

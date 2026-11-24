@@ -1,0 +1,22 @@
+{
+  "kind": "olt",
+  "model": "xg-pon-e2-16",
+  "vendor": "generic",
+  "label": "XG-PON1 OLT class E2, 16 ports",
+  "pon": "xg-pon",
+  "class": "E2",
+  "txPowerDbmMin": 8,
+  "txPowerDbmMax": 12,
+  "rxSensitivityDbm": -33.5,
+  "rxOverloadDbm": -13,
+  "budgetDb": 35,
+  "ports": 16,
+  "maxSplitRatio": 64,
+  "notes": "ITU-T G.987.2 (02/2023). Downstream 9.95328 Gbit/s, Table 9-3: class E2 is split into E2a (+8.0..+12.0 dBm) and E2b (+14.5..+16.5 dBm), and this row is the E2a variant with the ordinary -28.0 dBm / -8.0 dBm ONU receiver. E2b is a different part, not a looser figure on this one: it buys its extra launch with the reduced -21.5 dBm / -3.5 dBm ONU, which is the xg-pon-ont-n2b-1xge row, so pairing an E2b port with an ordinary ONT would throw away 6.5 dB of budget. Upstream 2.48832 Gbit/s, Table 9-4, class E2: OLT receiver sensitivity -33.5 dBm, minimum overload -13 dBm. Class E2 is 35 dB of ODN loss with an attenuation range of 20-35 dB (Table 6-1) - the deepest class G.987.2 defines, and the first XG-PON class in this catalogue that can carry a 1:128 split over a real feeder. Why this row did not exist before 2026-11-24: CLASS_BUDGET_DB had no xg-pon E1/E2 key, so the validator refused the class outright ('no published budget for xg-pon class \"E2\"'), even though xgs-pon E1/E2 were already tabled - the same four classes, from the same Table 6-1, on the other 10G PON. The class budget is the tighter verdict: 2.0 - (-33.5) = 35.5 dB upstream against the class's 35 dB, and downstream 8.0 + 28.0 = 36.0 dB against 35. The overload trap has no reach answer: at the +12.0 dBm ceiling, 12.0 + 8.0 = 20.0 dB is exactly E2's published minimum ODN loss, so a short span into this port blinds the ONT and needs the pad the budget's attenuator verdict names - never a longer route. Ports 16 is a line-card size, not a standards figure. Wavelength: XG-PON1 transmits 1575-1580 nm downstream and 1260-1280 nm upstream; the engine budgets one wavelength and defaults to 1490 down / 1310 up, whose cable attenuation (0.22 / 0.35 dB/km) sits within 0.01-0.02 dB/km of the real windows. Class figures from the recommendation, not one measured card: replace the row with the line card actually purchased before construction.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.987.2/en",
+  "tags": [
+    "xg-pon",
+    "e2",
+    "long-reach"
+  ]
+}
