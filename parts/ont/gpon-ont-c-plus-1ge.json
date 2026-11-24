@@ -1,0 +1,20 @@
+{
+  "kind": "ont",
+  "model": "gpon-ont-c-plus-1ge",
+  "vendor": "generic",
+  "label": "GPON ONT class C+ 1x GE",
+  "pon": "gpon",
+  "txPowerDbmMin": 0.5,
+  "txPowerDbmMax": 5,
+  "rxSensitivityDbm": -30,
+  "rxOverloadDbm": -8,
+  "ports": {
+    "ge": 1
+  },
+  "notes": "Class C+ ONU per ITU-T G.984.2 (08/2019) Appendix V, Table V.1 (2.488 Gbit/s downstream, 1.244 Gbit/s upstream single-sided reach-extended system; the appendix is industry best practice, not an integral part of the Recommendation): ONU mean launched power +0.5..+5 dBm, ONU minimum sensitivity -30 dBm, ONU minimum overload -8 dBm, upstream wavelength window 1290-1330 nm per G.984.5, pre-FEC BER 1e-4. Two notes travel with those figures and both cost a build if they are dropped. NOTE 2 of Table V.1: the -30 dBm assumes the optional RS(255,239) FEC of the GPON TC layer with current class B+ ONU detector technology - a CPE deployed with FEC off is the class B+ -27 dBm row (gpon-ont-1ge), and 3 dB of the downstream budget this row promises does not exist. NOTE 3: the -8 dBm overload is set to be common with the class B+ value even though -10 dBm would be sufficient in this application, so a short ODN can saturate this receiver exactly where a B+ one would. Why this row exists: the catalogue already had a C+ receiver, but only inside gpon-ont-4ge, whose label reads 'GPON ONT 4x GE' - a C+ OLT's 1-port CPE had nothing to select, and the obvious pick, gpon-ont-1ge at -27 dBm, silently spends 3 dB of the downstream headroom the C+ line card was bought for. Measured on the default C+ design (gpon-c-plus-8, 3.0 km of g652d-loose-24, one plc-1x8-sca, 4 splices, 2 SC/APC matings, 1490 nm): ODN 12.16 dB, receive -9.16 dBm at the card's 3 dBm launch floor, headroom 20.84 dB against this row's -30 dBm - the same plant against gpon-ont-1ge reads 17.84 dB. What the row does NOT buy: the class verdict is still the OLT's 32 dB C+ ODN budget, and 3 dB more receiver does not turn a 32 dB class into a 35 dB one (that is class C++, gpon-c-plus-plus-16). It covers class C++ downstream, where the C++ card's 6 dBm launch floor and this -30 dBm receiver make 36 dB against the 35 dB class, which is the arithmetic the C++ OLT row relies on. One GE port as the label says; the engine reports `ports` and does not budget it. Class figures from the Recommendation, not one measured ONT: replace sensitivity with the bought CPE's datasheet, and confirm the FEC the OLT will actually run, before construction.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
+  "tags": [
+    "gpon",
+    "c+"
+  ]
+}
