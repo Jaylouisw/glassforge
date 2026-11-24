@@ -199,7 +199,8 @@ difference is almost exactly the detour to the junction, which is the whole poin
   "routeMethod": "straight-line x1.2",
   "technology": "pon",
   "best": { "label": "PON 1:8 with 3 splitter site(s)", "metrics": { "cableM": 2987.7, "fibreMetres": 26987.7,
-            "onts": 24, "splitters": 3, "closures": 21, "worstHeadroomDb": 20.7, "marginalOnts": 0 } },
+            "onts": 24, "splitters": 3, "closures": 21, "worstHeadroomDb": 20.7, "marginalOnts": 0,
+            "launchWindowOnts": 0 } },
   "candidates": [ { "label": "...", "feasible": false, "reasons": ["..."], "metrics": {...} } ],
   "plant": { "nodes": [...], "spans": [...] },   // the winner, ready for network.validate
   "runs": [ { "id": "s-feed-1", "purpose": "feeder", "cable": "g652d-loose-12", "lengthM": 421.3, "feedsSplitters": 3 } ],
@@ -212,6 +213,15 @@ difference is almost exactly the detour to the junction, which is the whole poin
 tightest one once for the whole plant. Each candidate's `budgets` carries one row per ONT,
 `{ ont, name, verdict, marginalReason, headroomDb, rxPowerDbm, launchWindowPad, error }`, so a marginal
 verdict can be read per address instead of only as a plant-level sentence.
+
+`metrics.launchWindowOnts` counts the ONTs that are inside the receiver's overload point only at the
+bottom of the OLT's launch window — the band [OPTICAL.md](OPTICAL.md#the-band-between-the-two-launches)
+describes — and the winner's `warnings` carries that band as one sentence: the count, the worst
+overshoot at the top of the window and the pad to buy. It comes from `budget.launchWindowNote`, the
+same function the printed plan calls, so the report and the page a crew signs off say the same thing.
+The band does not make a design infeasible — the candidate stays `ok` and `feasible`, and whether that
+is right is still open in issue #111 — and `launchWindowPad` on each budget row is the per-ONT figure
+behind the plant-level count.
 
 `rationale` is written to be checkable: every line quotes the numbers the comparison used. When
 `ok` is false there is no `plant`, and every candidate carries the reasons it was refused — a design

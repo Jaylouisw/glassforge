@@ -276,6 +276,26 @@ closure, `parked` when it arrives on one cable and leaves on none, or `splitter 
 port P<n>` at a splitter, whose rows are never spliced across the split. The browser's own **Print → Save as PDF** is the PDF path; nothing is
 rendered into a PDF on the server and no library is loaded.
 
+The **Checks** section opens its budget warnings with one plant-level sentence about the OLT's launch
+window, built by `budget.launchWindowNote` — the same sentence a synthesised design puts in its
+`warnings`, so the page a crew signs off and the report that chose the design cannot disagree about it.
+It states the share of the estate in the band and the pad to buy, once, and the per-ONT warnings stay
+underneath it because a warning names the ONT it is about. Measured on a C+ OLT with a 1:8 cassette
+200 m away and two ONTs on 30 m drops (ODN 11.25 dB, so `ok` on both verdicts), the line reads:
+
+```
+2 of 2 ONTs are inside the overload point only at the bottom of the OLT gpon-c-plus-8 launch window:
+worst 3.75 dB over at the 7 dBm top, so 4 dB of inline pad at the OLT carries the design to full
+launch - as it stands it holds only while every line card lands at 3 dBm
+```
+
+One pad at the OLT is only the right purchase when every ONT in the band needs the same size. A band
+that needs a 4 dB pad on one drop and a 2 dB pad on another, or an estate with only part of its ONTs in
+the band, is answered with `a pad at each of the 2 affected ONTs carries the design to full launch
+(1 x 4 dB, 1 x 2 dB)` and, where the rest of the estate is clear, `and the other 1 cannot share a pad on
+the feeder`: one pad at the feeder is one size, so it would spend the other ONTs' margin to fix these.
+A plant clear of the band prints no such line at all.
+
 Everything the page prints is HTML-escaped, and the page contains no `<script>` and no remote
 `src`/`href`, so it renders on a machine with no network. An unknown id answers a **404 HTML page**.
 A project whose cable models cannot be priced still prints: the cable section names the error
