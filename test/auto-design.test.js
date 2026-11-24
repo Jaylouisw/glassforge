@@ -224,3 +224,35 @@ test('the design BOM buys each cable on its own drum length, rounded once', func
   }
   assert.ok(sawShortDrum, 'the winner carries a cable whose drum is not 2 km, or this test proves nothing');
 });
+
+test('a cost model that leaves a cable unpriced is refused, naming the model', function () {
+  // A price list that covers the PON feeder and the 1-fibre drop but not the 2-fibre drop or the
+  // 24-fibre trunk is not a money model: charging the missing cables 0 makes a design that builds
+  // with them look free, and the ranking is then wrong in the one direction nobody checks. The
+  // engine used to do exactly that (`isNum(perM) ? perM : 0`), so this asserts the refusal instead.
+  const err = throws(function () {
+    engine.design.synthesise(street(10, 0.0004), {
+      headEnd: HEAD_END,
+      costs: { splice: 8, closure: 120, splitter: 40, cablePerM: { 'g652d-loose-12': 1.1, 'g657a2-drop-1': 0.4 } }
+    }, registry);
+  }, 'costs.cablePerM has no price for', 'synthesise with a partial price list');
+  assert.ok(err.message.indexOf('g652d-loose-24') !== -1, 'names the 24-fibre trunk: ' + err.message);
+  assert.ok(err.message.indexOf('g657a2-drop-2') !== -1, 'names the 2-fibre drop: ' + err.message);
+});
+
+test('a cost model with no cable price at all is refused', function () {
+  // Splice and closure prices alone rank on the small terms and ignore the term cable price tracks
+  // (fibre-metres) - the objective would say "cost" and mean "splices". Refused rather than ignored.
+  throws(function () {
+    engine.design.synthesise(street(4, 0.0004), { headEnd: HEAD_END, costs: { splice: 8 } }, registry);
+  }, 'costs.cablePerM is required', 'synthesise with no cablePerM');
+});
+
+test('a negative cable price is refused, not netted off the BOM', function () {
+  throws(function () {
+    engine.design.synthesise(street(4, 0.0004), {
+      headEnd: HEAD_END,
+      costs: { cablePerM: { 'g652d-loose-12': -1 } }
+    }, registry);
+  }, 'costs.cablePerM["g652d-loose-12"] must be a non-negative number', 'synthesise with a negative price');
+});

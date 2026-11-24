@@ -73,6 +73,46 @@ function round(n, places) {
 }
 function cmpIds(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
 
+/**
+ * Validate the caller's cost model, because a money objective is only as good as its price list.
+ *
+ * The engine used to read `costs.cablePerM[line.model]` and charge 0 for a cable the caller had not
+ * priced. That is defaulting a missing figure to zero - the one thing this engine refuses to do with
+ * attenuation, and it is worse here: cable is the dominant term of a fibre BOM, so a partial list
+ * ranks a design by its splices while the response says `objective: "cost"`. A cable the model leaves
+ * unpriced is caught later, per candidate, because only a built design knows which cables it uses;
+ * this function catches the shapes and the entries that are wrong on their face.
+ */
+function costModel(input) {
+  if (input === undefined || input === null) return null;
+  if (typeof input !== 'object' || Array.isArray(input)) {
+    throw new TypeError('costs must be an object: { cablePerM: { model: n }, splice, closure, splitter }');
+  }
+  if (input.cablePerM === undefined) {
+    throw new TypeError('costs.cablePerM is required when a cost model is supplied - cable is the term a money objective is mostly made of; omit costs to rank by fibre-metres');
+  }
+  if (typeof input.cablePerM !== 'object' || input.cablePerM === null || Array.isArray(input.cablePerM)) {
+    throw new TypeError('costs.cablePerM must be an object of { cable model: price per metre }');
+  }
+  const prices = {};
+  for (const model of Object.keys(input.cablePerM)) {
+    const value = input.cablePerM[model];
+    if (!isNum(value) || value < 0) {
+      throw new TypeError('costs.cablePerM["' + model + '"] must be a non-negative number, got ' + JSON.stringify(value));
+    }
+    prices[model] = value;
+  }
+  const out = { cablePerM: prices };
+  for (const key of ['splice', 'closure', 'splitter']) {
+    if (input[key] === undefined) continue;
+    if (!isNum(input[key]) || input[key] < 0) {
+      throw new TypeError('costs.' + key + ' must be a non-negative number, got ' + JSON.stringify(input[key]));
+    }
+    out[key] = input[key];
+  }
+  return out;
+}
+
 function options(input) {
   const o = input || {};
   return {
@@ -87,7 +127,7 @@ function options(input) {
     active: Object.assign({}, DEFAULTS.active, o.active || {}),
     ladder: Array.isArray(o.ladder) && o.ladder.length ? o.ladder : DEFAULTS.ladder,
     overlengthPct: isNum(o.overlengthPct) ? o.overlengthPct : DEFAULTS.overlengthPct,
-    costs: o.costs || null,
+    costs: costModel(o.costs),
     kmeansIterations: DEFAULTS.kmeansIterations,
     includeAllPlants: !!o.includeAllPlants
   };
@@ -860,16 +900,22 @@ function evaluate(plant, opts, registry, meta) {
   };
 
   let cost = null;
+  const unpricedCable = [];
   if (opts.costs) {
+    // Every cable the BOM builds with must carry a price. A model that leaves one out is not a
+    // money model - charging it 0 makes the design that uses it look free - so the models are
+    // collected here and `synthesise` refuses the request once every candidate has been built,
+    // naming all of them rather than the first one met.
     cost = 0;
     for (const line of bom.lines) {
-      const perM = opts.costs.cablePerM && opts.costs.cablePerM[line.model];
-      cost += (isNum(perM) ? perM : 0) * line.designM;
+      const perM = opts.costs.cablePerM[line.model];
+      if (perM === undefined) { unpricedCable.push(line.model); continue; }
+      cost += perM * line.designM;
     }
     if (isNum(opts.costs.splice)) cost += opts.costs.splice * splices;
     if (isNum(opts.costs.closure)) cost += opts.costs.closure * closures;
     if (isNum(opts.costs.splitter)) cost += opts.costs.splitter * splitters;
-    cost = round(cost, 2);
+    cost = unpricedCable.length ? null : round(cost, 2);
   }
   metrics.cost = cost;
 
@@ -878,6 +924,9 @@ function evaluate(plant, opts, registry, meta) {
     label: meta.label,
     settings: meta.settings,
     feasible: reasons.length === 0,
+    // Not part of any response: `synthesise` reads it to refuse a price list that cannot rank the
+    // candidates it is about to compare, and the candidate table never carries this field.
+    unpricedCable: Array.from(new Set(unpricedCable)).sort(),
     reasons: reasons,
     warnings: structural.warnings,
     metrics: metrics,
@@ -1020,6 +1069,21 @@ function synthesise(demandInput, userOptions, registry) {
     }
   }
   if (!candidates.length) throw new Error('no candidate topology could be built for technology "' + opts.technology + '"');
+
+  // A money objective with a hole in its price list is refused before anything is ranked. The hole
+  // belongs to the caller's input, so it is a 400 at the API (see `asBadRequest`), and the message
+  // names every unpriced cable the candidates build with - not just the first one met, which would
+  // make the caller fix the list one model per attempt.
+  if (opts.costs) {
+    const unpriced = new Set();
+    for (const candidate of candidates) {
+      for (const model of candidate.unpricedCable || []) unpriced.add(model);
+    }
+    if (unpriced.size) {
+      throw new TypeError('costs.cablePerM has no price for ' + Array.from(unpriced).sort().join(', ') +
+        ' - a money objective that treats an unpriced cable as free ranks the wrong design; price every cable the design builds with, or omit costs to rank by fibre-metres');
+    }
+  }
 
   // The PON port limit is a plant-level constraint the validator cannot see, because it belongs to
   // the OLT part rather than to the tree.

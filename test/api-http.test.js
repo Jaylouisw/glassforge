@@ -210,6 +210,20 @@ async function main() {
     assert.deepStrictEqual(validation.errors, []);
   });
 
+  // The cost model is the caller's price list, and a hole in it used to be charged as 0 - a money
+  // objective that ranked a design with an unpriced cable as if the cable were free. That is
+  // caller input, so it is a 400 naming the cable, not a 500 and not a quiet zero.
+  const partialCost = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv,
+    headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' },
+    costs: { splice: 8, cablePerM: { 'g652d-loose-12': 1.1 } }
+  });
+  test('a cost model that leaves a cable unpriced is a 400 naming the cable', function () {
+    assert.strictEqual(partialCost.status, 400, 'status ' + partialCost.status + ': ' + JSON.stringify(partialCost.body));
+    assert.ok(partialCost.body.error.indexOf('costs.cablePerM has no price for') !== -1, partialCost.body.error);
+    assert.ok(partialCost.body.error.indexOf('g657a2-drop-2') !== -1, partialCost.body.error);
+  });
+
   const applied = await request('POST', '/api/design/synthesise', {
     demand: demandCsv,
     headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' },
