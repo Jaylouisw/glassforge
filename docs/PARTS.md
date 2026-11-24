@@ -64,10 +64,14 @@ in `notes` where its number came from.
   "kind": "olt", "model": "gpon-c-plus-8", "label": "GPON OLT class C+, 8 ports",
   "pon": "gpon", "class": "C+",
   "txPowerDbmMin": 3, "txPowerDbmMax": 7,
-  "rxSensitivityDbm": -30, "rxOverloadDbm": -8,
+  "rxSensitivityDbm": -32, "rxOverloadDbm": -12,
   "budgetDb": 32, "ports": 8, "maxSplitRatio": 128
 }
 ```
+
+The example is `parts/olt/gpon-c-plus-8.json`, field for field: `test/parts-doc-examples.test.js`
+parses every ```json block on this page and fails when a figure disagrees with the part it names, which
+is how the -30/-8 class B+ pair above was caught still sitting here after the part was corrected.
 
 - `pon`: `gpon`, `xg-pon`, `xgs-pon`. `class` must have a published budget; `budgetDb` that differs by
   more than 0.5 dB from the published figure warns.
