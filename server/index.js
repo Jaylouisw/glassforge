@@ -498,6 +498,11 @@ async function handle(req, res, ctx) {
         network: body.network,
         maxSnapM: body.maxSnapM,
         joinToleranceM: body.joinToleranceM,
+        // Every cable line the design prices is route x (1 + overlengthPct/100). The handler
+        // forwarded nine named keys and dropped this one, so `overlengthPct: 10` answered the
+        // design measured at 3% and `overlengthPct: "ten"` answered 200 instead of the engine
+        // refusal - a guard cannot fire on a key it never receives. A BOM is bought on this number.
+        overlengthPct: body.overlengthPct,
         pon: body.pon,
         active: body.active,
         costs: body.costs

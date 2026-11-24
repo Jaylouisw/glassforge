@@ -263,6 +263,37 @@ async function main() {
     assert.deepStrictEqual(validation.errors, []);
   });
 
+
+  // `overlengthPct` is a design slack the engine prices into every cable line, but the synthesise
+  // handler forwarded nine named keys and dropped it. Over this socket, 3 and 10 answered the same
+  // `designM`, so a caller asking for 10% bought a BOM quoted at 3% - and `overlengthPct: "ten"`
+  // answered 200, because the guard that refuses an unreadable value cannot fire on a key the
+  // handler never passed on. A BOM number that buys the wrong cable is the caller's loss, silent.
+  const shortSlack = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv, headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' }, overlengthPct: 3
+  });
+  const longSlack = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv, headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' }, overlengthPct: 10
+  });
+  const unreadableSlack = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv, headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' }, overlengthPct: 'ten'
+  });
+  test('a design slack reaches the BOM instead of being dropped at the handler', function () {
+    assert.strictEqual(shortSlack.status, 200, JSON.stringify(shortSlack.body).slice(0, 200));
+    assert.strictEqual(longSlack.status, 200, JSON.stringify(longSlack.body).slice(0, 200));
+    const shortM = shortSlack.body.best.metrics.designM;
+    const longM = longSlack.body.best.metrics.designM;
+    // Each cable line is route x (1 + pct/100), so 10% is 110/103 = 1.068 of the 3% design length.
+    assert.ok(shortM > 0 && longM > 0, 'designM ' + shortM + ' and ' + longM);
+    const ratio = longM / shortM;
+    assert.ok(ratio > 1.05 && ratio < 1.12, '3% and 10% quoted designM ' + shortM + ' and ' + longM);
+  });
+  test('a slack the design cannot read is a 400 naming the field, not a silent default', function () {
+    assert.strictEqual(unreadableSlack.status, 400,
+      'status ' + unreadableSlack.status + ': ' + JSON.stringify(unreadableSlack.body).slice(0, 200));
+    assert.ok(unreadableSlack.body.error.indexOf('overlengthPct') !== -1, unreadableSlack.body.error);
+  });
+
   // The cost model is the caller's price list, and a hole in it used to be charged as 0 - a money
   // objective that ranked a design with an unpriced cable as if the cable were free. That is
   // caller input, so it is a 400 naming the cable, not a 500 and not a quiet zero.
