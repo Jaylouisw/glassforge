@@ -81,7 +81,12 @@ function trace(plant, ontId) {
   }
   const target = nodeById(plant, ontId);
   if (!target) throw new Error('no node with id "' + ontId + '"');
-  if (target.type !== 'ont') throw new Error('node "' + ontId + '" is a ' + target.type + ', not an ont');
+  // Quote the types rather than splicing one into a fixed article: "is a " + "olt" reads "a olt",
+  // and the server's own 400 says `has type "olt", not "ont" - /budget takes an ONT id`. Same sentence
+  // shape here so a direct engine caller and an allOntBudgets error row carry the same wording.
+  if (target.type !== 'ont') {
+    throw new Error('node "' + ontId + '" has type "' + target.type + '", not "ont" - trace takes an ONT id');
+  }
 
   const roots = plant.nodes.filter(function (n) { return ROOT_TYPES.indexOf(n.type) !== -1; });
   if (roots.length !== 1) {

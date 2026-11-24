@@ -52,8 +52,12 @@ test('every ONT gets a verdict, and one broken ONT does not hide the rest', func
   assert.ok(results.find(function (r) { return r.ont === 'n6'; }).error.indexOf('not connected') !== -1);
 });
 
+// The refusal quotes the node types the way the server's 400 does - `has type "closure", not "ont"` -
+// instead of splicing a type name into a fixed article. It used to read `node "n2" is a closure, not
+// an ont`: the article agreed with "ont" and not with whatever type the node actually had, and the
+// server had already moved to the quoted form, so the two sentences drifted (#60).
 test('asking for an ONT that is not an ONT is refused', function () {
-  throws(function () { network.trace(plant(), 'n2'); }, 'not an ont');
+  throws(function () { network.trace(plant(), 'n2'); }, 'has type "closure", not "ont"');
   throws(function () { network.trace(plant(), 'nope'); }, 'no node with id');
 });
 
