@@ -67,10 +67,19 @@ A splitter with 1.2 dB of excess loss where you assumed 0.5 dB is half a kilomet
 | GPON | B+ | 28 dB | 1:64 | ITU-T G.984.2 |
 | GPON | C+ | 32 dB | 1:128 | ITU-T G.984.2 |
 | GPON | C++ | 35 dB | 1:128 | ITU-T G.984.2 Amd 1 |
+| XG-PON | N1 | 29 dB | 1:64 | ITU-T G.987.2 |
+| XG-PON | N2 | 31 dB | 1:64 | ITU-T G.987.2 |
 | XGS-PON | N1 | 29 dB | 1:64 | ITU-T G.9807.1 |
 | XGS-PON | N2 | 31 dB | 1:128 | ITU-T G.9807.1 |
 | XGS-PON | E1 | 33 dB | 1:128 | ITU-T G.9807.1 |
 | XGS-PON | E2 | 35 dB | 1:128 | ITU-T G.9807.1 |
+
+XG-PON and XGS-PON are two different PON types, not two spellings of one: XG-PON carries 9.953 Gbit/s
+down and 2.488 Gbit/s up, XGS-PON carries 9.953 Gbit/s both ways. They share the N1/N2 loss figures
+and the engine keeps them apart — an `xg-pon` OLT with an XGS-PON ONT is refused rather than budgeted
+(`the OLT is xg-pon and the ONT is xgs-pon - they cannot share a PON`). The XG-PON rows claim 1:64
+because that is the minimum G.987.1 clause 8.5 requires; 1:128 is an operator option the line card
+has to state for itself.
 
 The class budget is a check on the **ODN loss** (fibre + splices + connectors + splitters), separate
 from the receiver headroom check. Both have to pass.

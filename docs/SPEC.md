@@ -94,9 +94,9 @@ A design passes only if **both** hold:
    when the receiver is at or below its overload point) — and because a pad is ODN loss, `maxPadDb` is
    the point where the margin and the class budget run out.
 2. **The plant's own budget.** For a PON, `ODN loss ≤ class budget` (GPON B+ 28 dB, C+ 32, C++ 35;
-   XGS-PON N1 29, N2 31, E1 33, E2 35). For an active link, `ODN loss ≤ launch(min) − sensitivity` for
-   the optic pair, and the route must be inside the optic's reach — a link can be 3 dB inside its
-   budget and still be 60 km down a 10 km optic.
+   XG-PON N1 29, N2 31; XGS-PON N1 29, N2 31, E1 33, E2 35). For an active link,
+   `ODN loss ≤ launch(min) − sensitivity` for the optic pair, and the route must be inside the optic's
+   reach — a link can be 3 dB inside its budget and still be 60 km down a 10 km optic.
 
 They fail independently. A link can hear fine and still be outside what the OLT vendor supports —
 `test/budget-optics.test.js` has exactly that case. Verdicts are `ok`, `marginal` (passes, but with
