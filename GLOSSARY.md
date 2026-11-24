@@ -22,10 +22,13 @@ point-to-point or active-over-tree design. The root node type selects the budget
 **Splitter site** — a closure that holds a splitter, reached by a 1 m **splitter tail** so a feeder
 cable passing three sites is not mistaken for three cascaded splitters.
 
-**Cascade** — the number of splitters on the deepest root-to-leaf path, not the product of every
-splitter in the plant. On a plant's `capacity()` result the exposed field is **`splitterCascade`**;
-`maxCascade` is the local variable inside `engine/network.js` that computes it and is not part of any
-returned object. Report `splitterCascade`, read `maxCascade` only if you are editing that file.
+**Cascade** — the end-to-end split ratio of the deepest root-to-leaf path: the ratios of the
+splitters on that one path multiplied together, so two 1:8 splitters in line read as
+`splitterCascade: 64`. It is not the product of every splitter in the plant — six 1:8 splitters on six
+separate branches are six 1:8 paths, not 1:262144 — and it is not a count of splitters. On a plant's
+`capacity()` result the exposed field is **`splitterCascade`**; `maxCascade` is the local
+variable inside `engine/network.js` that computes it and is not part of any returned object. Report
+`splitterCascade`, read `maxCascade` only if you are editing that file.
 
 ## Money and cable
 
