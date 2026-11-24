@@ -128,10 +128,11 @@ POST /api/design/link
     optics: { a: transceiver model, b: transceiver model },
     network?: KML text | [polylines] | { edges: [{ coords }] },
     protection?: "diverse" (default) | "single",
+    direction?: "down" (default) | "up",
     thirdParty?: [{ provider, lengthM, lossDb, leg?: "a"|"b"|"both", cost?, reference? }],
     fibres?, cable?, ladder?, connectors?, splices?, marginDb?, maxSnapM?, joinToleranceM? }
-  → { ok, mode: "link", routeMethod, sites, legs, paths, runs, diversity, thirdParty, bom, verdict,
-      reasons, warnings, notes }
+  → { ok, mode: "link", technology, routeMethod, network, sites, protection, legs, paths, runs,
+      diversity, thirdParty, bom, verdict, upstreamVerdict, reasons, warnings, notes }
 ```
 
 Two named sites and an optic at each end, with **both legs routed along the supplied duct/street
@@ -140,7 +141,23 @@ legs are the minimum-cost edge-disjoint pair (Suurballe) where the graph allows 
 the second leg is the path that shares the fewest metres and `diversity.shared` names every shared
 segment with its metres (`diversity.sharedM` is `null` when there is only one leg: there is nothing to
 compare). Each leg carries its own `budget` from `budget.pointToPoint`, so reach, loss
-budget and overload are three verdicts per leg. `legs[].routedM` is the graph measurement,
+budget and overload are three verdicts per leg. `direction` picks which half of the circuit
+`budget` and `verdict` describe (default `"down"`, A launching into B); any value other than
+`"up"`/`"down"` is a 400, because the two directions are different receivers at different
+wavelengths and refusing beats reading a typo as `"down"`.
+**A circuit is two links over that one path**, so each leg also carries `upstream` - a second
+`pointToPoint` call with `direction: "up"`, always the B → A direction whatever `direction` asked for,
+and the same object as `budget` when the caller asked for `"up"` - with its own `upstreamVerdict`;
+the top-level `upstreamVerdict` is the worst of the legs, and it is `null` on a refusal, which routed
+nothing and so measured neither direction. The half not asked for is **warned about, not gated**:
+a failing `upstream` adds `A-leg: fails upstream over the same path - <reasons>`, naming the one pad
+to buy when both directions ask for one, but `verdict` and `ok` stay the direction the caller asked
+for - the same treatment auto-design gives `upstreamVerdict` / `metrics.upstreamFailOnts`, and
+whether an upstream failure should refuse a circuit is open in #185/#111. A mixed pair is not
+symmetric: `sfp-1g-lx-10km` at A and `sfp-1g-ex-40km` at B over a 3.0 km duct read `ok` downstream at
+-12.65 dBm and `fail` upstream at -2.65 dBm, because the EX launches its floor into the LX receiver's
+-3 dBm overload point: a 5 dB pad, not more reach.
+`legs[].routedM` is the graph measurement,
 `legs[].ownM` adds both site drops (the cable to buy) and `legs[].lengthM` adds leased segments.
 `legs[].spliceEvents` is what the light crosses - one splice per joint on the leg, or the `splices`
 option - and is what each leg's budget charges; `legs[].splices` is the crew's count, that number times

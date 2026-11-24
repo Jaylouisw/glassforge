@@ -324,11 +324,24 @@ A protected request whose legs share anything carries a warning quoting the same
 same building the same way; a leased segment on `leg: "both"` is counted separately in
 `leasedSharedM`.
 
-### One budget per leg, and leased fibre that is not cable
+### Both directions per leg, and leased fibre that is not cable
 
-Each leg is its own `budget.pointToPoint` call, so reach, loss budget and overload are three separate
-verdicts **per leg**: an asymmetric circuit gets two answers, not an average. Reasons are prefixed with
-the leg they belong to (`A-leg: the route is 50038 m but the shorter optic reaches 40000 m`).
+Each leg is its own `budget.pointToPoint` call in the direction the caller asked for (`direction`,
+default `"down"`, A launching into B), so reach, loss budget and overload are three separate verdicts
+**per leg**. A circuit is two links over that one path, so each leg also carries `upstream` - the same
+call read the other way (`direction: "up"`, always the B → A direction whatever was asked for, and the
+same object as `budget` when `"up"` was asked for) - with its own `upstreamVerdict`; the top-level
+`upstreamVerdict` is the worst of the legs and `null` on a refusal, which routed nothing. Reasons are
+prefixed with the leg they belong to (`A-leg: the route is 50038 m but the shorter optic reaches 40000 m`).
+
+The directions are **not symmetric** whenever the ends are different optics, and an asymmetric circuit
+gets two answers, not an average: `sfp-1g-lx-10km` at A and `sfp-1g-ex-40km` at B over the 3.0 km duct
+read `ok` downstream at -12.65 dBm and `fail` upstream at -2.65 dBm, because the EX launches its -1 dBm
+floor into the LX receiver's -3 dBm overload point. That is a 5 dB pad, not more reach. A failing
+upstream direction is **reported, not gated**: the leg warns `A-leg: fails upstream over the same path
+- <reasons>`, sizes the one pad to buy when both directions name a pad, and leaves `verdict` and `ok`
+on the direction the caller asked for - the same treatment the auto-design rows get above, and whether
+upstream should refuse a circuit is the open decision in #185/#111.
 
 A leased (third-party) segment carries a provider, a stated length and a stated loss. It is charged to
 the budget of the leg it rides, counted in the path length and in the cost, and **excluded from the
