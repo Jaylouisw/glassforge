@@ -1,0 +1,22 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp28-100g-lr1-10km",
+  "vendor": "generic",
+  "label": "QSFP28 100GBASE-LR1 single-lambda 10 km",
+  "speedMbps": 100000,
+  "wavelengthNm": 1310,
+  "reachM": 10000,
+  "txPowerDbmMin": -1.9,
+  "txPowerDbmMax": 4.8,
+  "rxSensitivityDbm": -8.2,
+  "rxOverloadDbm": 4.8,
+  "polish": "upc",
+  "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
+  "notes": "IEEE 802.3cu Clause 140 (100GBASE-LR1), the single-lambda 100G PMD now folded into IEEE 802.3-2022: 53.125 GBd PAM4 on one 1310 nm carrier over a 1304.5-1317.5 nm window, 10 km, duplex LC. Average launch power -1.9..+4.8 dBm and average receive power -8.2..+4.8 dBm, OMAouter sensitivity -6.1 dBm at TDECQ <= 1.4 dB (-7.5 + TDECQ above that). Corroboration: the Ascent ACT_QSFP28-100G-LR10 sheet (802.3cu D3.2 compliant) prints -1.9/+4.8 transmit, -8.2/+4.8 receive, -6.1 dBm OMA sensitivity and a -15 dBm transmitter-off level. Read the 10.6 dB power budget the clause prints the same way the 25GBASE-LR row does: it is 6.3 dB of channel insertion loss plus the 4.3 dB a worst-case PAM4 transmitter eye costs (TDECQ), and this engine compares average launch with average receive, so 6.3 dB is the whole figure a link may spend - -1.9 minus -8.2 = 6.3. Consequence at the default 3 dB margin: 10 km x 0.35 dB/km = 3.5 dB of fibre leaves 2.8 dB, so a bare full-reach span reads fail on margin, not on reach; 9.4 km (3.3 / 0.35) is the last length that reaches marginal and 3.7 km (1.3 / 0.35) the last that reads ok. Treat LR1 as an 8-9 km optic here or lower marginDb deliberately. Vendor sheets disagree by 0.5 dB on some rows because the 2019 draft put launch at -1.4 and receive at -7.7; the final table is -1.9 / -8.2 and that is what this row carries. What this row fixes is the distortion the 4-lane rows carry: 100GBASE-LR4 is four LAN-WDM lanes and the engine budgets one wavelength, so it has to say '1310, the top lane, worst case'. LR1 is one carrier at 1310 nm, a wavelength the cables publish attenuation for, so nothing is approximated - but the two rows share the same 6.3 dB channel budget, so LR1 is the same reach in one lane, not a longer link. FEC is part of the class (KP4 inside the module); a host that does not enable it is not this row. Class figures, not one measured module: replace the row with the module actually purchased before pricing a build.",
+  "tags": [
+    "100000",
+    "1310nm",
+    "100g",
+    "single-lambda"
+  ]
+}

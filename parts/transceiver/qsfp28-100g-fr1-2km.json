@@ -1,0 +1,22 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp28-100g-fr1-2km",
+  "vendor": "generic",
+  "label": "QSFP28 100GBASE-FR1 single-lambda 2 km",
+  "speedMbps": 100000,
+  "wavelengthNm": 1310,
+  "reachM": 2000,
+  "txPowerDbmMin": -2.4,
+  "txPowerDbmMax": 4,
+  "rxSensitivityDbm": -6.4,
+  "rxOverloadDbm": 4.5,
+  "polish": "upc",
+  "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
+  "notes": "IEEE 802.3cu Clause 140 (100GBASE-FR1), the 2 km rung of the single-lambda 100G pair: 53.125 GBd PAM4 on one 1310 nm carrier over a 1304.5-1317.5 nm window, duplex LC, FEC required to reach the 2 km. Average launch power -2.4..+4.0 dBm and average receive power -6.4..+4.5 dBm, OMAouter sensitivity -4.5 dBm at BER 2.4e-4 (KP4 FEC gives 1e-12 after decode), stressed receiver sensitivity -2.5 dBm OMA. The figures are the FS QSFP28-FR-100G sheet (100G Lambda MSA 100G-FR compliant) and match the clause; Glassforge records the averages, which is what a fibre budget spends - -2.4 minus -6.4 = 4.0 dB of channel insertion loss. That 4.0 dB is the tightest optical budget in this catalogue and the row exists to say so: 2 km x 0.35 dB/km = 0.7 dB of fibre, one patch-panel pair adds 0.6 dB, leaving 2.7 dB of spare - under the default 3 dB margin, so a compliant 2 km span reads fail on the default settings and marginal only with the connectors removed (3.3 dB). With 0.6 dB of terminations it never reads ok: 1 km is 0.35 + 0.6 = 0.95 dB and 3.05 dB of spare (marginal), 2 km is 2.7 dB (fail). FR1 is the cheap 2 km class with no reserve - pick 100GBASE-LR1 (6.3 dB) for any span that has to survive a field repair or a spliced repair loop, and do not read a fail here as 'the link is dead'. Lower marginDb to about 1.5 dB if the project genuinely wants to build at the FR1 class. Because it is one carrier at 1310 nm, this row needs none of the 'top LAN-WDM lane' hand-waving the 4-lane 100G rows carry, and the reach verdict still binds at 2 km. Class figures, not one measured module: replace the row with the module actually purchased before pricing a build.",
+  "tags": [
+    "100000",
+    "1310nm",
+    "100g",
+    "single-lambda"
+  ]
+}
