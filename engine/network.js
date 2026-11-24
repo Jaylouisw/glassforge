@@ -518,12 +518,41 @@ function capacity(plant, registry) {
   };
 }
 
+/**
+ * The project name is a string or it is absent - the one rule every write that carries it keeps.
+ *
+ * `rename` has always stringified (`String(name).trim()`), but `createProject` and `PUT` copied the
+ * field through unchanged: `{ name: { a: 1 } }` saved a project whose name is an object, because an
+ * object is truthy and JSON-safe and nothing downstream reads the name for anything. The proof is the
+ * page a crew takes to site - `GET /print/project/:id` titled itself "[object Object] - plan" - and the
+ * project list rendered the same. It is a caller mistake that only becomes visible in print, so it is
+ * refused at the write gate, by name, before it lands.
+ *
+ * Returns the refusal, or null when the field is fine. A missing name is fine: `createProject` defaults
+ * it, and a design candidate being validated has no name at all.
+ */
+function nameProblem(name) {
+  if (name === undefined || name === null || typeof name === 'string') return null;
+  return 'the project name must be a string, got ' + jsonTypeName(name);
+}
+
+function jsonTypeName(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'an array';
+  if (typeof value === 'object') return 'an object';
+  if (typeof value === 'number') return 'a number';
+  if (typeof value === 'boolean') return 'a boolean';
+  return 'a ' + typeof value;
+}
+
 /** Structural validation. Errors refuse a save; warnings are the things a planner should look at. */
 function validate(plant, registry) {
   const errors = [];
   const warnings = [];
 
   if (!plant || typeof plant !== 'object') return { ok: false, errors: ['plant is not an object'], warnings: warnings };
+  const nameFault = nameProblem(plant.name);
+  if (nameFault) errors.push(nameFault);
   const nodes = Array.isArray(plant.nodes) ? plant.nodes : null;
   const spans = Array.isArray(plant.spans) ? plant.spans : null;
   if (!nodes) errors.push('nodes must be an array');
@@ -884,6 +913,7 @@ module.exports = {
   spliceTable: spliceTable,
   capacity: capacity,
   validate: validate,
+  nameProblem: nameProblem,
   isSpanCount: isSpanCount,
   isBundleCount: isBundleCount,
   stats: stats

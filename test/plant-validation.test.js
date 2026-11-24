@@ -25,6 +25,24 @@ test('a well-formed plant validates', function () {
   assert.deepStrictEqual(result.warnings, []);
 });
 
+test('a project name that is not a string is refused, because it is printed', function () {
+  // The rename op has always stringified; `createProject` and `PUT` copied `name` through unchanged,
+  // so an object or an array saved. It is JSON-safe, so nothing complained until `/print/project/:id`
+  // rendered "[object Object] - plan". A name is a string, or absent - a design candidate has none.
+  const p = base();
+  p.name = { a: 1 };
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors,
+    ['the project name must be a string, got an object']);
+  p.name = ['x'];
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors,
+    ['the project name must be a string, got an array']);
+  p.name = 'Barrio Norte phase 2';
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors, []);
+  delete p.name;
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors, [],
+    'a plant with no name at all is what a design candidate looks like');
+});
+
 test('exactly one OLT: a second root is refused at plant level, with or without an ONT', function () {
   // With an ONT in the plant the per-ONT trace notices the ambiguity too, so a needle match alone
   // passes for the wrong reason: it must be the *plant-level* refusal, quoted verbatim.

@@ -319,8 +319,14 @@ async function handle(req, res, ctx) {
     if (method === 'GET') return sendJson(req, res, 200, { projects: store.listProjects(ctx.dataRoot) });
     if (method === 'POST') {
       const body = await readJsonBody(req);
+      // The name is the other field a create can get wrong that the caller then cannot see. An object
+      // or an array used to be saved as-is (it is truthy and JSON-safe), and the printed plan - the
+      // page a crew takes to site - titled itself "[object Object] - plan". Same refusal as a bad OLT
+      // model: 400, naming the field, before anything is written.
+      const nameFault = engine.network.nameProblem(body.name);
+      if (nameFault) return fail(req, res, 400, nameFault);
       const project = engine.project.createProject(body.name || 'Untitled project', { id: store.newId() });
-      // The OLT model is the one field a create can get wrong that the caller then cannot see. An
+      // The OLT model is another field a create can get wrong that the caller then cannot see. An
       // unknown model used to be saved with a 201 (apply() refuses op-level faults only), and every
       // later edit was then refused for 'node "n1" uses unknown olt model ...' - the *next* op
       // blamed for a typo made in the first one. A write is validated before it lands, and the

@@ -102,6 +102,18 @@ async function main() {
       'a refused create wrote a project anyway');
   });
 
+  // The name is the other field a create can get wrong and the caller then cannot see. It went to
+  // `createProject` unchanged, so `{ name: { a: 1 } }` was a 201 and the printed plan - the page a
+  // crew takes to site - titled itself "[object Object] - plan". A name is a string or it is absent.
+  const badName = await request('POST', '/api/projects', { name: { a: 1 }, olt: 'gpon-c-plus-8' });
+  const afterBadName = await request('GET', '/api/projects');
+  test('a project name that is not a string is a 400 naming the field, not a 201', function () {
+    assert.strictEqual(badName.status, 400, JSON.stringify(badName.body));
+    assert.strictEqual(badName.body.error, 'the project name must be a string, got an object');
+    assert.ok(!afterBadName.body.projects.some(function (p) { return typeof p.name !== 'string'; }),
+      'a refused create wrote a project anyway: ' + JSON.stringify(afterBadName.body.projects));
+  });
+
   const created = await request('POST', '/api/projects', { name: 'API test build' });
   test('a project can be created', function () {
     assert.strictEqual(created.status, 201);
@@ -124,6 +136,18 @@ async function main() {
     assert.strictEqual(last.body.nodes.length, 3);
     assert.strictEqual(last.body.spans.length, 2);
     assert.deepStrictEqual(last.body.derived.errors, []);
+  });
+
+  // `PUT` merges the body over the stored project and validated the plant, but not the name, so a
+  // saved project could be renamed to an array. The undo history does not restore a name, and the
+  // print page prints whatever it is given, so the write gate is the only place this can be caught.
+  const badRename = await request('PUT', '/api/projects/' + id, { name: ['x'] });
+  const reread = await request('GET', '/api/projects/' + id);
+  test('a PUT cannot store a name that is not a string', function () {
+    assert.strictEqual(badRename.status, 400, JSON.stringify(badRename.body));
+    assert.ok(badRename.body.errors.indexOf('the project name must be a string, got an array') !== -1,
+      JSON.stringify(badRename.body));
+    assert.strictEqual(reread.body.name, 'API test build', 'a refused PUT changed the stored name');
   });
 
   const budget = await request('POST', '/api/projects/' + id + '/budget', {});
