@@ -1,0 +1,21 @@
+{
+  "kind": "olt",
+  "model": "xg-pon-n2-16",
+  "vendor": "generic",
+  "label": "XG-PON1 OLT class N2, 16 ports",
+  "pon": "xg-pon",
+  "class": "N2",
+  "txPowerDbmMin": 4,
+  "txPowerDbmMax": 8,
+  "rxSensitivityDbm": -29.5,
+  "rxOverloadDbm": -9,
+  "budgetDb": 31,
+  "ports": 16,
+  "maxSplitRatio": 64,
+  "notes": "Figures are ITU-T G.987.2 (02/2023). Downstream 9.95328 Gbit/s, Table 9-3: the modern table splits N2 into N2a (+4.0..+8.0 dBm) and N2b (+10.5..+12.5 dBm), and this row is the N2a variant - the one a normal 31 dB ODN uses. N2b is a different part, not a looser figure on this one: it buys its extra launch with a cheaper -21.5 dBm / -3.5 dBm ONU receiver, so the pair only makes sense as a pair. N2a's ONU receiver is -28.0 dBm sensitivity and -8.0 dBm overload, which is what the XG-PON ONT row carries. Upstream 2.48832 Gbit/s, Table 9-4, class N2: OLT receiver sensitivity -29.5 dBm, minimum overload -9.0 dBm. Class N2 is 31 dB of ODN loss (Table 6-1) with an attenuation range of 16-31 dB: below 16 dB the ONU overloads and needs a pad - the verdict's pad is the smallest that clears the receiver, so check it against the class's 16 dB floor before ordering. 2.0 - (-29.5) = 31.5 dB upstream against the class's 31 dB. Split ratio 64 is G.987.1 clause 8.5's minimum requirement for XG-PON; 1:128+ is an operator option the line card has to state for itself. Fibre distance: XG-PON1 must support 20 km and the TC layer 60 km (G.987.1 clause 8.6) - reach is a loss question here, so the 31 dB class bounds the run. Wavelength: XG-PON1 transmits 1575-1580 nm downstream and 1260-1280 nm upstream; the engine budgets one wavelength and defaults to 1490 down / 1310 up, whose cable attenuation (0.22 / 0.35 dB/km) sits within 0.01-0.02 dB/km of the real windows. Class figures from the recommendation, not one measured card: replace the row with the line card actually purchased before construction.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.987.2/en",
+  "tags": [
+    "xg-pon",
+    "n2"
+  ]
+}

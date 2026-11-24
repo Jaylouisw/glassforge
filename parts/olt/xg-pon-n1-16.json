@@ -1,0 +1,21 @@
+{
+  "kind": "olt",
+  "model": "xg-pon-n1-16",
+  "vendor": "generic",
+  "label": "XG-PON1 OLT class N1, 16 ports",
+  "pon": "xg-pon",
+  "class": "N1",
+  "txPowerDbmMin": 2,
+  "txPowerDbmMax": 6,
+  "rxSensitivityDbm": -27.5,
+  "rxOverloadDbm": -7,
+  "budgetDb": 29,
+  "ports": 16,
+  "maxSplitRatio": 64,
+  "notes": "Figures are ITU-T G.987.2 (02/2023). Downstream 9.95328 Gbit/s, Table 9-3, class N1: OLT mean launched power +2.0..+6.0 dBm. N1's ONU receiver is -28.0 dBm sensitivity and -8.0 dBm overload, which is what the XG-PON ONT row carries. Upstream 2.48832 Gbit/s, Table 9-4, class N1: OLT receiver sensitivity -27.5 dBm, minimum overload -7.0 dBm. Class N1 is 29 dB of ODN loss (Table 6-1) with an attenuation range of 14-29 dB: an ODN shorter than 14 dB overloads the ONU and needs a pad, which the budget's attenuator verdict reports. 2.0 - (-27.5) = 29.5 dB upstream against the class's 29 dB, so the class budget is the tighter of the two. Split ratio 64 is G.987.1 clause 8.5's minimum requirement for XG-PON; 1:128 and beyond is an operator option the line card has to state for itself, so this row does not claim it. Fibre distance: XG-PON1 must support 20 km and the TC layer 60 km (G.987.1 clause 8.6) - reach is a loss question in this engine, so it is the 29 dB class that bounds a run, not a distance field. Wavelength: XG-PON1 transmits 1575-1580 nm downstream and 1260-1280 nm upstream; this engine budgets one wavelength and its PON defaults are 1490 down / 1310 up, whose cable attenuation (0.22 / 0.35 dB/km) sits within 0.01-0.02 dB/km of the real windows. Class figures from the recommendation, not one measured card: replace the row with the line card actually purchased before construction.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.987.2/en",
+  "tags": [
+    "xg-pon",
+    "n1"
+  ]
+}

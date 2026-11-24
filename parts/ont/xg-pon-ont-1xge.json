@@ -1,0 +1,19 @@
+{
+  "kind": "ont",
+  "model": "xg-pon-ont-1xge",
+  "vendor": "generic",
+  "label": "XG-PON1 ONT 1x 10GE",
+  "pon": "xg-pon",
+  "txPowerDbmMin": 2,
+  "txPowerDbmMax": 7,
+  "rxSensitivityDbm": -28,
+  "rxOverloadDbm": -8,
+  "ports": {
+    "10ge": 1
+  },
+  "notes": "Figures are ITU-T G.987.2 (02/2023). Downstream 9.95328 Gbit/s, Table 9-3: ONU sensitivity -28.0 dBm and minimum overload -8.0 dBm, the same for classes N1 and N2a, and specified in the presence of G-PON and video overlay on the same ODN. Upstream 2.48832 Gbit/s, Table 9-4: ONU mean launched power +2.0..+7.0 dBm for every class - note the +7.0 dBm ceiling, which is 2 dB above the XGS-PON ONT's +9.0 and is why an XG-PON ONT cannot be swapped for an XGS-PON one on the same ODN by the optics alone. The class names (N1/N2) describe the ODN loss the pair may span, not a difference in the ONU receiver, so one ONT row serves both N1 and N2 - and neither shares a PON port with a GPON or an XGS-PON OLT: downstream 1575-1580 nm and upstream 1260-1280 nm are XG-PON's own windows, and the engine refuses a pon mismatch. 10GE is the user port a 9.95 Gbit/s downstream can fill; the engine reports `ports` and does not budget it. Class figures from the recommendation, not one measured ONT: replace the row with the ONT actually purchased before construction.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.987.2/en",
+  "tags": [
+    "xg-pon"
+  ]
+}
