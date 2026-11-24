@@ -67,19 +67,42 @@ test('a plant with two OLTs cannot be traced', function () {
   throws(function () { network.trace(p, 'n5'); }, 'exactly one olt');
 });
 
+// This test used to be named for the connectorised case while its body only ever built the spliced
+// cassette (plc-1x8-sca) and asserted one splice: the name claimed a branch of `designForOnt` that no
+// catalogue part could reach, because every splitter row was spliced. plc-1x16-sca-conn is the row
+// that makes the branch real, so both halves are asserted here.
 test('a connectorised splitter costs connectors instead of a splice', function () {
-  const p = plant({ nodes: [
-    { id: 'n1', type: 'olt', model: 'gpon-c-plus-8' },
-    { id: 'n3', type: 'splitter', model: 'plc-1x8-sca', name: 'Splitter' },
-    { id: 'n5', type: 'ont', model: 'gpon-ont-4ge' }
-  ], spans: [
-    { id: 's1', from: 'n1', to: 'n3', cable: 'g652d-loose-12', lengthM: 500 },
-    { id: 's2', from: 'n3', to: 'n5', cable: 'g657a2-drop-1', lengthM: 40 }
-  ] });
-  const spliced = network.designForOnt(p, 'n5', registry);
+  function oneSplitter(model) {
+    return plant({ nodes: [
+      { id: 'n1', type: 'olt', model: 'gpon-c-plus-8' },
+      { id: 'n3', type: 'splitter', model: model, name: 'Splitter' },
+      { id: 'n5', type: 'ont', model: 'gpon-ont-4ge' }
+    ], spans: [
+      { id: 's1', from: 'n1', to: 'n3', cable: 'g652d-loose-12', lengthM: 500 },
+      { id: 's2', from: 'n3', to: 'n5', cable: 'g657a2-drop-1', lengthM: 40 }
+    ] });
+  }
+
+  const spliced = network.designForOnt(oneSplitter('plc-1x16-sca'), 'n5', registry);
   const spliceLines = spliced.breakdown.filter(function (b) { return b.kind === 'splice'; });
   assert.strictEqual(spliceLines.length, 1, 'the spliced splitter contributes one splice');
   assert.ok(spliceLines[0].label.indexOf('1 x') !== -1);
+
+  // Same chip, SC/APC adapters instead of a pigtail: two matings on the input, no splice there.
+  const p = oneSplitter('plc-1x16-sca-conn');
+  const connectorised = network.designForOnt(p, 'n5', registry);
+  assert.strictEqual(connectorised.breakdown.filter(function (b) { return b.kind === 'splice'; }).length, 0,
+    'a connectorised cassette is not spliced at its input');
+  // 2 x sc-apc (0.3) - 1 x fusion (0.1) = 0.5 dB, the figure both splitter rows' notes quote.
+  close(connectorised.odnLossDb - spliced.odnLossDb, (2 * 0.3) - 0.1, 0.01, 'connectorised minus spliced ODN');
+  // The splice diagram must agree with the budget about what the input is. It only rows up a
+  // splitter whose cables carry strands, so this sub-check names them.
+  const withStrands = oneSplitter('plc-1x16-sca-conn');
+  withStrands.spans[0].strands = [1];
+  withStrands.spans[1].strands = [1];
+  const point = network.spliceTable(withStrands, registry).points[0];
+  assert.strictEqual(point.termination, 'connectorised');
+  assert.strictEqual(point.rows.filter(function (r) { return r.via === 'splitter-input'; }).length, 1);
 });
 
 test('capacity reports the cascade and the ONT budget against the OLT', function () {

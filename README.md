@@ -22,7 +22,7 @@ Node 18 or newer. No `npm install`, because there is nothing to install: the ser
 plain CommonJS.
 
 <!-- parts:start -->
-**50 parts across 8 kinds** — 8 cables, 7 splitters, 9 OLTs, 4 ONTs, 11 transceiver, 5 closures, 4 connectors, 2 splices.
+**51 parts across 8 kinds** — 8 cables, 8 splitters, 9 OLTs, 4 ONTs, 11 transceiver, 5 closures, 4 connectors, 2 splices.
 <!-- parts:end -->
 
 ## What it does today

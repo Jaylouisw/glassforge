@@ -1,0 +1,18 @@
+{
+  "kind": "splitter",
+  "model": "plc-1x16-sca-conn",
+  "vendor": "generic",
+  "label": "PLC 1x16 SC/APC connectorised cassette",
+  "ratio": 16,
+  "splitLossDb": 12.04,
+  "excessLossDb": 1.76,
+  "termination": "connectorised",
+  "technology": "plc",
+  "notes": "The connectorised form of plc-1x16-sca: the same 1:16 PLC chip shipped with SC/APC adapters instead of a bare input pigtail to splice. The chip figures are that row's, unchanged and from the same place: 12.04 dB ideal split (10*log10(16)) plus 1.76 dB excess = 13.8 dB without connectors, inside ITU-T G.671's insertion-loss requirement for a 1x16 branching component on a normal-reach span (WR1) of 10.8 dB min / 14.1 dB max. Both chip numbers are typical values, the excess being the difference between the observed total and the ideal split, not a figure from a vendor sheet. What the termination changes is what is charged at the splitter's input: `termination: \"connectorised\"` bills two SC/APC matings (the catalogue's own sc-apc row, 2 x 0.3 = 0.6 dB) where the spliced cassette bills one fusion splice (fusion, 0.1 dB), so this row reads 0.5 dB more ODN than the same chip spliced - the \"about 0.5 dB\" the spliced row's notes promise, and the two connectors the input actually has. The trap when replacing this row: a cassette sheet that prints 'insertion loss <= 14.3 dB, SC/APC' has already counted its own connectors - compare that figure against 12.04 + 1.76 + 0.6 = 14.4 dB and leave excessLossDb alone; raising it for the connectors charges them twice. The rest of the ladder stays spliced because buildPon resolves a splitter as 'plc-1x' + ratio + '-sca', so auto-design never picks this row - it is for a plant that is drawn by hand, or for a splitter box whose cassettes arrive pre-terminated. Replace with the bought cassette's datasheet.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.671/en",
+  "tags": [
+    "plc",
+    "1x16",
+    "connectorised"
+  ]
+}
