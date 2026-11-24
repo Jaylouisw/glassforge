@@ -254,6 +254,26 @@ function describeShared(segment) {
 }
 
 /**
+ * The pad a budget asks for, whichever fault asked for it: an overload pads directly (`attenuator`),
+ * a module that is only too loud at the top of its launch window pads via `launchWindowPad`. Null
+ * when this direction asks for no pad, so a caller can tell "no pad" from "a pad of zero".
+ */
+function requestedPadDb(result) {
+  if (!result) return null;
+  if (result.attenuator && isNum(result.attenuator.padDb)) return result.attenuator.padDb;
+  if (result.launchWindowPad && isNum(result.launchWindowPad.padDb)) return result.launchWindowPad.padDb;
+  return null;
+}
+
+/** One verdict for a set of them: any fail fails, else any marginal, else ok. Null for an empty set. */
+function worstVerdict(verdicts) {
+  if (!verdicts.length) return null;
+  if (verdicts.indexOf('fail') !== -1) return 'fail';
+  if (verdicts.indexOf('marginal') !== -1) return 'marginal';
+  return 'ok';
+}
+
+/**
  * A link that cannot be drawn is still a report: the sites, the method, and the one reason it failed.
  * It is never a straight line pretending to be a duct route.
  */
@@ -284,6 +304,8 @@ function refusal(opts, context, reason) {
     thirdParty: thirdPartyReport(opts, []),
     bom: null,
     verdict: 'fail',
+    // Nothing was routed, so there is no path to read in either direction.
+    upstreamVerdict: null,
     reasons: [reason],
     warnings: [],
     notes: context.notes
@@ -478,19 +500,50 @@ function design(input, registry) {
         : designModule.cableForSpan(opts.fibres, ownM, opts.ladder, registry),
       opts.fibres, registry)
 
-    const budgetResult = budget.pointToPoint({
-      headEnd: { model: opts.optics.a },
-      cpe: { model: opts.optics.b },
-      spans: ownM > 0 ? [{ cable: cable.model, lengthM: ownM }] : [],
-      splices: spliceEvents,
-      connectors: opts.connectors,
-      thirdParty: leased.map(function (seg) {
-        return { provider: seg.provider, lengthM: seg.lengthM, lossDb: seg.lossDb };
-      }),
-      marginDb: opts.marginDb,
-      direction: opts.direction
-    }, registry);
+    // One path of glass, so both directions are the same ODN: the inputs are built once and only the
+    // launch and the receiver change with `direction`. A fresh object per call because the budget
+    // reads the arrays it is handed.
+    function budgetInputs(direction) {
+      return {
+        headEnd: { model: opts.optics.a },
+        cpe: { model: opts.optics.b },
+        spans: ownM > 0 ? [{ cable: cable.model, lengthM: ownM }] : [],
+        splices: spliceEvents,
+        connectors: opts.connectors,
+        thirdParty: leased.map(function (seg) {
+          return { provider: seg.provider, lengthM: seg.lengthM, lossDb: seg.lossDb };
+        }),
+        marginDb: opts.marginDb,
+        direction: direction
+      };
+    }
+    const budgetResult = budget.pointToPoint(budgetInputs(opts.direction), registry);
     budgetResult.warnings.forEach(function (w) { warnings.push(label + ': ' + w); });
+
+    // A circuit is two links over one path: A launches into B at one wavelength, B launches into A
+    // at the other. `pointToPoint` answers either direction (`direction: 'up'` reads the head-end
+    // receiver), but the report only ever asked for the requested one, defaulting to down - so a 1G
+    // circuit with an LX at the near end and an EX at the far end came back `ok` while the same ODN
+    // read upstream was `fail`: the far optic launches -1 dBm into the head-end receiver's -3 dBm
+    // overload point, and the fix is a 5 dB pad, not more reach. The two directions are not symmetric
+    // whenever the ends are different optics, and a circuit's report is where that has to show.
+    // This is the gap #185 fixed on the plant surfaces, with the same treatment: the upstream verdict
+    // is reported (`upstream`, `upstreamVerdict`) and warned about by name, but `verdict` stays the
+    // direction the caller asked for - gating a design on its upstream direction is the open decision
+    // in #185/#111, and this module does not take it here.
+    //
+    // Only a failing direction is warned about, never its `warnings`: the launch-window band asks for
+    // a pad sized from one receiver, and a second pad sentence for the same glass reads as a second
+    // pad to buy. When both directions name a pad, the sentence says which size to buy.
+    const up = opts.direction === 'up' ? budgetResult : budget.pointToPoint(budgetInputs('up'), registry);
+    if (up !== budgetResult && up.verdict === 'fail') {
+      const downPad = requestedPadDb(budgetResult);
+      const upPad = requestedPadDb(up);
+      warnings.push(label + ': fails upstream over the same path - ' + up.reasons.join('; ') +
+        (downPad && upPad
+          ? ' One pad is ODN loss in both directions: buy the larger, ' + Math.max(downPad, upPad) + ' dB.'
+          : ''));
+    }
 
     legs.push({
       id: id,
@@ -509,7 +562,11 @@ function design(input, registry) {
       edges: routed.edges.map(function (edge) { return edge.edgeId; }),
       route: route,
       budget: budgetResult,
-      verdict: budgetResult.verdict
+      verdict: budgetResult.verdict,
+      // Always the upstream direction, whatever `direction` asked for: when the caller asked for
+      // `up` this is the same object as `budget`, never a field that quietly means "the other one".
+      upstream: up,
+      upstreamVerdict: up.verdict
     });
   });
 
@@ -654,6 +711,9 @@ function design(input, registry) {
     thirdParty: thirdParty,
     bom: bom,
     verdict: verdict,
+    // The other half of the circuit, for a caller that reads one field instead of walking `legs`.
+    // The worst of the legs, so a protected pair is only ok upstream when both legs are.
+    upstreamVerdict: worstVerdict(legs.map(function (leg) { return leg.upstreamVerdict; })),
     reasons: reasons,
     warnings: warnings,
     notes: notes
