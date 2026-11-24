@@ -5,7 +5,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 Each suite count below is what `node scripts/run-tests.js` printed at that release's commit — the
 chain is 13 / 107 (0.1.0) → 16 / 141 (0.2.0) → 17 / 156 (0.3.0) → 18 / 174 (0.4.0), and the runner's
-own total on `main` is **23 suites / 239 assertions** at this writing. A count in a section is a snapshot,
+own total on `main` is **24 suites / 272 assertions** at this writing. A count in a section is a snapshot,
 never a promise.
 
 ## [Unreleased]
@@ -42,6 +42,23 @@ and the checks, and a PNG of the drawing at a stated scale.
   `splicedTo` is empty; the point carries the part's `ratio` and `termination`, and the printed page
   shows `splitter input (1 splice)` / `splitter port P1` instead of a span id. Closure rows keep their
   through-splice and gained the same `via` field (`splice` / `parked`).
+
+- **A span's splice and closure counts are counts, at the edit and in the validator.** `splices` and
+  `closures` on a span were copied out of the request as given, so text, a negative, a fraction or
+  `null` could land in a saved plant: `cableToBuy` then threw its own sentence, which reached the
+  caller as a 500 blaming the server for their field. Both entry points refuse it now. The edit answers
+  `span.splices must be a non-negative whole number or a list of splices, got "three"`, the validator
+  lists `span "s1" has an invalid splices count "1.5"` in `errors`, and `/bom` for a project file
+  edited by hand is a 400 naming the span instead of a 500. An absent count still means none, and a
+  splice *list* still prices by its length. Tests: `api-ops-validation` adds six (text, negative,
+  fraction, a PUT body, a hand-edited file, its BOM), `plant-validation` three.
+- **A wrong method is a 405 that names what the path answers.** `GET /api/design/synthesise` — a URL
+  straight out of docs/API.md — answered `404 not found`, which says the endpoint does not exist and
+  sends the reader to check their path instead of their method. The server now knows the method set of
+  every route it serves: a known path with the wrong method answers `405` with an `Allow` header and
+  `method GET is not allowed on /api/design/synthesise - it answers POST`, `404` is kept for a path
+  that is no endpoint at all, and `HEAD` follows `GET` where there is one. Tests: `api-http` adds
+  seven.
 
 ### Changed
 
