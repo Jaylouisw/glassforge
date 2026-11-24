@@ -257,12 +257,45 @@ function describeShared(segment) {
  * The pad a budget asks for, whichever fault asked for it: an overload pads directly (`attenuator`),
  * a module that is only too loud at the top of its launch window pads via `launchWindowPad`. Null
  * when this direction asks for no pad, so a caller can tell "no pad" from "a pad of zero".
+ *
+ * The object is returned, not the number: `padDb` is the smallest pad that clears the fault and
+ * `maxPadDb` the largest that still leaves this direction's margin and class, and a sentence that
+ * names one size for both directions needs both halves to know whether that size can be bought.
  */
-function requestedPadDb(result) {
+function requestedPad(result) {
   if (!result) return null;
-  if (result.attenuator && isNum(result.attenuator.padDb)) return result.attenuator.padDb;
-  if (result.launchWindowPad && isNum(result.launchWindowPad.padDb)) return result.launchWindowPad.padDb;
+  if (result.attenuator && isNum(result.attenuator.padDb)) return result.attenuator;
+  if (result.launchWindowPad && isNum(result.launchWindowPad.padDb)) return result.launchWindowPad;
   return null;
+}
+
+/**
+ * One pad sits in both paths of a circuit, so when both directions ask for one the report names the
+ * single size to buy - but only a size both directions can take. `padDb` is a floor and `maxPadDb` a
+ * ceiling per direction: a pad above the ceiling does not fix the link, it pushes that receiver below
+ * sensitivity + margin with a part bought for it. Where the two windows do not overlap, no size is
+ * offered and the sentence says the pair needs a different optic. At a 20 dB reserve neither direction
+ * can take a pad at all, and naming one anyway told a planner to buy a part its own reason had just
+ * ruled out (#203).
+ */
+function sharedPadSentence(down, up) {
+  const downPad = requestedPad(down);
+  const upPad = requestedPad(up);
+  if (!downPad || !upPad) return '';
+  const buy = Math.max(downPad.padDb, upPad.padDb);
+  const limit = Math.min(downPad.maxPadDb, upPad.maxPadDb);
+  if (downPad.fits && upPad.fits && buy <= limit) {
+    return ' One pad is ODN loss in both directions: buy the larger, ' + buy + ' dB.';
+  }
+  const why = [];
+  if (!downPad.fits) why.push('the downstream direction cannot take one at all');
+  if (!upPad.fits) why.push('the upstream direction cannot take one at all');
+  if (!why.length) {
+    why.push('the ' + buy + ' dB the louder direction needs is over the ' + limit +
+      ' dB the tighter one allows');
+  }
+  return ' No single pad clears both directions (' + downPad.padDb + ' dB downstream, ' + upPad.padDb +
+    ' dB upstream) - ' + why.join(' and ') + ' - so this pair needs a different optic.';
 }
 
 /** One verdict for a set of them: any fail fails, else any marginal, else ok. Null for an empty set. */
@@ -534,15 +567,12 @@ function design(input, registry) {
     //
     // Only a failing direction is warned about, never its `warnings`: the launch-window band asks for
     // a pad sized from one receiver, and a second pad sentence for the same glass reads as a second
-    // pad to buy. When both directions name a pad, the sentence says which size to buy.
+    // pad to buy. When both directions name a pad, the sentence says which size to buy - if a size
+    // that clears both exists at all.
     const up = opts.direction === 'up' ? budgetResult : budget.pointToPoint(budgetInputs('up'), registry);
     if (up !== budgetResult && up.verdict === 'fail') {
-      const downPad = requestedPadDb(budgetResult);
-      const upPad = requestedPadDb(up);
       warnings.push(label + ': fails upstream over the same path - ' + up.reasons.join('; ') +
-        (downPad && upPad
-          ? ' One pad is ODN loss in both directions: buy the larger, ' + Math.max(downPad, upPad) + ' dB.'
-          : ''));
+        sharedPadSentence(budgetResult, up));
     }
 
     legs.push({
