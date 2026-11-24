@@ -191,9 +191,12 @@ cycle, and §1 says a plant is a tree with one head-end. `link.design` returns a
   reported and its metres, because "diverse except 180 m at the building entry" is the true answer;
 - **each leg is budgeted separately** by `budget.pointToPoint`: reach, loss budget and overload are
   three verdicts per leg, and a reason is prefixed with the leg it belongs to;
-- **a leased segment is fibre somebody else owns**: its stated length and loss are charged to the leg's
-  budget and to the cost, and it never appears in the cable metres. A leased loss that is missing is an
-  error, not a zero — §8 applies to rented fibre exactly as it applies to bought fibre.
+- **a leased segment is fibre somebody else owns**: its stated length and loss are charged to the
+  budget of the leg it rides and to the cost, and it never appears in the cable metres. A segment
+  assigned to a leg the design did not build is reported as unattached (`attached: false`, summed in
+  the `unattached*` fields), charged to nothing and bought by nobody — the light never enters it. A
+  leased loss that is missing is an error, not a zero — §8 applies to rented fibre exactly as it
+  applies to bought fibre.
 
 A cable is bought per leg, because a protected circuit is two fibre paths. Nothing here changes the
 PON or active-tree paths: they share `computeOdn`, so a loss is computed once, in one place.

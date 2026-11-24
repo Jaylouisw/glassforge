@@ -118,6 +118,12 @@ cycle, and a plant is a tree. The response says `mode: "link"`.
 are asymmetric gets two verdicts, never an average. A leased segment is assigned to a leg with
 `leg: "a" | "b" | "both"`.
 
+**Attached lease** — a third-party segment whose leg the circuit actually built (`attached: true`).
+Only an attached lease is charged to a leg's budget, counted in `lengthM` and in `thirdParty.totalM`,
+and costed. A segment on an unbuilt leg — the B-leg of a `single`-protection circuit, or of one the
+graph only gave one route — is `attached: false` and summed in the `unattached*` fields, because no
+budget crosses it and nobody buys it.
+
 **Protection** — whether the circuit is protected: `protection.requested` is `"diverse"` (default) or
 `"single"`, `protection.achieved` is true only when the two legs share no graph edge and no leased
 segment, and `protection.legs` is how many legs the graph actually allowed (1 means unprotected).
@@ -130,8 +136,9 @@ design margin and the class budget can absorb, because a pad is ODN loss like an
 **`routedM` / `ownM` / `lengthM`** — the same leg measured three ways, because they answer three
 different questions: `routedM` is what the graph measured between the two snapped site nodes;
 `spurM` is the site-to-edge drops; `ownM` is `routedM + spurM` — the cable you buy, and what the BOM
-carries; `lengthM` is `ownM + leasedM`, everything the light travels along. A leased segment moves
-`lengthM` and the budget, never `ownM` and never `bom.cableM`.
+carries; `lengthM` is `ownM + leasedM`, everything the light travels along. A leased segment that
+rides a built leg moves `lengthM` and the budget, never `ownM` and never `bom.cableM`; a lease on a leg
+the circuit did not build moves none of them.
 
 ## Design and refusal
 

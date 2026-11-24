@@ -270,12 +270,23 @@ verdicts **per leg**: an asymmetric circuit gets two answers, not an average. Re
 the leg they belong to (`A-leg: the route is 50038 m but the shorter optic reaches 40000 m`).
 
 A leased (third-party) segment carries a provider, a stated length and a stated loss. It is charged to
-the budget it belongs to, counted in the path length and in the cost, and **excluded from the cable
-metres** — nobody buys cable for a duct they rent:
+the budget of the leg it rides, counted in the path length and in the cost, and **excluded from the
+cable metres** — nobody buys cable for a duct they rent:
 
 ```jsonc
-"bom": { "cableM": 1164.22, "thirdParty": { "totalM": 300, "cost": 1200, "inCableBom": false } }
+"bom": { "cableM": 1164.22,
+         "thirdParty": { "totalM": 300, "lossDb": 0.6, "cost": 1200,
+                         "segments": [ { "provider": "CityFibre", "lengthM": 300, "attached": true } ],
+                         "unattachedM": 0, "unattachedLossDb": 0, "unattachedCost": 0,
+                         "inCableBom": false } }
 ```
+
+`attached` is the whole question. A segment rides a leg only when that leg was built: `leg: "b"` on a
+`protection: "single"` circuit, on a graph that offered one route, or on a request where routing
+failed, belongs to a leg that does not exist. Those segments are still listed (`attached: false`),
+summed in `unattachedM`, `unattachedLossDb` and `unattachedCost`, and left out of `totalM`, `lossDb`
+and `cost` — the light never crosses them, so no budget is charged their loss and nobody buys them. A
+circuit that was built with one leg also warns, naming the provider.
 
 Lengths are reported three ways, because they answer three questions: `routedM` (measured on the graph),
 `ownM` (routed plus both site drops — the cable you buy) and `lengthM` (everything, leased included —

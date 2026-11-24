@@ -136,9 +136,15 @@ budget and overload are three verdicts per leg. `legs[].routedM` is the graph me
 option - and is what each leg's budget charges; `legs[].splices` is the crew's count, that number times
 `splicesPerJoint` (default `fibres`), and `bom.splices` sums it. A 24-fibre leg through one joint is one
 splice event and 24 splices to perform.
-A leased segment is charged to the budget and the cost and is never in `bom.cableM`
-(`bom.thirdParty.inCableBom === false`). A site off the graph, a leg beyond the optic's reach or an
-overload is `ok: false` with a reason naming the leg; a body without two sites, or a leased segment
+A leased segment that rides a leg this circuit built is charged to that leg's budget and to the cost,
+and is never in `bom.cableM` (`bom.thirdParty.inCableBom === false`). A segment assigned to a leg that
+was not built — `leg: "b"` under `protection: "single"`, on a circuit the graph only gave one route, or
+on a request where routing failed — is still listed, with `attached: false`, and summed in
+`unattachedM`, `unattachedLossDb` and `unattachedCost`; it is in none of `totalM`, `lossDb` or `cost`,
+and a circuit that was built with one leg warns, naming the provider. The light never enters it, so it
+is not a purchase. A segment on `leg: "both"` that is attached is one lease used twice: `onBothLegs`
+says so and `totalM` counts it once. A site off the graph, a leg beyond the optic's reach or an overload
+is `ok: false` with a reason naming the leg; a body without two sites, or a leased segment
 with no `lossDb`, is a 400. See [AUTO-DESIGN.md](AUTO-DESIGN.md#site-to-site-links-dc-to-dc).
 
 ## Design calculations
