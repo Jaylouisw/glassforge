@@ -30,8 +30,12 @@ curl -sS -X POST -H "Authorization: token $TOK" -H 'Content-Type: application/js
 # comment, label, close
 curl -sS -X POST -H "Authorization: token $TOK" -H 'Content-Type: application/json' \
   -d '{"body":"..."}' http://odin:3000/api/v1/repos/jaylouisw/glassforge/issues/12/comments
+# The label body takes a label **name** (or its id from `GET /labels`; the five triage labels are
+# ids 13-17, table in `docs/agents/triage-labels.md`). Prefer the name: label ids changed when the
+# labels were recreated, and a name or id that does not exist is answered `200` with nothing
+# applied - read the label list in the reply, not the status code.
 curl -sS -X POST -H "Authorization: token $TOK" -H 'Content-Type: application/json' \
-  -d '{"labels":[7]}' http://odin:3000/api/v1/repos/jaylouisw/glassforge/issues/12/labels
+  -d '{"labels":["needs-triage"]}' http://odin:3000/api/v1/repos/jaylouisw/glassforge/issues/12/labels
 curl -sS -X PATCH -H "Authorization: token $TOK" -H 'Content-Type: application/json' \
   -d '{"state":"closed"}' http://odin:3000/api/v1/repos/jaylouisw/glassforge/issues/12
 ```
