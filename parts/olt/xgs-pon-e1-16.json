@@ -1,0 +1,22 @@
+{
+  "kind": "olt",
+  "model": "xgs-pon-e1-16",
+  "vendor": "generic",
+  "label": "XGS-PON OLT class E1, 16 ports",
+  "pon": "xgs-pon",
+  "class": "E1",
+  "txPowerDbmMin": 6,
+  "txPowerDbmMax": 9,
+  "rxSensitivityDbm": -30,
+  "rxOverloadDbm": -9,
+  "budgetDb": 33,
+  "ports": 16,
+  "maxSplitRatio": 128,
+  "notes": "ITU-T G.9807.1 (02/2023), basic wavelength set. Table B.9.2: class E1 is an ODN attenuation range of 18-33 dB - the extended-reach class, for rural and long-span PONs where N1's 29 dB is not enough. Table B.9.3 (9.95328 Gbit/s downstream): OLT mean launched power +6.0..+9.0 dBm; the ONU receiver is -28.0 dBm sensitivity and -9.0 dBm overload for every class, which is what the XGS-PON ONT row carries. Table B.9.4 (9.95328 Gbit/s upstream): OLT receiver sensitivity -30.0 dBm, minimum overload -9.0 dBm; ONU mean launch +4.0..+9.0 dBm. Both directions land 1 dB above their receiver at the class limit: 6.0 - 33 = -27.0 dBm at a -28.0 dBm ONT, and 4.0 - 33 = -29.0 dBm at a -30.0 dBm OLT. The launch is 4 dB hotter than N1's, so the near end is the trap: at the +9.0 dBm ceiling an 18 dB ODN arrives at exactly the ONT's -9.0 dBm overload, and anything shorter overloads - pad it, do not read a green budget as permission to build a 2 km spur off this port. The 2023 edition splits N2/N2b and E2/E2b on the ONU side; E1 is a single class, and an E2b ONU (-21.5 dBm sensitivity) is a different part, not this row with looser figures. maxSplitRatio 128 is the widely deployed XGS-PON ratio but an operator and line-card option, not a PMD figure - confirm the card's own limit. Reach is a loss question here: the class's 33 dB bounds the run, and G.9807.1 requires DD20/DD40 support (400/800 ps/nm of dispersion) as in the N1 row. Wavelengths are 1575-1580 nm downstream and 1260-1280 nm upstream; the engine budgets one wavelength and its PON defaults are 1490 down / 1310 up, whose cable attenuation (0.22 / 0.35 dB/km) sits within 0.01-0.02 dB/km of the real windows. ports 16 is a line-card size, not a standards figure. Class figures from the recommendation, not one measured card: replace the row with the line card actually purchased before construction.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.9807.1/en",
+  "tags": [
+    "xgs-pon",
+    "e1",
+    "long-reach"
+  ]
+}
