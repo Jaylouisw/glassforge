@@ -119,6 +119,17 @@ function options(input) {
       'never joined, so the count has to be at least 1.'
   });
   const o = input || {};
+  // A crew count is whole, and this one reaches the purchase order: the BOM's `splices` is
+  // `spliceEvents x splicesPerJoint` and each splice also charges 30 m of splice reserve. Three joints
+  // at 2.5 splices is 7.5, which `round` answered as 8 - a splice nobody makes, quoted on a document
+  // that is a purchase order. `fibres`, `connectors` and `splices` are all refused when they are not
+  // whole numbers; this was the one count left to be multiplied through and rounded instead.
+  if (isNum(o.splicesPerJoint) && !Number.isInteger(o.splicesPerJoint)) {
+    throw new TypeError('the link design reads "splicesPerJoint" as a whole number of splices per ' +
+      'joint and got ' + o.splicesPerJoint + ' (a number). A joint splices whole strands, so a ' +
+      'fractional count is rounded into the BOM: 3 joints at 2.5 splices is 7.5, and the answer quotes ' +
+      '8 splices for joints that make 2 or 3.');
+  }
   const sitesInput = o.sites || { a: o.a || o.from, b: o.b || o.to };
   const sites = {
     a: siteOf(sitesInput && sitesInput.a, 'Site A'),

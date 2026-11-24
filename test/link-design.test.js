@@ -373,3 +373,18 @@ test('a leg route reaches both sites, so the drawing covers the cable the BOM bu
   assert.ok(route[0].lat !== route[1].lat || route[0].lon !== route[1].lon,
     'the first duct point is not repeated as a site drop');
 });
+
+test('a splices-per-joint count is whole, refused rather than rounded into the BOM', function () {
+  // The crew's count is `spliceEvents x splicesPerJoint`, and it is what the BOM bills and what the
+  // splice reserve (30 m per splice) is charged on. Three joints at 2.5 splices is 7.5, and `round`
+  // answered 8 - a splice nobody makes, on a document that goes on a purchase order. The other three
+  // counts read by `link.options` (`fibres`, `connectors`, `splices`) are refused when they are not
+  // whole numbers; this one was multiplied through and rounded instead.
+  throws(function () { gridLink({ splices: 3, splicesPerJoint: 2.5 }); }, 'splicesPerJoint',
+    'a fractional splices-per-joint');
+  throws(function () { gridLink({ splicesPerJoint: 1.2 }); }, 'splicesPerJoint', '1.2 per joint');
+  // A whole count still answers, and it multiplies the joint count exactly: 3 joints x 2 = 6 per leg.
+  const r = gridLink({ splices: 3, splicesPerJoint: 2 });
+  assert.strictEqual(r.legs[0].splices, 6, '3 joints x 2 splices = 6 on the leg');
+  assert.strictEqual(r.bom.splices, 12, 'both grid legs: 6 + 6');
+});
