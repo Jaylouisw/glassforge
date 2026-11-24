@@ -34,6 +34,7 @@ const demandModule = require('./demand');
 const designFields = require('./design-fields');
 const lengthModule = require('./length');
 const street = require('./street');
+const budgetModule = require('./budget');
 
 const DEFAULT_LADDER = [
   'g652d-loose-144', 'g652d-loose-96', 'g652d-loose-48', 'g652d-loose-24', 'g652d-loose-12',
@@ -1016,29 +1017,13 @@ function evaluate(plant, opts, registry, meta) {
   // unreadable. What the report needs is how much of the estate is in the band and what the worst of it
   // costs - the pad a hot module needs, and whether the margin and the class budget can fund it.
   //
-  // The `fits: false` clause is not reachable with the optics in the catalogue today - every receiver's
-  // overload-to-sensitivity span is wider than its transmitter's window, so a pad the band needs is
-  // always affordable - but `padSizing` owns that arithmetic and a catalogue that grows must not find
-  // this report claiming a pad nobody can buy.
-  let launchWindowNote = null;
-  if (hotLaunch.length) {
-    const worst = hotLaunch.reduce(function (a, b) {
-      return b.result.launchWindowPad.overDb > a.result.launchWindowPad.overDb ? b : a;
-    });
-    const pad = worst.result.launchWindowPad;
-    const noPad = hotLaunch.filter(function (b) { return !b.result.launchWindowPad.fits; }).length;
-    const marginDb = isNum(opts.marginDb) ? opts.marginDb : DEFAULTS.marginDb;
-    launchWindowNote = hotLaunch.length + ' of ' + budgets.length + ' ONT' + (budgets.length === 1 ? '' : 's') +
-      ' ' + (hotLaunch.length === 1 ? 'is' : 'are') + ' inside the overload point only at the bottom of the OLT ' +
-      worst.result.olt + ' launch window: worst ' + pad.overDb + ' dB over at the ' + pad.atTxDbm + ' dBm top, ' +
-      (pad.fits
-        ? 'so ' + pad.padDb + ' dB of inline pad at the OLT carries the design to full launch'
-        : 'and the worst of them needs ' + pad.padDb + ' dB of pad against the ' + pad.maxPadDb +
-          ' dB the margin and the class budget can fund') +
-      ' - as it stands it holds only while every line card lands at ' + worst.result.txDbm + ' dBm' +
-      (noPad ? '; ' + noPad + ' of them cannot be padded inside the ' + marginDb +
-        ' dB margin and the class budget, so those need a different split or optic' : '');
-  }
+  // The sentence itself lives in `budget.launchWindowNote`, because the printed plan needs the same
+  // one: two copies of a paragraph this specific drift apart, and the copy that drifts is the one a
+  // crew reads.
+  const bandNote = budgetModule.launchWindowNote(budgets, {
+    marginDb: isNum(opts.marginDb) ? opts.marginDb : DEFAULTS.marginDb
+  });
+  const launchWindowNote = bandNote ? bandNote.text : null;
 
   // One sentence for the plant, naming the ONT whose figure is tightest. `feasible` stays true and the
   // verdict stays `marginal`: this is a report of the decision, not a second failure rule - the same

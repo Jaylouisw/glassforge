@@ -887,6 +887,14 @@ function printPage(req, res, project, registry) {
     });
   }
 
+  // The band, once for the plant (#111, #110). Every per-ONT budget row already carries its own
+  // sentence, and a 1:16 estate puts all sixteen in the same band - sixteen copies of one sentence
+  // bury the two numbers the page exists for: how much of the estate is in the band, and how much pad
+  // to buy. `budget.launchWindowNote` is the same sentence the design report prints, so the plan and
+  // the synthesis cannot disagree about it. The per-ONT rows stay: a warning names the ONT it is about.
+  const bandNote = engine.budget.launchWindowNote(budgetRows, {});
+  if (bandNote) signalWarnings.unshift(bandNote.text);
+
   out.push('<h2>Checks</h2>');
   const planErrors = check.errors.concat(signalErrors);
   const planWarnings = check.warnings.concat(signalWarnings);

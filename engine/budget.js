@@ -448,6 +448,98 @@ function refuseEndpointLaunch(end, path) {
     path.split('.')[1] + '":{"model":"..."},"txDbm":5}');
 }
 
+/**
+ * The launch-window band, said once for the whole plant rather than once per ONT.
+ *
+ * `launchWindowWarning` is a per-ONT sentence, because a budget describes one link. A plant is not a
+ * link: a 1:16 splitter with short drops puts every ONT in the band at once, and a report that repeats
+ * one sentence sixteen times buries the number the report exists for - how much of the estate is in
+ * the band, and how much pad to buy. This is that sentence, built from the rows `allOntBudgets`
+ * returned, so the design report and the printed plan quote one implementation instead of two
+ * (`engine/design.js` used to carry its own copy).
+ *
+ * Where the pad goes is the part a purchase order gets wrong:
+ *
+ * - **Every ONT in the band**: one pad at the OLT holds the whole plant, because there is no receiver
+ *   below it that a pad would push under its margin.
+ * - **Some of them**: the pad belongs at each affected ONT. A pad on the shared feeder is one pad
+ *   doing the same 1-4 dB to the ONTs that were fine, spending their margin to fix somebody else's
+ *   overload, so the note names the ONTs it does not cover and never says "at the OLT".
+ *
+ * The verdict does not move (#111): the band is a warning on an `ok` budget, and only the
+ * `pad.fits === false` clause - a pad the margin and the class budget cannot fund - points at a
+ * different split or optic.
+ *
+ * rows are `{ ont, name, result }` as `network.allOntBudgets` returns them; rows whose budget threw
+ * carry no result and are not counted, because "2 of 3" has to mean three budgeted ONTs. Returns null
+ * when no row is in the band - an empty note is not a warning, and a 0 dB pad is a plate nobody orders.
+ */
+function launchWindowNote(rows, opts) {
+  const o = opts || {};
+  const marginDb = isNum(o.marginDb) ? o.marginDb : DEFAULT_MARGIN_DB;
+  const budgeted = (rows || []).filter(function (r) { return r && r.result; });
+  const hot = budgeted.filter(function (r) { return r.result.launchWindowPad; });
+  if (!hot.length) return null;
+
+  // The worst overshoot, ties broken on the ONT id: the sentence must not depend on the order the
+  // plant happened to be built in, and `reduce` keeps whichever row came first.
+  const worst = hot.reduce(function (a, b) {
+    const diff = b.result.launchWindowPad.overDb - a.result.launchWindowPad.overDb;
+    if (diff > 0) return b;
+    if (diff < 0) return a;
+    return String(b.ont) < String(a.ont) ? b : a;
+  });
+  const pad = worst.result.launchWindowPad;
+  const noPad = hot.filter(function (r) { return !r.result.launchWindowPad.fits; }).length;
+  const rest = budgeted.length - hot.length;
+  // Pads are bought in whole dB, so the sizes are what an order needs: a 1:16 estate can need a 1 dB
+  // pad on six drops and a 2 dB pad on two, and quoting the worst size for all eight over-pads the six.
+  const bySize = new Map();
+  hot.forEach(function (r) {
+    const db = r.result.launchWindowPad.padDb;
+    bySize.set(db, (bySize.get(db) || 0) + 1);
+  });
+  const sizeList = Array.from(bySize.keys()).sort(function (a, b) { return b - a; })
+    .map(function (db) { return bySize.get(db) + ' x ' + db + ' dB'; }).join(', ');
+  // One pad at the OLT is only the right purchase when every ONT in the band needs the same pad. A
+  // pad is one size, so a band that needs a 1 dB pad on six drops and a 2 dB pad on two cannot be
+  // served from the feeder: the 2 dB pad over-pads the six and spends their margin to fix the two.
+  const where = rest === 0 && bySize.size === 1
+    ? pad.padDb + ' dB of inline pad at the OLT carries the design to full launch'
+    : 'a pad at each of the ' + hot.length + ' affected ONT' + (hot.length === 1 ? '' : 's') +
+      ' carries the design to full launch (' + sizeList + ')' +
+      (rest === 0
+        ? ', because one pad size does not serve the whole band'
+        : ', and the other ' + rest + ' cannot share a pad on the feeder');
+
+  const text = hot.length + ' of ' + budgeted.length + ' ONT' + (budgeted.length === 1 ? '' : 's') +
+    ' ' + (hot.length === 1 ? 'is' : 'are') + ' inside the overload point only at the bottom of the OLT ' +
+    worst.result.olt + ' launch window: worst ' + pad.overDb + ' dB over at the ' + pad.atTxDbm +
+    ' dBm top, ' +
+    (pad.fits
+      ? 'so ' + where
+      : 'and the worst of them needs ' + pad.padDb + ' dB of pad against the ' + pad.maxPadDb +
+        ' dB the margin and the class budget can fund') +
+    ' - as it stands it holds only while every line card lands at ' + worst.result.txDbm + ' dBm' +
+    (noPad ? '; ' + noPad + ' of them cannot be padded inside the ' + marginDb +
+      ' dB margin and the class budget, so those need a different split or optic' : '');
+
+  return {
+    text: text,
+    onts: hot.length,
+    total: budgeted.length,
+    worstOnt: worst.ont,
+    olt: worst.result.olt,
+    padDb: pad.padDb,
+    overDb: pad.overDb,
+    atTxDbm: pad.atTxDbm,
+    maxPadDb: pad.maxPadDb,
+    sizes: Array.from(bySize.keys()).sort(function (a, b) { return b - a; }),
+    fits: pad.fits,
+    unpadded: noPad
+  };
+}
+
 /** The clause an overload reason carries, so the refusal says what to do about it. */
 function attenuatorClause(pad, marginDb) {
   if (!pad) return '';
@@ -788,6 +880,7 @@ module.exports = {
   DEFAULT_CONNECTOR_MODEL: DEFAULT_CONNECTOR_MODEL,
   cableAttenuation: cableAttenuation,
   splitterLoss: splitterLoss,
+  launchWindowNote: launchWindowNote,
   opticalBudget: opticalBudget,
   pointToPoint: pointToPoint,
   computeOdn: computeOdn
