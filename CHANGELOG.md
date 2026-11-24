@@ -34,6 +34,16 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A money objective prices the drums you buy, not the metres you hang.** `design.synthesise` charged
+  cable as `cablePerM × designM`, so the cost it ranked by disagreed with the BOM it had just built:
+  a 30-house PON buying 8 km on five drums (5.9 km of design length: three 2 km 12-fibre and two 1 km
+  drops) was quoted 9957.35 instead of 12144, because the 2.1 km of drum you pay for and never hang
+  was absent from the ranking. Drums are bought whole and rounded once per model (SPEC §5), so a spare drum is money; cost
+  now sums `cablePerM × purchaseM` per model plus the priced splices, closures and splitters.
+  `metrics.costBreakdown: { cable, splices, closures, splitters, total }` reports the terms (both it
+  and `cost` are `null` without a cost model), so a ranked-by-money verdict is reviewable the way a
+  budget is. Tests: new suite `cost-model`, 4 assertions (the priced purchase, the terms summing to
+  the total, `null` without a model, and a single-drum design pricing one drum).
 - **A span that needs two cables buys two cables.** Auto-design writes `spans[].bundles` when the
   fibres a span carries do not fit the largest cable in the ladder — 160 customer fibres is two
   144-fibre cables over one measured route — and its own BOM counts them (fibre-metres, `cableM`,

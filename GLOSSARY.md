@@ -51,6 +51,12 @@ so 24 fibres × 1 km is not the same purchase as 24 runs of 1 fibre × 1 km.
 **Cable-to-buy** — every span resolved onto a purchasable cable part, with the drum lengths and the
 total metres.
 
+**Cost** — the money objective auto-design ranks by when the caller supplies a `costs` model. Cable is
+priced on the **purchased** metres (`purchaseM`: the drums the BOM buys, rounded once per model), not on
+`designM`, because the metres nobody sells are metres somebody pays for; `splice`, `closure` and
+`splitter` are per-unit prices. `metrics.costBreakdown` reports the four terms and their sum, so a
+ranked-by-money verdict is reviewable like a budget.
+
 **Splice schedule** — the sheet a crew works from: every strand arriving on each cable, its TIA-598
 address and colour, and how it is terminated (`via`): `splice` at a closure, naming the strand on the
 other side (`splicedTo`); `parked` when it arrives and leaves on no cable; `splitter-input` and

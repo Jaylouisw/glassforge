@@ -53,6 +53,14 @@ and `cableM` stays in the output as its own metric. Supply `costs` (`cablePerM` 
 `splice`, `closure`, `splitter`) and the objective switches to money — and the response says which
 objective it used.
 
+A money price is a purchase order, so cable is priced on the **drums the design buys**: `cablePerM ×
+purchaseM`, the design length rounded up to the cable's own drum once per model (SPEC §5), never
+`cablePerM × designM`. Pricing the design length quoted three drums of 12-fibre as the 850 m actually
+hung and let the ranking disagree with the BOM it had just built — a spare drum costs money and the
+objective has to see it. `metrics.designM` and `metrics.drums` stay as the length and the drum count,
+and `metrics.costBreakdown: { cable, splices, closures, splitters, total }` reports the terms, so the
+ranked number can be checked by hand.
+
 ## How each topology is built
 
 ### PON

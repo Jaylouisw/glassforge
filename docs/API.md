@@ -102,6 +102,10 @@ straight-line factor to a street/duct graph; `/api/import/network` builds that g
 so the caller can preview it (and send it as `network` unchanged). `applyToProject` replaces the project's plant in
 one operation (one undo step) *after* validating it; without it, the design is returned and nothing is
 written. Candidates that fail are returned with `feasible: false` and their reasons, never dropped.
+With `costs`, `objective` is `cost` and every candidate's `metrics.cost` prices the drums the BOM buys
+(`purchaseM`) plus the priced splices, closures and splitters, with the terms in
+`metrics.costBreakdown: { cable, splices, closures, splitters, total }`; without `costs`, both are
+`null`.
 See [AUTO-DESIGN.md](AUTO-DESIGN.md).
 
 ## Site-to-site links

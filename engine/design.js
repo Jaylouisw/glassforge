@@ -900,24 +900,45 @@ function evaluate(plant, opts, registry, meta) {
   };
 
   let cost = null;
+  let costBreakdown = null;
   const unpricedCable = [];
   if (opts.costs) {
     // Every cable the BOM builds with must carry a price. A model that leaves one out is not a
     // money model - charging it 0 makes the design that uses it look free - so the models are
     // collected here and `synthesise` refuses the request once every candidate has been built,
     // naming all of them rather than the first one met.
-    cost = 0;
+    //
+    // Cable is priced on `purchaseM`, not `designM`: drums are bought whole and rounded once per
+    // model (SPEC §5), so the metres nobody sells are metres somebody pays for. Pricing the design
+    // length quoted three drums as 1.4 km of cable and let the money ranking disagree with the BOM
+    // it had just built. `designM` stays the length metric; `cost` is what the purchase order says.
+    let cableCost = 0;
     for (const line of bom.lines) {
       const perM = opts.costs.cablePerM[line.model];
       if (perM === undefined) { unpricedCable.push(line.model); continue; }
-      cost += perM * line.designM;
+      cableCost += perM * line.purchaseM;
     }
-    if (isNum(opts.costs.splice)) cost += opts.costs.splice * splices;
-    if (isNum(opts.costs.closure)) cost += opts.costs.closure * closures;
-    if (isNum(opts.costs.splitter)) cost += opts.costs.splitter * splitters;
-    cost = unpricedCable.length ? null : round(cost, 2);
+    const spliceCost = isNum(opts.costs.splice) ? opts.costs.splice * splices : 0;
+    const closureCost = isNum(opts.costs.closure) ? opts.costs.closure * closures : 0;
+    const splitterCost = isNum(opts.costs.splitter) ? opts.costs.splitter * splitters : 0;
+    if (unpricedCable.length) {
+      cost = null;
+    } else {
+      // A ranked-by-money verdict without its terms is as unreviewable as a budget without its
+      // breakdown (SPEC §4): report the cable, splice, closure and splitter terms and their sum.
+      cableCost = round(cableCost, 2);
+      cost = round(cableCost + spliceCost + closureCost + splitterCost, 2);
+      costBreakdown = {
+        cable: cableCost,
+        splices: round(spliceCost, 2),
+        closures: round(closureCost, 2),
+        splitters: round(splitterCost, 2),
+        total: cost
+      };
+    }
   }
   metrics.cost = cost;
+  metrics.costBreakdown = costBreakdown;
 
   return {
     technology: meta.technology,
