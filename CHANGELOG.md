@@ -32,6 +32,17 @@ and the checks, and a PNG of the drawing at a stated scale.
   adds 5 (the page, its escaping, an empty plant, a missing id, an unpriceable cable) and
   `ui-dom-contract` adds 1 (the two toolbar controls are wired). The repository total is the runner's.
 
+### Fixed
+
+- **A splitter is not a splice.** `engine.network.spliceTable` reported every strand at a splitter as
+  joined to the chain on the other side, so a 1:8 site's sheet said the feeder fibre was spliced
+  straight through to a customer's drop — the one mis-wiring the schedule exists to prevent. A
+  splitter's rows now carry `via: 'splitter-input'` (the cable nearer the head end, by hop count from
+  the root, with a splitter tail winning the tie) or `via: 'splitter-port'` with a 1-based `port`, and
+  `splicedTo` is empty; the point carries the part's `ratio` and `termination`, and the printed page
+  shows `splitter input (1 splice)` / `splitter port P1` instead of a span id. Closure rows keep their
+  through-splice and gained the same `via` field (`splice` / `parked`).
+
 ### Changed
 
 - `docs/API.md` documents the print route and the PNG scale arithmetic; the README lists plan export

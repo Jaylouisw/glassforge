@@ -678,6 +678,22 @@ function tableHtml(headers, rows, opts) {
   return '<table>' + head + '<tbody>' + body + '</tbody></table>';
 }
 
+/**
+ * What the splice sheet says a strand is joined to.
+ *
+ * A closure joins strand to strand (`splicedTo`), a strand on one cable is parked, and a splitter
+ * neither: its input strand terminates on the splitter and its output strands leave from numbered
+ * ports. Printing a span id for a splitter row would send a crew splicing the PON port straight to a
+ * customer and past the split.
+ */
+function spliceTarget(row, point) {
+  if (row.via === 'splitter-input') {
+    return point.termination === 'connectorised' ? 'splitter input (2 connectors)' : 'splitter input (1 splice)';
+  }
+  if (row.via === 'splitter-port') return 'splitter port P' + row.port;
+  return row.splicedTo.length ? row.splicedTo.join(', ') : 'parked';
+}
+
 function printPage(req, res, project, registry) {
   const stats = engine.network.stats(project, registry);
   const check = engine.project.check(project, registry);
@@ -762,12 +778,13 @@ function printPage(req, res, project, registry) {
     out.push('<p class="muted">No closure or splitter carries assigned strands yet.</p>');
   } else {
     for (const point of splice.points) {
-      out.push('<h3>' + escapeHtml(point.name) + ' <span class="muted">(' + escapeHtml(point.type) + ', ' +
+      out.push('<h3>' + escapeHtml(point.name) + ' <span class="muted">(' + escapeHtml(point.type) +
+        (point.ratio ? ' 1:' + point.ratio : '') + ', ' +
         point.spans.length + ' cable(s), ' + point.rows.length + ' strand(s))</span></h3>');
-      out.push(tableHtml(['Span', 'Strand', 'Address', 'Colour', 'Splices to'], point.rows.map(function (row) {
+      out.push(tableHtml(['Span', 'Strand', 'Address', 'Colour', 'Joints / port'], point.rows.map(function (row) {
         return [row.span, { text: String(row.strand), cls: 'num' }, row.address,
           { html: '<span class="swatch" style="background:' + escapeHtml(row.hex) + '"></span>' + escapeHtml(row.colour) },
-          row.splicedTo.length ? row.splicedTo.join(', ') : 'parked'];
+          spliceTarget(row, point)];
       })));
     }
   }

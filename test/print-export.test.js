@@ -101,7 +101,11 @@ test('a strand index that is not a positive integer is skipped, not allowed to k
   assert.deepStrictEqual(table.points[0].rows.map(function (r) { return r.strand; }), [3, 3]);
 });
 
-test('a splitter is a splice point too, and a plant with no closures has an empty schedule', function () {
+test('a splitter terminates its strands; it does not splice them through to the distribution cable', function () {
+  // This test used to assert `rows[0].splicedTo === ['s2']` at the splitter - i.e. that the feeder
+  // strand was spliced straight through the splitter to the customer's drop. That is the exact
+  // mis-wiring the sheet exists to prevent: it bypasses the split. A splitter's input strand is
+  // terminated on the splitter and every strand below it leaves from an output port.
   const splitters = {
     nodes: [
       { id: 'o1', type: 'olt', model: 'gpon-c-plus-8' },
@@ -109,19 +113,83 @@ test('a splitter is a splice point too, and a plant with no closures has an empt
       { id: 'n1', type: 'ont', model: 'gpon-ont-4ge' }
     ],
     spans: [
-      { id: 's1', from: 'o1', to: 'sp1', cable: 'g652d-loose-12', lengthM: 500, strands: [1] },
-      { id: 's2', from: 'sp1', to: 'n1', cable: 'g657a2-drop-1', lengthM: 40, strands: [1] }
+      { id: 's1', from: 'o1', to: 'sp1', cable: 'g652d-loose-12', lengthM: 500, strands: [1], purpose: 'feeder' },
+      { id: 's2', from: 'sp1', to: 'n1', cable: 'g657a2-drop-1', lengthM: 40, strands: [1, 2] }
     ]
   };
   const table = engine.network.spliceTable(splitters, engine.createRegistry());
   assert.strictEqual(table.points.length, 1);
-  assert.strictEqual(table.points[0].type, 'splitter');
-  assert.strictEqual(table.points[0].rows.length, 2);
-  assert.deepStrictEqual(table.points[0].rows[0].splicedTo, ['s2']);
+  const point = table.points[0];
+  assert.strictEqual(point.type, 'splitter');
+  assert.strictEqual(point.rows.length, 3);
+  // The ratio and the termination come from the part, so the sheet can say 1:8 and "one splice".
+  assert.strictEqual(point.ratio, 8);
+  assert.strictEqual(point.termination, 'spliced');
+
+  const input = point.rows.find(function (r) { return r.span === 's1'; });
+  assert.strictEqual(input.via, 'splitter-input');
+  assert.deepStrictEqual(input.splicedTo, []);
+  assert.strictEqual(input.port, null);
+
+  const outputs = point.rows.filter(function (r) { return r.span === 's2'; });
+  assert.deepStrictEqual(outputs.map(function (r) { return r.port; }), [1, 2]);
+  outputs.forEach(function (row) {
+    assert.strictEqual(row.via, 'splitter-port');
+    assert.deepStrictEqual(row.splicedTo, [], 'a splitter port is not spliced to anything across the split');
+  });
 
   const empty = engine.network.spliceTable({ nodes: [{ id: 'o1', type: 'olt' }], spans: [] }, engine.createRegistry());
   assert.deepStrictEqual(empty.points, []);
   assert.strictEqual(empty.totalStrands, 0);
+});
+
+test('the input cable of a splitter is the one nearer the head end, whatever order the spans are listed in', function () {
+  // Same plant, spans reversed and no splitter tail to fall back on: the input must still be s1,
+  // decided by hop count from the OLT and not by array position.
+  const plant = {
+    nodes: [
+      { id: 'o1', type: 'olt', model: 'gpon-c-plus-8' },
+      { id: 'sp1', type: 'splitter', model: 'plc-1x8-sca' },
+      { id: 'n1', type: 'ont', model: 'gpon-ont-4ge' }
+    ],
+    spans: [
+      { id: 's2', from: 'sp1', to: 'n1', cable: 'g657a2-drop-1', lengthM: 40, strands: [1] },
+      { id: 's1', from: 'o1', to: 'sp1', cable: 'g652d-loose-12', lengthM: 500, strands: [1] }
+    ]
+  };
+  const point = engine.network.spliceTable(plant, engine.createRegistry()).points[0];
+  assert.deepStrictEqual(point.spans, ['s1', 's2']);
+  const input = point.rows.find(function (r) { return r.via === 'splitter-input'; });
+  assert.strictEqual(input.span, 's1');
+});
+
+test('a splitter with two output cables numbers its ports across both of them', function () {
+  const plant = {
+    nodes: [
+      { id: 'o1', type: 'olt', model: 'gpon-c-plus-8' },
+      { id: 'sp1', type: 'splitter', model: 'plc-1x8-sca' },
+      { id: 'c1', type: 'closure', model: 'nap-8' },
+      { id: 'n1', type: 'ont', model: 'gpon-ont-4ge' }
+    ],
+    spans: [
+      { id: 's1', from: 'o1', to: 'sp1', cable: 'g652d-loose-12', lengthM: 500, strands: [1] },
+      { id: 's2', from: 'sp1', to: 'c1', cable: 'g652d-loose-12', lengthM: 80, strands: [1, 2] },
+      { id: 's3', from: 'sp1', to: 'n1', cable: 'g657a2-drop-2', lengthM: 30, strands: [1] }
+    ]
+  };
+  const point = engine.network.spliceTable(plant, engine.createRegistry()).points[0];
+  const ports = point.rows.filter(function (r) { return r.span !== 's1'; }).map(function (r) {
+    return r.span + ':' + r.port;
+  });
+  assert.deepStrictEqual(ports, ['s2:1', 's2:2', 's3:3']);
+});
+
+test('a closure still splices strand to strand and parks a strand on one cable', function () {
+  const point = engine.network.spliceTable(plantWithStrands(), engine.createRegistry()).points[0];
+  const parked = point.rows.find(function (r) { return r.span === 's1' && r.strand === 1; });
+  assert.strictEqual(parked.via, 'parked');
+  const spliced = point.rows.find(function (r) { return r.span === 's1' && r.strand === 2; });
+  assert.strictEqual(spliced.via, 'splice');
 });
 
 done();

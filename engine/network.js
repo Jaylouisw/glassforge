@@ -546,11 +546,24 @@ function stats(plant, registry) {
 
 /**
  * The splice schedule: for every splice point (a closure or a splitter), the strands arriving on each
- * cable and which strand on the other side each one is joined to.
+ * cable and how each one is terminated.
  *
  * This is what a crew works from on paper, and it is derived from the same `span.strands` the strand
- * ledger and the canvas address. A strand that arrives on a single cable is parked, not spliced, and
- * its `splicedTo` is empty - saying so is the point: an empty list is a decision, not a missing row.
+ * ledger and the canvas address.
+ *
+ * A **closure** is a splice: a strand on two cables is joined to its counterpart (`via: 'splice'`,
+ * `splicedTo` naming the span on the other side), and a strand on one cable arrives and leaves on no
+ * cable, so it is parked (`splicedTo: []`).
+ *
+ * A **splitter** is not a splice. The feeder fibre is terminated on the splitter's input, and every
+ * fibre below it leaves from an output port; nothing is joined to anything. Reporting the feeder
+ * strand as `splicedTo` the distribution cable is the one mistake this sheet exists to prevent - a
+ * crew that follows it splices the PON port straight to a customer and bypasses the split. So a
+ * splitter's rows carry `via: 'splitter-input'` (the cable nearer the head end) or
+ * `via: 'splitter-port'` with a 1-based `port`, never a `splicedTo`. Which cable is the input is a
+ * fact about the plant - the one nearer the head end by hop count - not about the order the spans
+ * happen to be listed in; a splitter tail wins the tie when the plant is not traceable from a root.
+ *
  * Indices that are not positive integers are skipped, so one bad hand-edited project cannot make the
  * print page die.
  */
@@ -560,12 +573,23 @@ function spliceTable(plant, registry) {
   const idOf = new Map();
   spans.forEach(function (span, i) { idOf.set(span, span.id || '#' + i); });
 
+  const depth = nodeDepths(plant);
   const points = [];
   let totalStrands = 0;
 
   for (const node of nodes) {
     if (node.type !== 'closure' && node.type !== 'splitter') continue;
     const local = spans.filter(function (s) { return s.from === node.id || s.to === node.id; });
+    if (!local.length) continue;
+
+    if (node.type === 'splitter') {
+      const point = splitterPoint(node, local, idOf, depth, registry);
+      if (!point.rows.length) continue;
+      totalStrands += point.rows.length;
+      points.push(point);
+      continue;
+    }
+
     const byStrand = new Map();
     for (const span of local) {
       const seen = new Set();
@@ -586,13 +610,16 @@ function spliceTable(plant, registry) {
       const carriers = byStrand.get(index).slice().sort();
       const address = fiber.addressFor(index);
       carriers.forEach(function (spanId) {
+        const others = carriers.filter(function (id) { return id !== spanId; });
         rows.push({
           span: spanId,
           strand: index,
           address: address.label,
           colour: address.fiberColor.name,
           hex: address.fiberColor.hex,
-          splicedTo: carriers.filter(function (id) { return id !== spanId; })
+          via: others.length ? 'splice' : 'parked',
+          port: null,
+          splicedTo: others
         });
       });
     });
@@ -602,12 +629,100 @@ function spliceTable(plant, registry) {
       name: node.name || node.id,
       type: node.type,
       model: node.model || null,
+      ratio: null,
+      termination: null,
       spans: local.map(function (s) { return idOf.get(s); }),
       rows: rows
     });
   }
 
   return { points: points, totalStrands: totalStrands };
+}
+
+/**
+ * Hop count from the head end, for every node it can reach.
+ *
+ * A splitter's input is the cable on the head-end side. `nodeDepths` answers that with the plant's
+ * own topology; an empty map (no single root yet) leaves the caller to fall back on a splitter tail.
+ */
+function nodeDepths(plant) {
+  const depth = new Map();
+  const roots = rootNodes(plant);
+  if (roots.length !== 1) return depth;
+  const adj = adjacency(plant);
+  depth.set(roots[0].id, 0);
+  const queue = [roots[0].id];
+  while (queue.length) {
+    const id = queue.shift();
+    for (const edge of adj.get(id) || []) {
+      if (depth.has(edge.to)) continue;
+      depth.set(edge.to, depth.get(id) + 1);
+      queue.push(edge.to);
+    }
+  }
+  return depth;
+}
+
+/** Order the cables at a splitter: the input first, then the outputs, deterministically. */
+function orderSplitterCables(node, local, idOf, depth) {
+  function farDepth(span) {
+    const other = span.from === node.id ? span.to : span.from;
+    return depth.has(other) ? depth.get(other) : null;
+  }
+  return local.slice().sort(function (a, b) {
+    const da = farDepth(a);
+    const db = farDepth(b);
+    // A cable with no depth is not on the traced tree: it sorts after any cable that is.
+    if ((da === null) !== (db === null)) return da === null ? 1 : -1;
+    // A splitter tail into the splitter is the input by definition (it is 1 m of fibre into the box).
+    const ta = a.purpose === 'splitter-tail' ? 0 : 1;
+    const tb = b.purpose === 'splitter-tail' ? 0 : 1;
+    if (ta !== tb) return ta - tb;
+    if (da !== null && da !== db) return da - db;
+    const ia = String(idOf.get(a));
+    const ib = String(idOf.get(b));
+    return ia < ib ? -1 : ia > ib ? 1 : 0;
+  });
+}
+
+function splitterPoint(node, local, idOf, depth, registry) {
+  const part = node.model && registry.has('splitter', node.model) ? registry.get('splitter', node.model) : null;
+  const ordered = orderSplitterCables(node, local, idOf, depth);
+  const rows = [];
+  let port = 0;
+
+  for (const span of ordered) {
+    const isInput = span === ordered[0];
+    const seen = new Set();
+    for (const raw of Array.isArray(span.strands) ? span.strands : []) {
+      const index = Number(raw);
+      if (!Number.isInteger(index) || index < 1) continue;
+      if (seen.has(index)) continue;
+      seen.add(index);
+      const address = fiber.addressFor(index);
+      rows.push({
+        span: idOf.get(span),
+        strand: index,
+        address: address.label,
+        colour: address.fiberColor.name,
+        hex: address.fiberColor.hex,
+        via: isInput ? 'splitter-input' : 'splitter-port',
+        port: isInput ? null : ++port,
+        splicedTo: []
+      });
+    }
+  }
+
+  return {
+    node: node.id,
+    name: node.name || node.id,
+    type: node.type,
+    model: node.model || null,
+    ratio: part ? part.ratio : null,
+    termination: part ? (part.termination || 'spliced') : null,
+    spans: ordered.map(function (s) { return idOf.get(s); }),
+    rows: rows
+  };
 }
 
 module.exports = {

@@ -456,6 +456,53 @@ async function main() {
       'a printed plan must render with no network access');
   });
 
+  // A splitter on the printed sheet. The engine's rows are asserted directly in print-export; this
+  // drives the page a crew actually gets, because the wording there is the claim in docs/API.md.
+  const splitProject = await request('POST', '/api/projects', { name: 'Splitter plan' });
+  let splitState = await request('POST', '/api/projects/' + splitProject.body.id + '/ops', {
+    op: 'add-node', node: { type: 'olt', model: 'gpon-c-plus-8', name: 'OLT', lat: 51.5, lon: -0.1 }
+  });
+  const splitOlt = splitState.body.nodes.find(function (n) { return n.type === 'olt'; }).id;
+  splitState = await request('POST', '/api/projects/' + splitProject.body.id + '/ops', {
+    op: 'add-node', node: { type: 'splitter', model: 'plc-1x8-sca', name: 'SPL 1:8', lat: 51.5005, lon: -0.1 }
+  });
+  const splitSplitter = splitState.body.nodes.find(function (n) { return n.type === 'splitter'; }).id;
+  splitState = await request('POST', '/api/projects/' + splitProject.body.id + '/ops', {
+    op: 'add-node', node: { type: 'ont', model: 'gpon-ont-4ge', name: 'House 1', lat: 51.501, lon: -0.1 }
+  });
+  const splitOnt = splitState.body.nodes.find(function (n) { return n.type === 'ont'; }).id;
+  splitState = await request('POST', '/api/projects/' + splitProject.body.id + '/ops', {
+    op: 'add-span', span: { from: splitOlt, to: splitSplitter, cable: 'g652d-loose-12', lengthM: 500, strands: [1] }
+  });
+  const feederSpan = splitState.body.spans[0].id;
+  splitState = await request('POST', '/api/projects/' + splitProject.body.id + '/ops', {
+    op: 'add-span', span: { from: splitSplitter, to: splitOnt, cable: 'g657a2-drop-1', lengthM: 40, strands: [1, 2] }
+  });
+  const dropSpan = splitState.body.spans[1].id;
+  const splitPrint = await request('GET', '/print/project/' + splitProject.body.id);
+
+  test('the printed splitter schedule names input and ports, never a splice across the split', function () {
+    const html = splitPrint.raw.toString('utf8');
+    assert.ok(html.indexOf('splitter input (1 splice)') !== -1, 'the feeder strand is not shown terminated on the splitter');
+    assert.ok(html.indexOf('splitter port P1') !== -1 && html.indexOf('splitter port P2') !== -1,
+      'the distribution strands are not numbered as splitter ports');
+    assert.ok(html.indexOf('1:8') !== -1, 'the sheet does not print the split ratio');
+    // The splitter's own table must not name either neighbouring cable as a joint: that row is the
+    // mis-wiring this schedule exists to prevent.
+    // The node name is also drawn in the plan SVG, so the section is taken from the schedule heading.
+    const heading = html.indexOf('Splice schedule');
+    const start = html.indexOf('SPL 1:8', heading);
+    const end = html.indexOf('</table>', start);
+    const splitterSection = html.slice(start, end);
+    assert.ok(splitterSection.indexOf('>' + feederSpan + '<') !== -1, 'the feeder cable is missing from the splitter table');
+    splitterSection.split('<tr>').slice(1).forEach(function (row) {
+      const cells = row.split('<td');
+      const joints = cells[cells.length - 1];
+      assert.ok(joints.indexOf(feederSpan) === -1 && joints.indexOf(dropSpan) === -1,
+        'a splitter row claims a joint to another cable: ' + joints);
+    });
+  });
+
   const emptyProject = await request('POST', '/api/projects', { name: 'Empty plan' });
   const emptyPrint = await request('GET', '/print/project/' + emptyProject.body.id);
   test('an empty project still prints: zero counts, no crash, no invented cable', function () {
