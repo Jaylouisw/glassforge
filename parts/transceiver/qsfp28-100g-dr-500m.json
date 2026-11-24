@@ -1,0 +1,16 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp28-100g-dr-500m",
+  "vendor": "generic",
+  "label": "QSFP28 100GBASE-DR 500 m",
+  "speedMbps": 100000,
+  "wavelengthNm": 1310,
+  "reachM": 500,
+  "txPowerDbmMin": -2.9,
+  "txPowerDbmMax": 4.0,
+  "rxSensitivityDbm": -5.9,
+  "rxOverloadDbm": 4.0,
+  "polish": "upc",
+  "sourceUrl": "https://apps.juniper.net/hct/model/QSFP-100G-DR/hwspecs",
+  "notes": "IEEE 802.3cd 100GBASE-DR: one 1311 nm carrier (1304.5-1317.5 nm lane band), 53.125 GBd PAM4, duplex LC/UPC on one single-mode pair, 500 m with KP4 FEC. Figures are the class values, and two independent datasheets print the same numbers - Juniper QSFP-100G-DR (its sheet names the standard as IEEE 100GBASE-DR, clause 140) and Huawei QSFP28-100G-DR (02312VSP): average launch -2.9..+4.0 dBm, average receive power -5.9..+4.0 dBm, TDECQ 3.4 dB max, stressed receiver sensitivity (OMAouter) -1.9 dBm. Glassforge records the averages, as the FR1 and LR1 rows do, because the averages are what a fibre budget spends: -2.9 minus -5.9 = 3.0 dB of channel insertion loss, the tightest budget in this catalogue and 1.0 dB tighter than FR1's 4.0 dB. This row deliberately carries no OMA sensitivity figure: Juniper states receiver sensitivity as max(-3.9, SECQ-5.3) dBm rather than the single -4.4 dBm number the 802.3cd proposals print, and an OMA figure is not what a fibre budget spends anyway - the average is, and it is the one both sheets agree on. Measured by driving budget.pointToPoint at the default 3 dB margin: 500 m x 0.35 dB/km (G.652.D, 1310 nm) = 0.175 dB of fibre leaves 2.83 dB of headroom and reads FAIL; add the LC/UPC pair each end (2 x 0.25 = 0.5 dB, 0.675 dB total) and it reads 2.33 dB, also fail; it reads ok once marginDb is lowered to 2.3 dB with the pair, or 2.8 dB without it. At zero length the headroom is exactly 3.00 dB - the class budget and the margin are the same number, so a compliant DR span has no reserve for a repair loop, a spliced repair or a dirty ferrule. 100GBASE-FR1 (4.0 dB) or -LR1 (6.3 dB) is the optic for any span that has to survive one. The overload verdict cannot fire on this row, and that is a property of the class rather than a quirk: the receiver's overload (+4.0 dBm) and the module's own maximum launch (+4.0 dBm) are the same number, so a loss-free plant puts exactly +4.0 dBm on a receiver rated +4.0 dBm and the engine passes it (measured at txDbm 4.0 over a 0 m span: rx +4.0 dBm, ok, no pad, no warning). A module running above its spec ceiling is where this row goes over, and the launch-window band is what to read there. wavelengthNm is 1310, not the 1311 nm centre on the sheets: the budget keys each cable's attenuation table on this number and refuses a window the cable does not publish (measured: 'cable \"g652d-loose-12\" publishes no attenuation at 1311 nm'), and 0.35 dB/km at the 1310 nm window covers the DR lane band 1304.5-1317.5 nm. A 1311 nm entry would be a coercion dressed as precision, not a better budget. Why this row exists: every other optic here reaches 2 km or more, so an in-building or cross-campus duct run of a few hundred metres - the shortest site-to-site case the planner is asked for - had nothing to order but a 2 km module, paying for reach nobody has. Class figures, not one measured module: replace the row with the module actually purchased before pricing a build."
+}

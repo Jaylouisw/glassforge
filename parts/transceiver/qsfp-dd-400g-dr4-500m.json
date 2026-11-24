@@ -1,0 +1,16 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp-dd-400g-dr4-500m",
+  "vendor": "generic",
+  "label": "QSFP-DD 400GBASE-DR4 500 m (MPO-12/APC)",
+  "speedMbps": 400000,
+  "wavelengthNm": 1310,
+  "reachM": 500,
+  "txPowerDbmMin": -2.9,
+  "txPowerDbmMax": 4.0,
+  "rxSensitivityDbm": -5.9,
+  "rxOverloadDbm": 4.0,
+  "polish": "apc",
+  "sourceUrl": "https://www.l-p.com/file/datasheet/lqd-m31400-dr4sc.pdf",
+  "notes": "IEEE 802.3bs 400GBASE-DR4, the parallel-single-mode 500 m rung: four 100G PAM4 lanes, all at 1311 nm (1304.5-1317.5 nm lane band), over four fibres in each direction, terminated MPO-12/APC. Per-lane figures from three independent datasheets - the LINK-PP LQD-M31400-DR4SC sheet (802.3bs compliant, and the sourceUrl here), the NVIDIA MMS1V00-WM specification (802.3bs-2017 compliant, Type 2 MPO-12 housing) and the ATGBICS QSFP-DD-400G-DR4 sheet - which agree: average launch -2.9..+4.0 dBm, average receive power -5.9..+4.0 dBm, receiver sensitivity (OMAouter) -4.4 dBm, stressed receiver sensitivity -1.9 dBm, TDECQ 3.4 dB, damage threshold 5 dBm, operating distance 2-500 m with FEC. Cisco's 400G QSFP-DD portfolio names the same part (QDD-400G-DR4-S: 400GBASE-DR4, MPO-12 SMF APC, 500 m), which is what a purchase order would quote. Glassforge records the per-lane averages, which is what a fibre budget spends: -2.9 minus -5.9 = 3.0 dB per lane, exactly the 100GBASE-DR budget, because it is the same lane - DR4 is four DR channels in one housing, and this row and qsfp28-100g-dr-500m must be read as one class rather than two vendors' opinions. Two things this row does not do like its duplex neighbours. It needs EIGHT strands (4 Tx + 4 Rx), so a leg is designed with fibres: 8; the smallest cable here that carries it is the 12F ladder floor, which is also what cableForSpan asks for on any span over 300 m, so a DR4 leg is a 12F cable with four strands dark or spare. And its termination is MPO-12/APC, not the SC/APC the default connector model charges: budget it with connectors { count: 2, model: 'mpo-12-apc' } (2 x 0.2 = 0.4 dB), and only four of the twelve MPO positions carry each direction - an 8- or 12-fibre MPO trunk is the right order, a duplex patch cord is not. Measured by driving budget.pointToPoint at the default 3 dB margin: 500 m x 0.35 dB/km = 0.175 dB of fibre plus 0.4 dB of MPO matings is 0.575 dB, leaving 2.43 dB of headroom and a FAIL; it reads ok at marginDb 2.4 dB, and at 501 m it reports both that margin and 'the route is 501 m but the shorter optic reaches 500 m'. Same story as the DR row and the same answer: 400GBASE-FR4 at 2 km is the optic with reserve, and this one is for a link that is genuinely inside 500 m. wavelengthNm is 1310 rather than the 1311 nm centre on the sheets, for the reason the DR row gives: the budget keys the cable's attenuation table on this number and refuses a window the cable does not publish. This row exists because the 500 m hole under FR4 was empty for 400G while qsfp-dd-400g-fr4-2km covered 2 km and nothing shorter - an in-building or cross-campus 400G run had no optic it could order. Class figures, not one measured module: replace with the module actually purchased, and with its MPO polarity and lane assignment, before pricing a build."
+}
