@@ -154,7 +154,8 @@ with no `lossDb`, is a 400. See [AUTO-DESIGN.md](AUTO-DESIGN.md#site-to-site-lin
 ## Design calculations
 
 ```
-POST /api/projects/:id/budget   { ontId?, direction?, marginDb?, wavelength? }
+POST /api/projects/:id/budget
+  { ontId?, direction?, wavelength?, connectorModel?, spliceModel?, allowanceDb?, marginDb? }
   → { budgets: [ { ont, name, result } | { ont, name, error } ] }
 
 GET  /api/projects/:id/bom       → { lines: [...per span], byCable: [...per model], spanCount }
@@ -173,6 +174,25 @@ it above one when the fibres a span carries do not fit the largest cable in the 
 the measured route and `designM` is what is bought for **every** cable in the bundle, so a 1.2 km span
 with `bundles: 2` prices 2.4 km of that cable. The strand page counts the same capacity: 18 strands on
 a 2 × 12 span is three-quarters full, not overbooked.
+
+`/api/projects/:id/budget` hands the body to `designForOnt` as its options, and **seven** keys are what
+it reads: `ontId` narrows the answer to a single ONT, `direction` (default `down`) and `wavelength`
+(1490 down, 1310 up) choose the receiver, `spliceModel` (default `fusion`) and `connectorModel`
+(default `sc-apc`) set the loss each splice and each connector is charged at, `marginDb` (default 3) is
+the reserve the verdict requires, and `allowanceDb` (default 0) is extra design reserve **added to the
+ODN loss**. `allowanceDb` is the one a planner reaches for on a project: it changes no plant, it makes the
+verdict account for slack the route has not spent — the result echoes `marginDb`, and `totalLossDb`
+carries the allowance (`odnLossDb` 11.86 + 2 for `{"allowanceDb":2}`). Measured on a project of one 1:8
+splitter and 3 km of `g652d-loose-12`: `{}` answers `totalLossDb` 11.86 with `headroomDb` 18.14,
+`{"allowanceDb":2}` answers 13.86 and 16.14, `{"spliceModel":"mechanical"}` adds 0.2 dB at the splitter's
+splice, and `{"connectorModel":"lc-apc"}` takes 0.05 dB off each of the two connectors.
+
+`direction`, `marginDb` and `allowanceDb` are checked once, before any ONT is budgeted: a value that is
+present and unusable is a `400` naming the field (`{"allowanceDb":-1}`, `{"marginDb":"3"}`,
+`{"direction":"sideways"}`), never a `200` whose every row repeats the same complaint. `spliceModel` and
+`connectorModel` are looked up per ONT instead, so an unknown model answers a row `{ ont, name, error }`
+naming the models that exist — `unknown splice model "nope" - known models: fusion, mechanical` — because
+a missing figure stays missing, and the rest of the plant is still budgeted.
 
 `/api/design/budget` runs the **PON** budget and nothing else: it calls `budget.opticalBudget`, so
 `design.olt.model` is required. A design with no OLT model — including a point-to-point body of
