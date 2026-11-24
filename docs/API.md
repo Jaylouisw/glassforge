@@ -3,6 +3,9 @@
 Everything the UI does goes through these endpoints, so anything the UI can do can be scripted.
 All responses are JSON unless noted. Errors are `{ "error": "..." }` with `400` (bad input), `404`
 (unknown thing) or `405` (wrong method); a `500` means the server broke, not that your design is wrong.
+A body over the limit is a **`413` naming the limit** — 2 MiB for a JSON body, 25 MiB for an import
+upload — answered with `Connection: close`. Read the refusal and start a new request rather than finish
+an upload the server has already refused.
 
 A `405` names the path and the methods it does answer, and carries them in `Allow` — `GET
 /api/design/synthesise` is refused with `405 … it answers POST`, never `404`, because the endpoint

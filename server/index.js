@@ -146,11 +146,19 @@ function readBody(req, limit) {
   return new Promise(function (resolve, reject) {
     const chunks = [];
     let size = 0;
+    let refused = false;
     req.on('data', function (chunk) {
+      if (refused) return;
       size += chunk.length;
       if (size > limit) {
+        refused = true;
+        // The refusal is a 413, and it has to be able to reach the caller: `req.destroy()` here tore
+        // down the socket the response travels on, so every over-limit body answered the client with
+        // ECONNRESET ("socket hang up") and the reason ("request body exceeds N bytes") was never
+        // said. Pausing is no better - the unread bytes stay in the socket, the close turns into a
+        // TCP reset, and a reset makes the client throw the response away. Keep reading and discard,
+        // so the 413 arrives and the connection closes in an orderly way.
         reject(Object.assign(new Error('request body exceeds ' + limit + ' bytes'), { status: 413 }));
-        req.destroy();
         return;
       }
       chunks.push(chunk);
@@ -981,7 +989,11 @@ function createServer(opts) {
     handle(req, res, ctx).catch(function (err) {
       const status = err && err.status ? err.status : 500;
       if (status >= 500) console.error('glassforge: ' + (err && err.stack ? err.stack : err));
-      fail(req, res, status, err && err.message ? err.message : 'internal error');
+      // A 413 leaves the caller mid-upload by definition: the body that was refused may still be
+      // arriving. `readBody` keeps discarding it, and the `Connection: close` here tells the client
+      // this connection is done - so the refusal is read rather than lost to a reset.
+      fail(req, res, status, err && err.message ? err.message : 'internal error', undefined,
+        status === 413 ? { Connection: 'close' } : undefined);
     });
   });
 

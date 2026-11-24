@@ -487,6 +487,26 @@ async function main() {
     assert.strictEqual(goodLength.body.drums, 2);
   });
 
+  // The body limit is mapped to a 413, and that status used to be unreachable: `readBody` answered an
+  // over-limit body by destroying the request, which tears down the socket the refusal has to travel
+  // on. The caller's next read was ECONNRESET ("socket hang up"), so an upload that was merely too
+  // big looked like a dead server and the reason - `request body exceeds 2097152 bytes` - was never
+  // said. 2 MiB + 1 KiB is over the JSON limit and nowhere near the 25 MiB upload limit.
+  let oversizeAnswer = null;
+  try {
+    oversizeAnswer = await request('POST', '/api/projects', Buffer.alloc(2 * 1024 * 1024 + 1024, 0x78));
+  } catch (err) {
+    oversizeAnswer = { dropped: err };
+  }
+  test('a body over the limit is a 413 naming the limit, not a dropped socket', function () {
+    assert.ok(!oversizeAnswer.dropped,
+      'the request was dropped instead of refused: ' + (oversizeAnswer.dropped && (oversizeAnswer.dropped.code || oversizeAnswer.dropped.message)));
+    assert.strictEqual(oversizeAnswer.status, 413,
+      'status ' + oversizeAnswer.status + ': ' + JSON.stringify(oversizeAnswer.body));
+    // 2 MiB is MAX_BODY_BYTES: the sentence has to carry the number the caller has to get under.
+    assert.ok(oversizeAnswer.body.error.indexOf('2097152') !== -1, oversizeAnswer.body.error);
+  });
+
   const splitOk = await request('GET', '/api/design/splitter?ratio=8');
   const splitZero = await request('GET', '/api/design/splitter?ratio=0');
   const splitText = await request('GET', '/api/design/splitter?ratio=abc');
