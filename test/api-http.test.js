@@ -330,6 +330,23 @@ async function main() {
     assert.ok(badBudget.body.error.indexOf('design.olt.model') !== -1, badBudget.body.error);
   });
 
+  // A design field the budget does not read is a typo that costs loss: `splitter` (singular) left the
+  // 1:8 splitter out of a 15 km GPON budget and answered 200 with ODN 4.3 dB instead of 14.8 dB.
+  // The engine refuses it, and `asBadRequest` is what turns that into a 400 the caller can act on
+  // rather than a 500 that blames the server for it.
+  const typoBudget = await request('POST', '/api/design/budget', {
+    design: {
+      olt: { model: 'gpon-b-plus-8' }, ont: { model: 'gpon-ont-1ge' },
+      spans: [{ cable: 'g652d-loose-12', lengthM: 15000 }], splices: 4, connectors: 2,
+      splitter: { model: 'plc-1x8-sca' }
+    }
+  });
+  test('a near-miss design field is a 400 naming the field that was meant', function () {
+    assert.strictEqual(typoBudget.status, 400, 'status ' + typoBudget.status + ': ' + JSON.stringify(typoBudget.body));
+    assert.ok(typoBudget.body.error.indexOf('"splitter"') !== -1, typoBudget.body.error);
+    assert.ok(typoBudget.body.error.indexOf('splitters') !== -1, typoBudget.body.error);
+  });
+
   // A JSON body of `null` is valid JSON and is what a client sends when it has no object to send.
   // Every handler reads a field off the body, so the first access threw a TypeError and the generic
   // handler answered 500 "Cannot read properties of null (reading 'demand')" - the caller was told

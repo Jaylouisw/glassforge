@@ -26,11 +26,24 @@
  */
 
 const partsModule = require('./parts');
+const designFields = require('./design-fields');
 
 const DEFAULT_SPLICE_MODEL = 'fusion';
 const DEFAULT_CONNECTOR_MODEL = 'sc-apc';
 const DEFAULT_MARGIN_DB = 3;
 const DEFAULT_WAVELENGTH = { down: '1490', up: '1310' };
+
+/**
+ * The fields each budget entry point reads, for `design-fields.assertKnownFields`.
+ *
+ * A field this engine does not read is a near miss the caller meant to type - a singular `splitter`
+ * removes 10.5 dB of splitter loss from a 1:8 ODN without a warning and still answers `200` - so the
+ * two lists are kept next to the code that reads them and a test asserts every name is read here.
+ */
+const PON_DESIGN_FIELDS = ['direction', 'wavelength', 'olt', 'ont', 'spans', 'splices', 'spliceModel',
+  'connectors', 'connectorModel', 'splitters', 'thirdParty', 'allowanceDb', 'marginDb', 'txDbm'];
+const ACTIVE_DESIGN_FIELDS = ['direction', 'wavelength', 'headEnd', 'cpe', 'spans', 'splices', 'spliceModel',
+  'connectors', 'connectorModel', 'thirdParty', 'allowanceDb', 'marginDb', 'txDbm'];
 
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 function round(n, places) {
@@ -321,6 +334,7 @@ function attenuatorClause(pad, marginDb) {
 function opticalBudget(design, registry) {
   if (!design || typeof design !== 'object') throw new TypeError('opticalBudget needs a design object');
   if (!registry) throw new TypeError('opticalBudget needs a parts registry');
+  designFields.assertKnownFields(design, PON_DESIGN_FIELDS, 'the PON budget');
 
   const direction = design.direction === 'up' ? 'up' : 'down';
   const wavelength = String(design.wavelength || DEFAULT_WAVELENGTH[direction]);
@@ -442,6 +456,7 @@ function opticalBudget(design, registry) {
 function pointToPoint(design, registry) {
   if (!design || typeof design !== 'object') throw new TypeError('pointToPoint needs a design object');
   if (!registry) throw new TypeError('pointToPoint needs a parts registry');
+  designFields.assertKnownFields(design, ACTIVE_DESIGN_FIELDS, 'the active budget');
   if (!design.headEnd || !design.headEnd.model) throw new TypeError('design.headEnd.model is required (the optic at the aggregation end)');
   if (!design.cpe || !design.cpe.model) throw new TypeError('design.cpe.model is required (the optic at the customer end)');
 
