@@ -102,7 +102,7 @@ A design passes only if **both** hold:
    that warning. Whether the band should fail is open in issue #111; today the engine reports it and
    leaves the verdict where this section puts it.
 2. **The plant's own budget.** For a PON, `ODN loss ≤ class budget` (GPON B+ 28 dB, C+ 32, C++ 35;
-   XG-PON N1 29, N2 31; XGS-PON N1 29, N2 31, E1 33, E2 35). For an active link,
+   XG-PON N1 29, N2 31, E1 33, E2 35; XGS-PON N1 29, N2 31, E1 33, E2 35). For an active link,
    `ODN loss ≤ launch(min) − sensitivity` for the optic pair, and the route must be inside the optic's
    reach — a link can be 3 dB inside its budget and still be 60 km down a 10 km optic.
 

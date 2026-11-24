@@ -69,6 +69,8 @@ A splitter with 1.2 dB of excess loss where you assumed 0.5 dB is half a kilomet
 | GPON | C++ | 35 dB | 1:128 | ITU-T G.984.2 Amd 1 |
 | XG-PON | N1 | 29 dB | 1:64 | ITU-T G.987.2 |
 | XG-PON | N2 | 31 dB | 1:64 | ITU-T G.987.2 |
+| XG-PON | E1 | 33 dB | 1:64 | ITU-T G.987.2 |
+| XG-PON | E2 | 35 dB | 1:64 | ITU-T G.987.2 |
 | XGS-PON | N1 | 29 dB | 1:64 | ITU-T G.9807.1 |
 | XGS-PON | N2 | 31 dB | 1:128 | ITU-T G.9807.1 |
 | XGS-PON | E1 | 33 dB | 1:128 | ITU-T G.9807.1 |
