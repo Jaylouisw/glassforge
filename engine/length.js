@@ -17,6 +17,7 @@
 
 const geo = require('./geo');
 const network = require('./network');
+const designFields = require('./design-fields');
 
 const DEFAULTS = {
   overlengthPct: 3,
@@ -24,6 +25,27 @@ const DEFAULTS = {
   closureReserveM: 20,
   drumM: 2000
 };
+
+/**
+ * The nine options a cable calculation reads - and a near miss of one is refused by name.
+ *
+ * The answer here is a purchase order, so a key the calculation does not read is the worst kind of
+ * typo: it removes a term without removing a number from the order. Measured on this engine before
+ * the guard, on `routeM: 1000`:
+ *
+ *   `{"overlengthpct": 10}`  answered `designM` 1030, the 3% default - 70 m of the overlength the
+ *                            caller named, missing from the order;
+ *   `{"drumm": 500}`         priced the 2000 m drum, so 2000 m were bought where 3 x 500 m was asked,
+ *                            and the line read "Purchase (1 x 2000 m drum)";
+ *   `{"closure": 2}`         (singular) dropped both 20 m closure reserves, 40 m short.
+ *
+ * The budget endpoints have refused a near-miss field by name since #137 and #192; this is the same
+ * narrow rule - case, singular/plural, a prefix, one letter or a unit slip - at the one endpoint whose
+ * answer is money. A key that is not near a field it reads (`name`, `notes`, `points`, `network`) is
+ * still ignored, so a caller's own bookkeeping and the drawn-route form's own keys pass through.
+ */
+const OPTION_FIELDS = ['routeM', 'overlengthPct', 'splices', 'spliceReserveM', 'closures',
+  'closureReserveM', 'dropReserveM', 'drumM', 'minimumPurchaseM'];
 
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 function round(n, places) {
@@ -77,6 +99,13 @@ function purchaseOf(designM, drumM, minimumPurchaseM) {
  */
 function cableToBuy(opts) {
   const o = opts || {};
+  // Before the route is read, because a typo is the cause and "routeM is required" would be the
+  // symptom: a caller who sent `routeKM` has a route, just not in a unit this reads.
+  designFields.assertKnownFields(o, OPTION_FIELDS, 'the cable calculation', {
+    noun: 'option',
+    consequence: 'A term the calculation ignores buys cable without the metres it names, so a near ' +
+      'miss is refused rather than skipped.'
+  });
   if (!isNum(o.routeM) || o.routeM < 0) throw new TypeError('routeM is required and must be a non-negative number');
 
   const overlengthPct = nonNegative(o.overlengthPct, 'overlengthPct', DEFAULTS.overlengthPct);

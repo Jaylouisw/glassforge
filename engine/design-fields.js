@@ -80,15 +80,29 @@ function suggestField(field, known) {
     });
     return hits[0];
 }
+/** The budget's wording - the default, because four refusals already read exactly this way. */
+const DEFAULT_NEAR_MISS_NOUN = 'design field';
+const DEFAULT_NEAR_MISS_CONSEQUENCE = 'A field the engine ignores loses the loss it names without saying so, so a ' +
+    'near miss is refused rather than skipped.';
 /**
  * Refuse a design whose key is a near miss of a field the budget reads.
  *
  * `design` is `unknown` because it arrives as API JSON. A non-object is not this guard's business -
  * the entry point names the missing `olt.model`/`headEnd.model` itself.
+ *
+ * `wording` exists because the same rule is now applied to a module whose terms are not losses.
+ * `engine/length.js` reads nine options and answers with a purchase order, so its refusal has to say
+ * that the check is about **metres** - a sentence about a lost loss is the wrong cause for a caller
+ * who typed `drumm` and bought a cable. Both halves default to the budget's own words, so every
+ * existing refusal reads byte for byte as before.
  */
-function assertKnownFields(design, known, what) {
+function assertKnownFields(design, known, what, wording) {
     if (typeof design !== 'object' || design === null || Array.isArray(design))
         return;
+    const noun = wording !== undefined && wording.noun !== undefined ? wording.noun : DEFAULT_NEAR_MISS_NOUN;
+    const consequence = wording !== undefined && wording.consequence !== undefined
+        ? wording.consequence
+        : DEFAULT_NEAR_MISS_CONSEQUENCE;
     const keys = Object.keys(design);
     for (const key of keys) {
         if (known.indexOf(key) !== -1)
@@ -96,9 +110,8 @@ function assertKnownFields(design, known, what) {
         const suggestion = suggestField(key, known);
         if (suggestion === null)
             continue;
-        throw new TypeError(what + ' does not read the design field "' + key + '" - did you mean "' +
-            suggestion + '"? A field the engine ignores loses the loss it names without saying so, so a ' +
-            'near miss is refused rather than skipped. Fields it reads: ' + known.join(', '));
+        throw new TypeError(what + ' does not read the ' + noun + ' "' + key + '" - did you mean "' +
+            suggestion + '"? ' + consequence + ' Fields it reads: ' + known.join(', '));
     }
 }
 /**

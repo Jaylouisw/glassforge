@@ -290,6 +290,17 @@ because a guard that refused every unknown key would refuse a caller who is not 
 `/api/design/link` builds that design from its own named options, so over the HTTP surface the refusal
 is the PON budget's.
 
+`/api/design/length` reads nine options — `routeM`, `overlengthPct`, `splices`, `spliceReserveM`,
+`closures`, `closureReserveM`, `dropReserveM`, `drumM`, `minimumPurchaseM` — and refuses a near miss
+of one by the same rule, because its answer is a purchase order. `{"routeM":1000,"drumm":500}` answered
+`200` with `drumM: 2000, drums: 1`: 2000 m bought where 3 × 500 m was asked. `{"overlengthpct":10}`
+answered `designM` 1030 — the 3% default — instead of 1100, so 70 m of overlength were missing from the
+order, and a singular `{"closure":2}` dropped both 20 m closure reserves. Each is now a `400` naming the
+field that was meant — `the cable calculation does not read the option "drumm" - did you mean "drumM"? …`
+— on both forms of the endpoint, since the drawn route ends in the same calculation. The guard is as
+narrow here as it is on a budget: `name`, `notes` and the route form's own `points` pass through, and a
+correctly spelled option still answers.
+
 A budget `result` carries: `verdict` (`ok`/`marginal`/`fail`), `reasons`, `warnings` (sentences that
 do not move the verdict; the launch-window band
 [OPTICAL.md](OPTICAL.md#the-band-between-the-two-launches) describes is the one an ordinary estate

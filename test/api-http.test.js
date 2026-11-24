@@ -567,6 +567,20 @@ async function main() {
     assert.strictEqual(goodLength.body.drums, 2);
   });
 
+  // The cable calculation reads nine named options, and a near miss of one was not read at all: the
+  // 200 answered the default and the purchase order was computed without the term the caller named.
+  // `{"routeM":1000,"drumm":500}` bought 2000 m of a 2000 m drum where the caller asked for 3 x 500,
+  // and `{"routeM":1000,"overlengthpct":10}` answered `designM` 1030 instead of 1100. Same near-miss
+  // rule the budget endpoints refuse by name (#137, #192), applied where the money is spent.
+  const typoDrum = await request('POST', '/api/design/length', { routeM: 1000, drumm: 500 });
+  const typoOverlength = await request('POST', '/api/design/length', { routeM: 1000, overlengthpct: 10 });
+  test('a near-miss option on the cable calculation is a 400 naming the field', function () {
+    assert.strictEqual(typoDrum.status, 400, 'status ' + typoDrum.status + ': ' + JSON.stringify(typoDrum.body));
+    assert.ok(typoDrum.body.error.indexOf('did you mean "drumM"') !== -1, typoDrum.body.error);
+    assert.strictEqual(typoOverlength.status, 400, 'status ' + typoOverlength.status + ': ' + JSON.stringify(typoOverlength.body));
+    assert.ok(typoOverlength.body.error.indexOf('did you mean "overlengthPct"') !== -1, typoOverlength.body.error);
+  });
+
   // The route form of the same endpoint had no measured length and said nothing: `{"points":[]}`
   // answered 200 with `routeM: 0, drums: 0, purchaseM: 0` - a purchase order for nothing. A caller's
   // mistake is a 400 (see AGENTS.md), and it names what a route needs.

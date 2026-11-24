@@ -37,6 +37,36 @@ test('bad inputs are refused', function () {
   throws(function () { length.cableToBuy({ routeM: 10, overlengthPct: 'lots' }); }, 'overlengthPct');
 });
 
+// A knob the calculation does not read is a typo, and this endpoint's answer is a purchase order,
+// so a silently skipped option buys the wrong cable. Measured before this guard, on `routeM: 1000`:
+//   `overlengthpct: 10` answered `designM` 1030 (the 3% default) - 70 m of the overlength the caller
+//   named was missing from the order, and `drumm: 500` priced the 2000 m drum, so 2000 m were bought
+//   where the caller asked for 3 x 500. The budget endpoints have refused a near-miss field since #137;
+//   this is the same rule where the money is.
+test('an option the calculation does not read is refused, not skipped', function () {
+  throws(function () { length.cableToBuy({ routeM: 1000, overlengthpct: 10 }); },
+    'did you mean "overlengthPct"', 'overlengthpct');
+  throws(function () { length.cableToBuy({ routeM: 1000, drumm: 500 }); },
+    'did you mean "drumM"', 'drumm');
+  // Singular for plural: the 20 m reserve each closure carries was dropped, 40 m short on two.
+  throws(function () { length.cableToBuy({ routeM: 1000, closure: 2 }); },
+    'did you mean "closures"', 'closure');
+  // A wrong unit is a near miss too: routeKM against routeM.
+  throws(function () { length.cableToBuy({ routeM: 1000, routeKM: 1 }); },
+    'did you mean "routeM"', 'routeKM');
+  // The refusal is narrow: a key that is not near a field the calculation reads is still ignored, so
+  // a caller's own bookkeeping passes through. `name` and `notes` are the two the API documents.
+  const r = length.cableToBuy({ routeM: 1000, name: 'Feeder A', notes: 'pulled 2026-11' });
+  close(r.designM, 1030, 0.001, 'a bookkeeping key must not change the number');
+});
+
+test('a drawn route refuses a near-miss knob as well', function () {
+  // Both forms end in `cableToBuy`, so a guard there covers the route form without a second list.
+  const points = [{ lat: 51.5, lon: -0.1 }, { lat: 51.51, lon: -0.1 }];
+  throws(function () { length.cableToBuyForRoute(points, { overlengthpct: 10 }); },
+    'did you mean "overlengthPct"', 'route form');
+});
+
 test('a route drawn as points measures itself', function () {
   const points = [{ lat: 51.5, lon: -0.1 }, { lat: 51.501, lon: -0.1 }];
   const r = length.cableToBuyForRoute(points, { drumM: 0, overlengthPct: 0, splices: 0, closures: 0 });
