@@ -80,6 +80,8 @@ textarea {
 .tab-body { padding: 12px; overflow: auto; flex: 1; }
 .card { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px; background: var(--panel-2); }
 .card h3 { margin: 0 0 6px; font-size: 13px; }
+.card h4 { margin: 8px 0 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; display: flex; align-items: center; gap: 8px; }
+.card .direction + .direction { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 8px; }
 .verdict { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .verdict.ok { background: rgba(46,158,79,.18); color: #6ee28e; border: 1px solid var(--ok); }
 .verdict.marginal { background: rgba(242,194,0,.15); color: #f5d35a; border: 1px solid var(--warn); }

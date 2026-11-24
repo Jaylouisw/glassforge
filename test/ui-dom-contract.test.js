@@ -85,7 +85,7 @@ test('the served UI loads the modules the app expects', function () {
   const fs = require('fs');
   const path = require('path');
   const html = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf8');
-  for (const script of ['/fiber.js', '/scene.js', '/dom.js', '/app.js']) {
+  for (const script of ['/fiber.js', '/scene.js', '/signal.js', '/dom.js', '/app.js']) {
     assert.ok(html.indexOf('src="' + script + '"') !== -1, 'index.html does not load ' + script);
   }
   const app = fs.readFileSync(path.join(__dirname, '..', 'web', 'app.js'), 'utf8');

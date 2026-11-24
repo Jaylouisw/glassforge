@@ -195,12 +195,19 @@ async function main() {
   // The app's Signal tab is the other surface. It is an IIFE with no exports, so the guard here is
   // that the card builder reads the field the engine fills - the rendering itself was verified on
   // the real page (screenshot on the PR), which is the only proof of rendering that exists.
-  test('the Signal tab reads budget warnings, not only its reasons', function () {
+  //
+  // This used to slice `renderSignal` to `renderStrands` and look for `r.warnings`. The tab learned
+  // to draw both directions (#185) and the warning list moved into `directionBlock`, the function
+  // both directions share, so the same assertion is made against the function that paints it. The
+  // old slice still passes on the file while asserting nothing, which is why it is not kept.
+  test('the Signal card reads budget warnings, not only its reasons', function () {
     const app = fs.readFileSync(path.join(__dirname, '..', 'web', 'app.js'), 'utf8');
-    const card = app.slice(app.indexOf('function renderSignal'), app.indexOf('function renderStrands') === -1
-      ? app.length : app.indexOf('function renderStrands'));
-    assert.ok(card.length > 0, 'renderSignal not found');
-    assert.ok(card.indexOf('r.warnings') !== -1,
+    const start = app.indexOf('function directionBlock');
+    assert.ok(start !== -1, 'directionBlock not found');
+    const end = app.indexOf('function renderSignal');
+    const card = app.slice(start, end === -1 ? app.length : end);
+    assert.ok(card.length > 0, 'the Signal direction block was not found');
+    assert.ok(card.indexOf('result.warnings') !== -1,
       'the Signal card drops result.warnings, so the launch-window warning is invisible where the verdict is read');
   });
 

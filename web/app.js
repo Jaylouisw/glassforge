@@ -11,7 +11,7 @@
     selected: null,
     tab: 'signal',
     derived: null,
-    budgets: null,
+    budget: null,
     bom: null,
     strands: null,
     checks: null,
@@ -71,7 +71,7 @@
     return api('/api/projects/' + id).then(function (project) {
       state.project = project;
       state.derived = project.derived;
-      state.budgets = null; state.bom = null; state.strands = null;
+      state.budget = null; state.bom = null; state.strands = null;
       $('#project-name').value = project.name;
       const root = (project.nodes || []).find(function (n) { return n.type === 'olt' || n.type === 'headend'; });
       if (root && typeof root.lat === 'number' && typeof root.lon === 'number') {
@@ -206,65 +206,101 @@
     return renderChecks(body);
   }
 
+  // The Signal tab is two links over one ODN, and it asked for one of them (#185).
+  //
+  // A PON launches into the ONT at 1490 nm and the ONT launches into the OLT at 1310 nm; on an active
+  // plant `pointToPoint` answers the pair's own two directions the same way, because which end
+  // launches changes with the direction. The two disagree exactly where it costs money: a C+ card
+  // behind 11.53 dB of ODN is `ok` downstream - with the launch-window warning and a 4 dB pad - and
+  // `fail` upstream, -11.22 dBm onto a receiver whose overload is -12 dBm. Only the upstream pass
+  // names the pad that actually clears it, so both passes are fetched and the upstream verdict sits
+  // beside the downstream one instead of behind it.
+  //
+  // One request's failure never blanks the other: a plant whose path cannot be budgeted already says
+  // so in the downstream rows, and losing the whole tab to the second call would be a worse page than
+  // the one with a note on it.
+  function loadBudgetPair(projectId) {
+    const post = function (body) {
+      return api('/api/projects/' + projectId + '/budget', { method: 'POST', body: JSON.stringify(body) });
+    };
+    return post({}).then(function (down) {
+      const pair = { down: down.budgets, up: null, upError: null };
+      return post({ direction: 'up' })
+        .then(function (up) { pair.up = up.budgets; return pair; })
+        .catch(function (err) { pair.upError = err.message; return pair; });
+    });
+  }
+
+  // One direction of one ONT's link: the verdict, the figures it was made from, its reasons and its
+  // warnings. A warning is not a reason - a verdict can be `ok` and the design still depend on a cold
+  // optic, because overload is judged at the bottom of the launch window (#111) - so both lists are
+  // read. The heading and the rows come from `GFSignal`, which the test drives with real payloads.
+  function directionBlock(result) {
+    const block = el('div', { class: 'direction' });
+    const head = el('h4', {});
+    head.appendChild(el('span', { text: GFSignal.title(result) }));
+    head.appendChild(el('span', { class: 'verdict ' + result.verdict, text: result.verdict.toUpperCase() }));
+    block.appendChild(head);
+    const table = el('table', {});
+    for (const row of GFSignal.rows(result)) {
+      const tr = el('tr', {});
+      tr.appendChild(el('th', { text: row[0] }));
+      tr.appendChild(el('td', { class: 'num', text: row[1] }));
+      table.appendChild(tr);
+    }
+    block.appendChild(table);
+    if (result.reasons.length) {
+      const list = el('ul', { class: 'err' });
+      for (const reason of result.reasons) list.appendChild(el('li', { text: reason }));
+      block.appendChild(list);
+    }
+    if (result.warnings && result.warnings.length) {
+      const list = el('ul', { class: 'warn' });
+      for (const warning of result.warnings) list.appendChild(el('li', { text: warning }));
+      block.appendChild(list);
+    }
+    const details = el('details', {});
+    details.appendChild(el('summary', { class: 'muted', text: 'Loss breakdown' }));
+    const inner = el('table', {});
+    for (const line of result.breakdown) {
+      const tr = el('tr', {});
+      tr.appendChild(el('td', { text: line.label }));
+      tr.appendChild(el('td', { class: 'num', text: line.db + ' dB' }));
+      inner.appendChild(tr);
+    }
+    details.appendChild(inner);
+    block.appendChild(details);
+    return block;
+  }
+
   function renderSignal(body) {
-    if (!state.budgets) {
+    if (!state.budget) {
       body.appendChild(el('p', { class: 'muted', text: 'Loading budgets…' }));
-      api('/api/projects/' + state.project.id + '/budget', { method: 'POST', body: JSON.stringify({}) })
-        .then(function (payload) { state.budgets = payload.budgets; renderRight(); })
+      loadBudgetPair(state.project.id)
+        .then(function (pair) { state.budget = pair; renderRight(); })
         .catch(function (err) { body.textContent = ''; body.appendChild(el('p', { class: 'err', text: err.message })); });
       return;
     }
-    if (!state.budgets.length) { body.appendChild(el('p', { class: 'muted', text: 'No ONTs yet: place one to see a power budget.' })); return; }
-    for (const entry of state.budgets) {
-      const card = el('div', { class: 'card' });
-      card.appendChild(el('h3', { text: entry.name || entry.ont }));
-      if (entry.error) { card.appendChild(el('p', { class: 'err', text: entry.error })); body.appendChild(card); continue; }
-      const r = entry.result;
-      const verdict = el('span', { class: 'verdict ' + r.verdict, text: r.verdict.toUpperCase() });
-      card.appendChild(verdict);
-      const rows = [
-        ['Rx power', r.rxPowerDbm + ' dBm'],
-        ['Sensitivity', r.sensitivityDbm + ' dBm (overload ' + r.overloadDbm + ')'],
-        ['Headroom', r.headroomDb + ' dB (margin ' + r.marginDb + ')'],
-        ['ODN loss', r.odnLossDb + ' dB of ' + r.budgetDb + ' dB ' + r.pon + ' ' + r.oltClass],
-        ['Class headroom', r.classHeadroomDb + ' dB'],
-        ['Cascade', '1:' + r.cascadeRatio],
-        ['Wavelength', r.wavelength + ' nm ' + r.direction + 'stream']
-      ];
-      const table = el('table', {});
-      for (const row of rows) {
-        const tr = el('tr', {});
-        tr.appendChild(el('th', { text: row[0] }));
-        tr.appendChild(el('td', { class: 'num', text: row[1] }));
-        table.appendChild(tr);
+    if (!state.budget.down.length) { body.appendChild(el('p', { class: 'muted', text: 'No ONTs yet: place one to see a power budget.' })); return; }
+    // An upstream pass that could not run is news, not silence: it names the half of the plant that
+    // was not measured, and the downstream cards are still worth reading.
+    if (state.budget.upError) {
+      body.appendChild(el('p', { class: 'warn', text: 'The upstream direction could not be budgeted: ' + state.budget.upError }));
+    }
+    for (const card of GFSignal.merge(state.budget.down, state.budget.up)) {
+      const box = el('div', { class: 'card' });
+      box.appendChild(el('h3', { text: card.name || card.ont }));
+      // A row that cannot be budgeted at all is a fault in the path, not in one direction, and the
+      // upstream pass reports the same path fault: saying it twice reads as two problems.
+      if (card.error) {
+        box.appendChild(el('p', { class: 'err', text: card.error }));
+        body.appendChild(box);
+        continue;
       }
-      card.appendChild(table);
-      if (r.reasons.length) {
-        const list = el('ul', { class: 'err' });
-        for (const reason of r.reasons) list.appendChild(el('li', { text: reason }));
-        card.appendChild(list);
-      }
-      // A warning is not a reason: the verdict can be `ok` and the design still depend on a cold
-      // optic, because overload is judged at the bottom of the launch window (#111). The engine
-      // computed that sentence and this card dropped it, so the one place the verdict is read
-      // said nothing about it.
-      if (r.warnings && r.warnings.length) {
-        const list = el('ul', { class: 'warn' });
-        for (const warning of r.warnings) list.appendChild(el('li', { text: warning }));
-        card.appendChild(list);
-      }
-      const details = el('details', {});
-      details.appendChild(el('summary', { class: 'muted', text: 'Loss breakdown' }));
-      const inner = el('table', {});
-      for (const line of r.breakdown) {
-        const tr = el('tr', {});
-        tr.appendChild(el('td', { text: line.label }));
-        tr.appendChild(el('td', { class: 'num', text: line.db + ' dB' }));
-        inner.appendChild(tr);
-      }
-      details.appendChild(inner);
-      card.appendChild(details);
-      body.appendChild(card);
+      box.appendChild(directionBlock(card.down));
+      if (card.upError) box.appendChild(el('p', { class: 'warn', text: 'Upstream: ' + card.upError }));
+      else if (card.up) box.appendChild(directionBlock(card.up));
+      body.appendChild(box);
     }
   }
 
@@ -596,7 +632,7 @@
         body: JSON.stringify({ op: 'add-span', span: { from: state.connectFrom, to: node.id, cable: cable, lengthM: distance } })
       }).then(function (project) {
         state.project = project; state.derived = project.derived; state.connectFrom = null;
-        state.bom = null; state.strands = null; state.budgets = null;
+        state.bom = null; state.strands = null; state.budget = null;
         banner(''); renderAll(); loadProjects();
       }).catch(function (err) { banner(err.message); });
       return;
@@ -624,7 +660,7 @@
       body: JSON.stringify({ op: 'add-node', node: { type: type, model: model, lat: point.lat, lon: point.lon, name: type.toUpperCase() } })
     }).then(function (project) {
       state.project = project; state.derived = project.derived;
-      state.budgets = null; state.checks = null;
+      state.budget = null; state.checks = null;
       renderAll(); loadProjects();
     }).catch(function (err) { banner(err.message); });
   }
@@ -643,7 +679,7 @@
     api('/api/projects/' + state.project.id + '/undo', { method: 'POST', body: '{}' })
       .then(function (project) {
         state.project = project; state.derived = project.derived;
-        state.budgets = null; state.bom = null; state.strands = null; state.checks = null;
+        state.budget = null; state.bom = null; state.strands = null; state.checks = null;
         renderAll(); loadProjects(); banner(project.undone ? 'Undid: ' + project.undone : 'Nothing to undo', 'ok');
       }).catch(function (err) { banner(err.message); });
   }
