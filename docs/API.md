@@ -227,9 +227,16 @@ arithmetic is asserted in `test/print-export.test.js`, not checked by eye.
 
 ```
 POST /api/import/kml      body: KML text, or a KMZ buffer with Content-Type: application/vnd.google-earth.kmz
-  → { name, routes: [{ name, points, lengthM, ends }], points: [{ name, lat, lon }],
-      skipped: [...], duplicates, routeM, unsupported }
+  → { name, routes: [{ name, points, lengthM, ends, dropped }], points: [{ name, lat, lon }],
+      skipped: [...], duplicates, droppedCoordinates, routeM, unsupported }
 ```
+
+A `lon,lat[,alt]` tuple whose longitude or latitude cell is blank, non-numeric or out of range is
+**dropped, never read as 0** — 0 is a legal longitude, so a missing cell would otherwise import as a
+phantom bend on the Greenwich meridian and a route length nobody can defend. Every dropped tuple is
+counted: `routes[].dropped` for a route that lost a bend, `droppedCoordinates` for the whole file. A
+route quotes the length of the points it still has, and a placemark that lost its only coordinate is
+reported as `unsupported`, not as an empty route.
 
 Nothing is written: the caller decides which routes and points become spans and nodes.
 

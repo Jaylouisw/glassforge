@@ -657,8 +657,15 @@
         headers: { 'Content-Type': isKmz ? 'application/vnd.google-earth.kmz' : 'application/vnd.google-earth.kml+xml' },
         body: reader.result
       }).then(function (res) { return res.json(); }).then(function (result) {
+        // A tuple the parser could not read is dropped and counted, never read as 0 - and the route
+        // length in this sentence is measured on fewer bends because of it. Saying so here is the
+        // difference between an import a planner can trust and one that quietly lost a corner.
+        const lost = result.droppedCoordinates
+          ? ' ' + result.droppedCoordinates + ' coordinate tuple(s) could not be read and were dropped.'
+          : '';
         banner('Imported ' + result.routes.length + ' route(s), ' + result.points.length + ' point(s), ' +
-          result.duplicates + ' duplicate(s) skipped, ' + result.routeM + ' m of route.', 'ok');
+          result.duplicates + ' duplicate(s) skipped, ' + result.routeM + ' m of route.' + lost,
+          result.droppedCoordinates ? 'warn' : 'ok');
       }).catch(function (err) { banner('KML import failed: ' + err.message); });
     };
     if (/\.kmz$/i.test(file.name)) reader.readAsArrayBuffer(file);

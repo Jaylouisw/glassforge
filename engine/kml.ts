@@ -30,6 +30,8 @@ export type GeometryType = 'Point' | 'LineString' | 'Polygon';
 export interface KmlGeometry {
   type: GeometryType;
   coords: KmlCoordinate[];
+  /** Coordinate tuples in this geometry's `<coordinates>` that could not be read and were dropped. */
+  dropped: number;
 }
 
 export interface KmlPlacemark {
@@ -43,6 +45,12 @@ export interface ParsedKml {
   name: string | null;
   placemarks: KmlPlacemark[];
   unsupported: number;
+  /**
+   * Coordinate tuples in the whole document that could not be read and were dropped. Optional
+   * because a `ParsedKml` assembled by hand - or by a caller that predates the field - may not
+   * carry it, and `classify` then falls back to the per-geometry counts.
+   */
+  droppedCoordinates?: number;
 }
 
 export interface KmlRoute {
@@ -51,6 +59,8 @@ export interface KmlRoute {
   points: KmlCoordinate[];
   lengthM: number | null;
   ends: [KmlCoordinate, KmlCoordinate];
+  /** Tuples this route had to drop; `lengthM` is measured on the points it still has. */
+  dropped: number;
 }
 
 export interface KmlPoint {
@@ -71,6 +81,8 @@ export interface ClassifiedKml {
   points: KmlPoint[];
   skipped: SkippedGeometry[];
   duplicates: number;
+  /** Tuples the parser could not read, for the whole file - never a blank cell read as 0. */
+  droppedCoordinates: number;
   routeM: number;
 }
 
@@ -90,6 +102,12 @@ interface ZipEntry {
 interface FoundGeometry {
   at: number;
   geometry: KmlGeometry;
+}
+
+/** The points one `<coordinates>` element yielded, and how many tuples in it could not be read. */
+interface CoordinateRead {
+  points: KmlCoordinate[];
+  dropped: number;
 }
 
 function escapeTag(tag: string): string {
@@ -117,30 +135,68 @@ function firstText(xml: string, tag: string): string | null {
   return inner.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]*>/g, '').trim();
 }
 
-/** `lon,lat[,alt]` tuples separated by whitespace -> `{ lat, lon }`. */
-export function parseCoordinates(text: string | null | undefined): KmlCoordinate[] {
-  const out: KmlCoordinate[] = [];
+/**
+ * One numeric field of a `lon,lat[,alt]` tuple, or null when it is not a number.
+ *
+ * `Number('')` is 0 and `Number(' ')` is 0 - and 0 is a perfectly legal longitude, so nothing
+ * downstream can tell a blank cell from a survey point on the Greenwich meridian. The raw string has
+ * to be tested before it is converted. `demand.js` refuses a blank CSV cell for the same reason; this
+ * is the KML side of that rule.
+ */
+function coordinateField(raw: string | undefined): number | null {
+  const text = String(raw === undefined ? '' : raw).trim();
+  if (text === '') return null;
+  const value = Number(text);
+  return isFinite(value) ? value : null;
+}
+
+/**
+ * `lon,lat[,alt]` tuples separated by whitespace -> the `{ lat, lon }` points that parsed, and how
+ * many tuples did not.
+ *
+ * A tuple that cannot be read is **dropped**, never placed at zero: a missing longitude is missing,
+ * and the route length that counts it is a cable order nobody can defend. The count is returned so
+ * the caller can say how many vanished instead of reporting a clean import.
+ */
+function coordinateList(text: string | null | undefined): CoordinateRead {
+  const points: KmlCoordinate[] = [];
+  let dropped = 0;
   for (const tuple of String(text || '').trim().split(/\s+/)) {
     if (!tuple) continue;
     const bits = tuple.split(',');
-    if (bits.length < 2) continue;
-    const lon = Number(bits[0]);
-    const lat = Number(bits[1]);
-    if (!isFinite(lat) || !isFinite(lon)) continue;
+    if (bits.length < 2) {
+      dropped += 1;
+      continue;
+    }
+    const lon = coordinateField(bits[0]);
+    const lat = coordinateField(bits[1]);
+    if (lon === null || lat === null) {
+      dropped += 1;
+      continue;
+    }
     const point: KmlCoordinate = { lat: lat, lon: lon };
-    if (!isCoordinate(point)) continue;
-    if (bits[2] !== undefined && bits[2] !== '' && isFinite(Number(bits[2]))) point.alt = Number(bits[2]);
-    out.push(point);
+    if (!isCoordinate(point)) {
+      dropped += 1;
+      continue;
+    }
+    const alt = bits[2] === undefined ? null : coordinateField(bits[2]);
+    if (alt !== null) point.alt = alt;
+    points.push(point);
   }
-  return out;
+  return { points: points, dropped: dropped };
+}
+
+/** `lon,lat[,alt]` tuples separated by whitespace -> the `{ lat, lon }` points that parsed. */
+export function parseCoordinates(text: string | null | undefined): KmlCoordinate[] {
+  return coordinateList(text).points;
 }
 
 /** The shape rules a geometry has to meet before this planner will read it as one. */
-function geometryOfCoords(type: GeometryType, coords: KmlCoordinate[]): KmlGeometry | null {
+function geometryOfCoords(type: GeometryType, coords: KmlCoordinate[], dropped: number): KmlGeometry | null {
   if (!coords.length) return null;
-  if (type === 'Point') return { type: 'Point', coords: [coords[0]] };
-  if (type === 'LineString' && coords.length >= 2) return { type: 'LineString', coords: coords };
-  if (type === 'Polygon' && coords.length >= 3) return { type: 'Polygon', coords: coords };
+  if (type === 'Point') return { type: 'Point', coords: [coords[0]], dropped: dropped };
+  if (type === 'LineString' && coords.length >= 2) return { type: 'LineString', coords: coords, dropped: dropped };
+  if (type === 'Polygon' && coords.length >= 3) return { type: 'Polygon', coords: coords, dropped: dropped };
   return null;
 }
 
@@ -154,18 +210,21 @@ function geometryOfCoords(type: GeometryType, coords: KmlCoordinate[]): KmlGeome
  * entry per ring; the hole is a boundary the file drew, and hiding it would be the same silence
  * this change removes.
  */
-function geometriesOf(xml: string): KmlGeometry[] {
+function geometriesOf(xml: string): { geometries: KmlGeometry[]; dropped: number } {
   const re = /<(?:[A-Za-z0-9_.-]+:)?(Point|LineString|LinearRing)\b[^>]*>([\s\S]*?)<\/(?:[A-Za-z0-9_.-]+:)?\1>/gi;
   const found: FoundGeometry[] = [];
+  let dropped = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(xml)) !== null) {
     const tag = m[1];
     const type: GeometryType = tag === 'Point' ? 'Point' : tag === 'LineString' ? 'LineString' : 'Polygon';
-    const geometry = geometryOfCoords(type, parseCoordinates(firstText(m[2], 'coordinates')));
+    const read = coordinateList(firstText(m[2], 'coordinates'));
+    dropped += read.dropped;
+    const geometry = geometryOfCoords(type, read.points, read.dropped);
     if (geometry) found.push({ at: m.index, geometry: geometry });
   }
   found.sort(function (a, b) { return a.at - b.at; });
-  return found.map(function (f) { return f.geometry; });
+  return { geometries: found.map(function (f) { return f.geometry; }), dropped: dropped };
 }
 
 /**
@@ -185,8 +244,11 @@ export function parseKml(text: unknown): ParsedKml {
 
   const placemarks: KmlPlacemark[] = [];
   let unsupported = 0;
+  let droppedCoordinates = 0;
   for (const body of blocks(xml, 'Placemark')) {
-    const geometries = geometriesOf(body);
+    const read = geometriesOf(body);
+    droppedCoordinates += read.dropped;
+    const geometries = read.geometries;
     const name = firstText(body, 'name');
     const description = firstText(body, 'description');
     if (!geometries.length) {
@@ -203,7 +265,12 @@ export function parseKml(text: unknown): ParsedKml {
     }
   }
 
-  return { name: docName, placemarks: placemarks, unsupported: unsupported };
+  return {
+    name: docName,
+    placemarks: placemarks,
+    unsupported: unsupported,
+    droppedCoordinates: droppedCoordinates
+  };
 }
 
 function keyOf(point: Coordinate, precision?: number): string {
@@ -243,7 +310,10 @@ export function classify(parsed: ParsedKml | null | undefined, opts?: ClassifyOp
         description: pm.description,
         points: pm.geometry.coords,
         lengthM: pm.lengthM,
-        ends: [first, last]
+        ends: [first, last],
+        // Tuples this route had to drop. A route quoted at its survivor length must say that it lost
+        // a bend, or the length reads as the survey's own measurement.
+        dropped: pm.geometry.dropped
       });
     } else if (pm.geometry.type === 'Point') {
       const at = pm.geometry.coords[0];
@@ -257,11 +327,18 @@ export function classify(parsed: ParsedKml | null | undefined, opts?: ClassifyOp
   }
 
   const routeM = routes.reduce(function (n, r) { return n + (r.lengthM === null ? 0 : r.lengthM); }, 0);
+  // The parse already counted every tuple it could not read, including the ones inside a placemark
+  // that lost its only coordinate and is reported as unsupported. Report that figure rather than
+  // re-adding the survivors, which would under-count exactly the case worth seeing.
+  const droppedCoordinates = typeof parsed?.droppedCoordinates === 'number'
+    ? parsed.droppedCoordinates
+    : ((parsed && parsed.placemarks) || []).reduce(function (n, pm) { return n + pm.geometry.dropped; }, 0);
   return {
     routes: routes,
     points: points,
     skipped: skipped,
     duplicates: duplicates,
+    droppedCoordinates: droppedCoordinates,
     routeM: Math.round(routeM * 10) / 10
   };
 }

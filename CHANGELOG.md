@@ -34,6 +34,12 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A blank KML coordinate cell is not the zero meridian.** `kml.parseCoordinates` converted each
+  `lon,lat[,alt]` field with `Number()` before testing it, and `Number('')` is 0 - a legal longitude -
+  so a tuple with an empty cell imported as a point on the Greenwich meridian. One blank cell in a
+  route that is 111.2 m measured 7 102.5 m of cable. A tuple that cannot be read is now dropped, counted
+  (`routes[].dropped`, `droppedCoordinates` in the import response) and named in the UI's import
+  banner, instead of silently moving the route.
 - **A splitter's ports are counted in fibres, not cables.** `network.capacity` counted one port per
   cabled output leaving a splitter site, so a site whose customers share one distribution cable — the
   shape `emitTerminalTree` emits, one strand per ONT — reported `portsUsed: 1` on a 1:8 that was full.

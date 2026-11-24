@@ -181,3 +181,30 @@ test('a geometry too short to be a route is unsupported, not an empty route', fu
   assert.strictEqual(parsed.placemarks.length, 0);
   assert.strictEqual(parsed.unsupported, 1);
 });
+
+test('a blank coordinate field is not the zero meridian', function () {
+  // `Number('')` is 0, and 0 is a legal longitude - so a tuple with an empty field used to import as
+  // a point on the Greenwich meridian. On `origin/main` this document measured 7102.5 m of cable: one
+  // blank cell put a phantom bend 0.1 degrees west of the survey in a route that is 111.2 m long.
+  const doc = '<?xml version="1.0"?><kml><Document>' +
+    '<Placemark><name>Feeder B</name><LineString>' +
+    '<coordinates>,51.5000,0 -0.1010,51.5000,0 -0.1010,51.5010,0</coordinates>' +
+    '</LineString></Placemark>' +
+    '<Placemark><name>NAP 13</name><Point><coordinates>,51.5010,0</coordinates></Point></Placemark>' +
+    '</Document></kml>';
+  const parsed = kml.parseKml(doc);
+  const route = parsed.placemarks.find(function (p) { return p.name === 'Feeder B'; });
+  assert.strictEqual(route.geometry.coords.length, 2, 'the blank tuple is not a coordinate');
+  assert.ok(route.geometry.coords.every(function (c) { return c.lon < 0; }), 'nothing lands on lon 0');
+  // -0.1010,51.5000 -> -0.1010,51.5010 is 0.001 degrees of latitude: 0.001 x 111.2 km = 111 m.
+  assert.ok(route.lengthM > 100 && route.lengthM < 120,
+    'the route measures what it still shows, got ' + route.lengthM + ' m');
+  assert.strictEqual(parsed.placemarks.length, 1, 'a point with no usable tuple has no geometry');
+  assert.strictEqual(parsed.unsupported, 1);
+  // Dropping is counted, not silent: one tuple on the route, one in the point that lost its only one.
+  assert.strictEqual(parsed.droppedCoordinates, 2);
+  assert.strictEqual(route.geometry.dropped, 1);
+  const classified = kml.classify(parsed);
+  assert.strictEqual(classified.droppedCoordinates, 2);
+  assert.strictEqual(classified.routes[0].dropped, 1);
+});
