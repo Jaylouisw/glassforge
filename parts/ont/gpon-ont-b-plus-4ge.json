@@ -1,0 +1,20 @@
+{
+  "kind": "ont",
+  "model": "gpon-ont-b-plus-4ge",
+  "vendor": "generic",
+  "label": "GPON ONT class B+ 4x GE",
+  "pon": "gpon",
+  "txPowerDbmMin": 0.5,
+  "txPowerDbmMax": 5,
+  "rxSensitivityDbm": -27,
+  "rxOverloadDbm": -8,
+  "ports": {
+    "ge": 4
+  },
+  "notes": "Class B+ ONU per ITU-T G.984.2 (08/2019) Table A.1, the B+ optical power levels for the 2.4 Gbit/s downstream, 1.2 Gbit/s upstream system: ONU mean launched power +0.5..+5 dBm, ONU minimum sensitivity -27 dBm, ONU minimum overload -8 dBm, against an OLT side of +1.5..+5 dBm launch, -28 dBm sensitivity and -8 dBm overload - the figures gpon-b-plus-8 already carries. Class B+ is an ODN of 13..28 dB in that table's own class list: 28 dB is the class verdict, and the 13 dB floor is the overload trap below. Four GE ports as the label says; the engine reports `ports` and does not budget it. Why this row exists: the catalogue's only 4-port GPON CPE was gpon-ont-4ge, which is a C+ receiver at -30 dBm (its own notes say so, and gpon-ont-c-plus-1ge's notes name it as the catalogue's C+ 4-port row), and the B+ CPE existed only as gpon-ont-1ge, one port - so a B+ OLT serving 4-port CPEs had nothing to select, and the obvious pick spends a receiver figure the B+ card never bought. Measured through the engine on one plant - gpon-b-plus-8, one plc-1x64-sca, 20 km of g652d-loose-12, four fusion splices and two SC/APC matings at 1490 nm - the ODN is 25.9 dB (20.5 splitter + 4.4 fibre + 0.4 splices + 0.6 connectors), 2.1 dB inside the 28 dB class. Against gpon-ont-4ge (-30 dBm) that plant reads 5.6 dB of receiver headroom and `ok`; against this row (-27 dBm) it reads 2.6 dB and `fail` - \\\"headroom 2.6 dB is below the 3 dB design margin (sensitivity -27 dBm)\\\" - where the class verdict still has 2.1 dB to spare. That is the honest answer rather than a regression: a B+ launch floor and a B+ sensitivity are 28.5 dB apart, so with a 3 dB margin the receiver check binds a B+ ODN at 25.5 dB while the class alone would sign 28, and a B+ design approved against a -30 dBm CPE is approved against a receiver nobody bought. What that 3 dB is NOT: a claim that the C+ row is mis-sold. gpon-ont-c-plus-1ge's notes record G.984.2 Appendix V NOTE 2, that its -30 dBm assumes the GPON TC layer's RS(255,239) FEC with current B+ detector technology (G.984.2 Amendment 1 meets the B+ -27 dBm with an APD without FEC, or a PIN with it), so a C+ CPE at -30 dBm is real when the OLT runs FEC - confirm the OLT's FEC before choosing between the two rows, and do not read the C+ row as a B+ part. Overload sits on the class' own 13 dB floor: at the +5 dBm top of the launch window against a -8 dBm overload point, an ODN under 13 dB overdrives this receiver, and the budget's overload verdict asks for exactly a 13 dB pad on a 0.2 dB span - a bare patch into a new ONT blinds it, and more reach is never the answer. These are the Recommendation's class limits, not one measured ONT: replace the sensitivity with the bought CPE's datasheet before construction.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
+  "tags": [
+    "gpon",
+    "b+"
+  ]
+}
