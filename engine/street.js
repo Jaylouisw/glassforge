@@ -33,6 +33,7 @@ const kml = require('./kml');
 const VERTEX_PRECISION = 6;        // ~0.11 m: two vertices this close are the same place
 const DEFAULT_JOIN_M = 1.5;        // KML lines from different drawings rarely share exact endpoints
 const DEFAULT_MAX_SNAP_M = 250;    // farther than this from any street, a property is not connected
+const CROSSING_EPS_M = 0.05;       // shallower than this off the other line is a graze
 
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 function round(n, places) {
@@ -234,30 +235,162 @@ function nearestOnEdges(graph, point) {
  * A T-junction is the normal case in imported geometry: a side street drawn *from* the main road,
  * where the main road has no vertex at the junction. Merging only coincident vertices leaves the two
  * lines as separate components, so nothing on the side street is reachable from the main road - and
- * every property there comes back "not on the street network". This makes the graph planar, which is
- * what "connected" means for a street network.
+ * every property there comes back "not on the street network".
  */
-function planarize(graph, toleranceM) {
-  const tol = isNum(toleranceM) ? toleranceM : graph.joinToleranceM;
+function splitAtInteriorVertices(graph, tol) {
   let splits = 0;
+  const boxes = new Map();
+  function boxOf(edge) {
+    let box = boxes.get(edge.id);
+    if (box) return box;
+    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    for (const p of edge.geometry) {
+      if (p.lat < minLat) minLat = p.lat;
+      if (p.lat > maxLat) maxLat = p.lat;
+      if (p.lon < minLon) minLon = p.lon;
+      if (p.lon > maxLon) maxLon = p.lon;
+    }
+    box = { minLat: minLat, maxLat: maxLat, minLon: minLon, maxLon: maxLon };
+    boxes.set(edge.id, box);
+    return box;
+  }
   const nodeIds = Array.from(graph.nodes.keys()).sort(cmp);
   for (const nodeId of nodeIds) {
     const node = graph.nodes.get(nodeId);
+    // A node outside an edge's bounding box (widened by the tolerance) cannot project onto it, and on
+    // a town-sized import that rejection is most of the work: the projection itself is the expensive
+    // half, and this pass is quadratic without it.
+    const latPad = tol / 111132.95;
+    const lonPad = tol / (111319.49 * Math.max(0.01, Math.cos((node.lat * Math.PI) / 180)));
     const edgeIds = Array.from(graph.edges.keys()).sort(cmp);
     for (const edgeId of edgeIds) {
       const edge = graph.edges.get(edgeId);
       if (!edge || edge.a === nodeId || edge.b === nodeId) continue;
+      const box = boxOf(edge);
+      if (node.lat < box.minLat - latPad || node.lat > box.maxLat + latPad ||
+          node.lon < box.minLon - lonPad || node.lon > box.maxLon + lonPad) continue;
       const found = projectOnEdge(edge, node);
       if (!found || found.distM > tol) continue;
       if (found.t <= 1e-9 || found.t >= 1 - 1e-9) continue;
       const before = edge.geometry.slice(0, found.segIndex).concat([node]);
       const after = [node].concat(edge.geometry.slice(found.segIndex));
       removeEdge(graph, edgeId);
+      boxes.delete(edgeId);
       graph.addEdge(edge.a, nodeId, before);
       graph.addEdge(nodeId, edge.b, after);
       splits++;
     }
   }
+  return splits;
+}
+
+/**
+ * Where two segments cross with no vertex between them, in coordinates, or null.
+ *
+ * Both segments are projected into metres around `a1` and each segment's far end is measured against
+ * the *other* line, so the test is a pair of signed perpendicular distances: opposite signs on both
+ * lines means each line has the other's ends on either side, which is a transversal crossing. A
+ * distance under `CROSSING_EPS_M` is not a crossing - that endpoint is lying on the line, a T
+ * junction, and `splitAtInteriorVertices` is the pass that owns it.
+ */
+function segmentCrossing(a1, a2, b1, b2) {
+  const mPerDegLat = 111132.95;
+  const mPerDegLon = 111319.49 * Math.cos((a1.lat * Math.PI) / 180);
+  // A at the origin, with the frame running from A to B; C and D wherever they fall.
+  const bx = (a2.lon - a1.lon) * mPerDegLon;
+  const by = (a2.lat - a1.lat) * mPerDegLat;
+  const cx = (b1.lon - a1.lon) * mPerDegLon;
+  const cy = (b1.lat - a1.lat) * mPerDegLat;
+  const dx = (b2.lon - a1.lon) * mPerDegLon;
+  const dy = (b2.lat - a1.lat) * mPerDegLat;
+  const len1 = Math.sqrt(bx * bx + by * by);
+  const len2 = Math.sqrt((dx - cx) * (dx - cx) + (dy - cy) * (dy - cy));
+  if (!(len1 > 0) || !(len2 > 0)) return null;
+
+  const s1 = (bx * cy - by * cx) / len1;
+  const s2 = (bx * dy - by * dx) / len1;
+  const s3 = ((dx - cx) * -cy - (dy - cy) * -cx) / len2;
+  const s4 = ((dx - cx) * (by - cy) - (dy - cy) * (bx - cx)) / len2;
+  function straddles(p, q) {
+    return (p > CROSSING_EPS_M && q < -CROSSING_EPS_M) || (p < -CROSSING_EPS_M && q > CROSSING_EPS_M);
+  }
+  if (!straddles(s1, s2) || !straddles(s3, s4)) return null;
+  // The parameter is taken from the pair measured against the *other* line: s1/s2 locate the crossing
+  // along B-D, so interpolating A->B with them puts the node three-quarters along a line the road
+  // crosses at a quarter - invisible on a symmetric X, wrong on every real one.
+  const t = s3 / (s3 - s4);
+  return { lat: a1.lat + (a2.lat - a1.lat) * t, lon: a1.lon + (a2.lon - a1.lon) * t };
+}
+
+/**
+ * Put a vertex where two lines cross between their own vertices.
+ *
+ * A T-junction has a vertex that lands on a line; a crossing has none on either line, so nothing
+ * merges and the graph stays two components. That is every crossing drawn as two separate polylines,
+ * which is how most exported KML arrives - and it made a whole road unreachable, reported by name as
+ * "not on the street network" when the geometry itself was sound. Two streets at grade meet, so a
+ * crossing becomes a node and both edges are cut at it by the vertex pass that follows.
+ *
+ * The assumption is stated because it is one: two networks that cross *without* connecting - a duct
+ * passing under a street on another level - would be joined here. An import that means "no junction"
+ * must offset the lines or supply the node itself.
+ *
+ * Candidates are pruned by a sweep over longitudes and then by bounding box, so a town-sized import
+ * does not cost one intersection test per edge pair.
+ */
+function joinCrossings(graph) {
+  const items = [];
+  for (const edge of graph.edges.values()) {
+    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    for (const p of edge.geometry) {
+      if (p.lat < minLat) minLat = p.lat;
+      if (p.lat > maxLat) maxLat = p.lat;
+      if (p.lon < minLon) minLon = p.lon;
+      if (p.lon > maxLon) maxLon = p.lon;
+    }
+    items.push({ edge: edge, minLat: minLat, maxLat: maxLat, minLon: minLon, maxLon: maxLon });
+  }
+  items.sort(function (x, y) { return cmp(x.minLon, y.minLon) || cmp(x.edge.id, y.edge.id); });
+
+  const points = [];
+  for (let i = 0; i < items.length; i++) {
+    const one = items[i];
+    for (let j = i + 1; j < items.length; j++) {
+      const two = items[j];
+      if (two.minLon > one.maxLon) break;
+      if (two.minLat > one.maxLat || two.maxLat < one.minLat) continue;
+      const a = one.edge;
+      const b = two.edge;
+      if (a.a === b.a || a.a === b.b || a.b === b.a || a.b === b.b) continue;
+      let found = null;
+      for (let p = 1; p < a.geometry.length && !found; p++) {
+        for (let q = 1; q < b.geometry.length && !found; q++) {
+          found = segmentCrossing(a.geometry[p - 1], a.geometry[p], b.geometry[q - 1], b.geometry[q]);
+        }
+      }
+      if (found) points.push(found);
+    }
+  }
+  for (const point of points) graph.nodeAt(point);
+  return points.length;
+}
+
+/**
+ * Planarise: every place one line meets another is a vertex on both.
+ *
+ * Two passes, because they feed each other. Vertices land on edges (snaps, T-junctions), and crossings
+ * land between two sets of vertices (X-junctions); the crossing pass creates the nodes, and the vertex
+ * pass behind it cuts the lines that own them - including a third line the crossing node happens to
+ * sit on. Splitting an edge never moves geometry, so it can never create a new crossing, and the two
+ * passes settle in one round.
+ */
+function planarize(graph, toleranceM) {
+  const tol = isNum(toleranceM) ? toleranceM : graph.joinToleranceM;
+  let splits = splitAtInteriorVertices(graph, tol);
+  const crossings = joinCrossings(graph);
+  // No crossing means no new node for the vertex pass to cut, so the second pass is skipped: a graph
+  // that only had T-junctions costs exactly what it cost before crossings were understood.
+  if (crossings) splits += crossings + splitAtInteriorVertices(graph, tol);
   return splits;
 }
 

@@ -107,13 +107,24 @@ builders, the cable taper and the ranking are shared.
 ### street-graph
 
 ```
-KML / KMZ / { edges }  →  graph (vertices merged within 1.5 m)
+KML / KMZ / { edges }  →  graph (vertices merged within 1.5 m; T-junctions and crossings split)
                        →  snap every property onto the nearest edge, splitting it
                        →  Dijkstra from the root
                        →  union of shortest paths to every terminal, pruned
                        →  contract degree-2 junctions, keep the polyline
 ```
 
+- **A crossing between two lines is a junction.** A T-junction has a vertex that lands on a line; a
+  crossing has none on either line, so merging vertices alone leaves the graph in two components and a
+  whole road comes back "not on the street network" when the geometry is sound — which is every pair of
+  roads exported as separate polylines. `street.planarize` therefore runs two passes: vertices that
+  land on an edge's interior, then a sweep for transversal crossings (as seen from both lines, each
+  line's ends on opposite sides, and at least 0.05 m clear of the other line — a graze is not a
+  junction), whose points become nodes the first pass then cuts. The sweep is pruned by longitude and
+  by per-edge bounding boxes, so a grid-shaped import costs work per node, not per node × edge.
+  **The assumption is stated because it is one:** two streets at grade do meet, but a duct passing
+  *under* a street on another level would be joined too. The geometry carries no level and the graph
+  does not invent one, so a grade-separated crossing must be offset in the import or given its node.
 - **A property is snapped to the nearest edge, and the gap is a real length.** A house is not on the
   centreline: the distance from the property to the point it joins the street is the drop, carried as
   `spurM` and emitted as a drop span. It is not rounded away and it is not a 2 m placeholder.

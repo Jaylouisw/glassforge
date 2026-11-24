@@ -220,3 +220,140 @@ test('two legs can be found on a ring, and a single corridor reports what it sha
   close(only.sharedM, only.legs[0].lengthM, 0.01, 'the whole corridor is shared');
   assert.strictEqual(only.shared.length, 1);
 });
+
+// --- crossings between two lines -------------------------------------------------------------
+// A T-junction has a vertex on a line. A crossing has none on either line, so the vertex merge finds
+// nothing to do and the graph stays two components - which is every pair of roads drawn as separate
+// polylines, and how most exported KML arrives. Two streets at grade meet, so the crossing is a node.
+
+function crossingNet() {
+  return { edges: [
+    { id: 'main', coords: [{ lat: 51.5, lon: -0.1010 }, { lat: 51.5, lon: -0.0990 }] },
+    { id: 'cross', coords: [{ lat: 51.49, lon: -0.1000 }, { lat: 51.51, lon: -0.1000 }] }
+  ] };
+}
+
+test('two lines that cross between their vertices are joined where they cross', function () {
+  const graph = street.buildGraph(crossingNet());
+  // Each line is one edge; the crossing at -0.1000, 51.5000 cuts both in two, so 4 edges and
+  // 4 ends + 1 junction = 5 nodes. 0.0010 deg of longitude at 51.5 = 69.3 m; 0.010 deg of latitude on
+  // the crossing road = 1111.3 m either side.
+  assert.strictEqual(graph.stats().edges, 4, 'both lines split at the crossing');
+  assert.strictEqual(graph.stats().nodes, 5, 'four ends and one junction');
+
+  const root = street.snap(graph, HEAD_END);
+  const property = street.snap(graph, { lat: 51.5020, lon: -0.1000 });
+  const path = street.routePath(graph, root.nodeId, property.nodeId);
+  assert.ok(path, 'the crossing road is reachable from the main road');
+  const crossing = { lat: 51.5, lon: -0.1000 };
+  // 69.3 m along the main road + 222.3 m up the crossing road, measured from the same geometry.
+  const expected = geo.distanceM(HEAD_END, crossing) + geo.distanceM(crossing, { lat: 51.5020, lon: -0.1000 });
+  close(path.lengthM, expected, 1, 'the run is the two arms, with no detour to a distant junction');
+});
+
+test('splitting at a crossing adds a node, not a metre', function () {
+  const graph = street.buildGraph(crossingNet());
+  const total = Array.from(graph.edges.values()).reduce(function (n, e) { return n + e.lengthM; }, 0);
+  const drawn = geo.distanceM({ lat: 51.5, lon: -0.1010 }, { lat: 51.5, lon: -0.0990 }) +
+    geo.distanceM({ lat: 51.49, lon: -0.1000 }, { lat: 51.51, lon: -0.1000 });
+  close(total, drawn, 0.5, 'the cable length is the geometry, cut in two');
+});
+
+test('the junction is found whatever order the two lines arrive in', function () {
+  const net = crossingNet();
+  const one = street.buildGraph({ edges: [net.edges[0], net.edges[1]] });
+  const two = street.buildGraph({ edges: [net.edges[1], net.edges[0]] });
+  assert.strictEqual(JSON.stringify(one.stats()), JSON.stringify(two.stats()));
+  const at = street.snap(one, { lat: 51.5, lon: -0.1000 });
+  close(at.spurM, 0, 0.1, 'a node sits on the crossing point');
+  assert.strictEqual(one.adjacency.get(at.nodeId).length, 4, 'four arms meet there');
+});
+
+test('three lines through one point meet at one node, not three', function () {
+  // A crossroads with a diagonal through it is still one junction: the crossing pass proposes three
+  // points for the same place and `nodeAt` merges them within the join tolerance, so the graph gets
+  // one node of degree 6 rather than three nodes of degree 4 stacked on top of each other.
+  const graph = street.buildGraph({ edges: [
+    { id: 'main', coords: [{ lat: 51.5, lon: -0.1010 }, { lat: 51.5, lon: -0.0990 }] },
+    { id: 'cross', coords: [{ lat: 51.49, lon: -0.1000 }, { lat: 51.51, lon: -0.1000 }] },
+    { id: 'diag', coords: [{ lat: 51.4955, lon: -0.1005 }, { lat: 51.5045, lon: -0.0995 }] }
+  ] });
+  assert.strictEqual(graph.stats().edges, 6, 'three lines, each cut in two');
+  assert.strictEqual(graph.stats().nodes, 7, 'six ends and one junction');
+  const at = street.snap(graph, { lat: 51.5, lon: -0.1000 });
+  assert.strictEqual(graph.adjacency.get(at.nodeId).length, 6, 'six arms meet there');
+});
+
+test('two roads running 3 m apart are not joined by the crossing pass', function () {
+  // 0.000027 deg of latitude = 3.0 m, twice the 1.5 m join tolerance: two parallel roads alongside
+  // each other for 139 m. They never cross, so nothing may connect them - a graze is not a junction.
+  const graph = street.buildGraph({ edges: [
+    { id: 'north', coords: [{ lat: 51.5, lon: -0.1010 }, { lat: 51.5, lon: -0.0990 }] },
+    { id: 'south', coords: [{ lat: 51.499973, lon: -0.1010 }, { lat: 51.499973, lon: -0.0990 }] }
+  ] });
+  assert.strictEqual(graph.stats().edges, 2);
+  assert.strictEqual(graph.stats().nodes, 4);
+  const a = street.snap(graph, { lat: 51.5, lon: -0.1010 });
+  const b = street.snap(graph, { lat: 51.499973, lon: -0.0990 });
+  assert.strictEqual(street.routePath(graph, a.nodeId, b.nodeId), null, 'two parallel roads do not connect');
+});
+
+test('a design can serve addresses on both sides of a crossing', function () {
+  // The whole point of the junction: a head-end on one road, addresses on both, and no address
+  // refused as "not on the street network" because the import never traced the crossing.
+  const result = engine.design.synthesise(
+    [{ label: 'A', lat: 51.5020, lon: -0.1000 }, { label: 'B', lat: 51.5, lon: -0.0995 }],
+    { headEnd: HEAD_END, network: crossingNet() },
+    registry
+  );
+  assert.strictEqual(result.ok, true, (result.rationale || []).join(' | '));
+  assert.strictEqual(result.routeMethod.indexOf('street-graph'), 0, result.routeMethod);
+  // The winner on this demand is a home-run, so each cable is measured from the head-end and the
+  // 69.3 m main-road arm is bought twice - an active home-run has no trunk to share. What the crossing
+  // buys is reachability: both totals are street geometry, and without the junction address A has no
+  // route at all. 69.3 + 222.3 = 291.6 m, and 69.3 + 34.6 = 103.9 m (0.0005 deg of longitude at 51.5
+  // is 34.6 m).
+  const total = result.runs.reduce(function (n, run) { return n + run.lengthM; }, 0);
+  close(total, 291.6 + 103.9, 1.5, 'both runs are routed: ' + result.runs.map(function (r) { return r.lengthM; }).join(' + '));
+});
+
+test('the junction sits where the lines cross, not halfway along either', function () {
+  // This crossing is 75% along the main road and 50% along the side road. A symmetric X cannot tell
+  // the two parameters apart; taking the wrong one put the junction at -0.099167 - 83 m east of the
+  // real crossing - on the first implementation of this pass.
+  const graph = street.buildGraph({ edges: [
+    { id: 'main', coords: [{ lat: 51.5, lon: -0.1010 }, { lat: 51.5, lon: -0.0990 }] },
+    { id: 'side', coords: [{ lat: 51.49, lon: -0.0995 }, { lat: 51.51, lon: -0.0995 }] }
+  ] });
+  const at = street.snap(graph, { lat: 51.5, lon: -0.0995 });
+  close(at.spurM, 0, 0.1, 'the node is on the crossing point');
+  assert.strictEqual(graph.adjacency.get(at.nodeId).length, 4, 'four arms meet there');
+  const west = street.snap(graph, { lat: 51.5, lon: -0.1010 });
+  const east = street.snap(graph, { lat: 51.5, lon: -0.0990 });
+  // 0.0015 deg of longitude at 51.5 = 103.9 m of the 138.6 m road, and 0.0005 deg = 34.6 m of it.
+  close(street.routePath(graph, west.nodeId, at.nodeId).lengthM, 103.83, 0.2, 'west arm');
+  close(street.routePath(graph, east.nodeId, at.nodeId).lengthM, 34.61, 0.2, 'east arm');
+});
+
+test('a protected pair can be drawn round a ring whose four corners are only crossings', function () {
+  // Four roads, each drawn past the other, so no corner is a vertex on either line: the ring exists
+  // only because the crossings were turned into junctions. Without them there is no second leg, and
+  // nothing for `diversePaths` to protect.
+  const graph = street.buildGraph({ edges: [
+    { id: 'north', coords: [{ lat: 51.505, lon: -0.1010 }, { lat: 51.505, lon: -0.0990 }] },
+    { id: 'south', coords: [{ lat: 51.500, lon: -0.1010 }, { lat: 51.500, lon: -0.0990 }] },
+    { id: 'west', coords: [{ lat: 51.4995, lon: -0.1000 }, { lat: 51.5055, lon: -0.1000 }] },
+    { id: 'east', coords: [{ lat: 51.4995, lon: -0.0995 }, { lat: 51.5055, lon: -0.0995 }] }
+  ] });
+  assert.strictEqual(graph.stats().edges, 12, 'each road is cut twice');
+  assert.strictEqual(graph.stats().nodes, 12, '8 ends and 4 corners');
+  const a = street.snap(graph, { lat: 51.500, lon: -0.1000 });
+  const b = street.snap(graph, { lat: 51.500, lon: -0.0995 });
+  const pair = street.diversePaths(graph, a.nodeId, b.nodeId);
+  assert.strictEqual(pair.disjoint, true, pair.method);
+  assert.strictEqual(pair.sharedM, 0, JSON.stringify(pair.shared));
+  assert.strictEqual(pair.legs.length, 2);
+  // 34.6 m along the south road against 0.0005 deg of longitude plus 2 x 0.005 deg of latitude:
+  // the direct leg is the short one.
+  close(Math.min(pair.legs[0].lengthM, pair.legs[1].lengthM), 34.61, 0.2, 'the direct leg');
+});

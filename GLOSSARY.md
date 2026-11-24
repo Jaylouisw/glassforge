@@ -97,6 +97,14 @@ that edge at the projection so the connection is real.
 **Join tolerance** — the distance within which a vertex is treated as the same junction, so a side street
 drawn from the middle of a main road is connected rather than a second component.
 
+**Crossing (X-junction)** — two lines that intersect between their own vertices. It becomes a node on
+both, because two roads at grade meet; a grade-separated crossing has to be offset in the import, since
+the geometry carries no level.
+
+**Planarise** — make every place one line meets another a vertex on both: vertices that fall inside an
+edge, then transversal crossings. Until a graph is planarised, a road drawn across another is a second
+component and everything on it is "not on the street network".
+
 **routeMethod** — how a run's length was measured: `street-graph` when it walked the geometry,
 `straight-line xN` when no network was supplied. A street-routed design never reports a straight line
 without saying so.
