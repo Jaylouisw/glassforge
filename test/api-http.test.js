@@ -209,6 +209,34 @@ async function main() {
     assert.strictEqual(legacyGet.status, 200);
   });
 
+  // A legacy file can also hold a shape the write gate now refuses: a headend root with a splitter under
+  // it. The budget used to walk past the splitter (an active design has no `splitters` field), charge its
+  // tail splice and none of its 10.5 dB, and answer a clean verdict on a link ten decibels short. The row
+  // for that ONT is now an `error` naming the splitter - 200, because the other ONTs are still budgetable
+  // - and never a `result`.
+  const activeLegacyId = 'plegacy0002';
+  fs.writeFileSync(path.join(dataRoot, 'projects', activeLegacyId + '.json'), JSON.stringify({
+    id: activeLegacyId,
+    name: 'Legacy active with a splitter',
+    nodes: [
+      { id: 'h1', type: 'headend', model: 'qsfp28-100g-lr4-10km', name: 'Head end' },
+      { id: 'sp1', type: 'splitter', model: 'plc-1x8-sca', name: 'SPL 1:8' },
+      { id: 'o1', type: 'ont', model: 'qsfp28-100g-lr4-10km', name: 'Customer' }
+    ],
+    spans: [
+      { id: 's1', from: 'h1', to: 'sp1', cable: 'g652d-loose-12', lengthM: 1000, strands: [1] },
+      { id: 's2', from: 'sp1', to: 'o1', cable: 'g652d-loose-12', lengthM: 1000, strands: [2] }
+    ]
+  }));
+  const activeLegacyBudget = await request('POST', '/api/projects/' + activeLegacyId + '/budget', {});
+  test('a stored active plant with a splitter answers an error row naming it, not a clean verdict', function () {
+    assert.strictEqual(activeLegacyBudget.status, 200, JSON.stringify(activeLegacyBudget.body));
+    const row = activeLegacyBudget.body.budgets[0];
+    assert.strictEqual(row.ont, 'o1');
+    assert.strictEqual(row.result, undefined, 'a refused ONT must not carry a verdict as well');
+    assert.ok(/splitter/.test(row.error) && row.error.indexOf('sp1') !== -1, row.error);
+  });
+
   const strands = await request('GET', '/api/projects/' + id + '/strands');
   test('the strand page reports usage against the cable', function () {
     assert.strictEqual(strands.status, 200);

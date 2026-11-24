@@ -186,6 +186,24 @@ function splicesAtClosure(nodeId, spans, registry) {
 function designForOnt(plant, ontId, registry, opts) {
   const o = opts || {};
   const path = trace(plant, ontId);
+  // An active network has no splitter, and the budget says so instead of walking past it.
+  //
+  // `validate` refuses "a splitter in an active plant", but a budget is reachable from a stored project
+  // that predates the save-time validation, and an ACTIVE design has no `splitters` field - so a splitter
+  // on the traced path used to contribute its spliced tail (0.10 dB) and none of its insertion loss
+  // (10.50 dB for a 1:8). Measured: A - 1 km - splitter - 1 km - B on 100G-LR4 reported ODN 1.40 dB and
+  // verdict "marginal", with no reason, on a link 10.5 dB short of what the plant costs. The same plant
+  // under an OLT charges 11.64 dB, because a PON design carries its splitters. Refused by node - the
+  // splitter is plant somebody drew, and deleting its loss is the optimistic answer this project keeps
+  // in the refusal list (SPEC 8).
+  if (path.nodes[0].type === 'headend') {
+    for (const node of path.nodes) {
+      if (node.type !== 'splitter') continue;
+      throw new Error('splitter node "' + node.id + '" is on the path to ont "' + ontId +
+        '" - an active network (headend root) cannot contain a splitter - splitters are a PON element, ' +
+        'so this path cannot be budgeted');
+    }
+  }
   const spans = path.spans.map(function (s) { return { cable: s.cable, lengthM: s.lengthM }; });
   const splitters = [];
   let splices = 0;
