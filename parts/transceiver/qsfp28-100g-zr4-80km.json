@@ -1,0 +1,23 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp28-100g-zr4-80km",
+  "vendor": "generic",
+  "label": "QSFP28 100GBASE-ZR4 80 km",
+  "speedMbps": 100000,
+  "wavelengthNm": 1310,
+  "reachM": 80000,
+  "txPowerDbmMin": 2,
+  "txPowerDbmMax": 6.5,
+  "rxSensitivityDbm": -28,
+  "rxOverloadDbm": -7,
+  "polish": "upc",
+  "sourceUrl": "https://datainterfaces.com/content/QSFP-10080-ZR4-100GE-QSFP28-ZR4-80km-datasheet-v2.pdf",
+  "notes": "Figure provenance: ROBOfiber QSFP-10080-ZR4 datasheet, 'Optical Characteristics - 100GBASE-ZR4 Operation' table, which is the sheet whose full table is legible: average launch power per lane +2.0..+6.5 dBm (total over four lanes 8.0..12.5 dBm), average receive power per lane -28..-7 dBm, receiver sensitivity -28 dBm at BER 5e-5 WITH FEC and -20.9 dBm at BER 1e-12 without, 80 km on G.652. Three other sheets corroborate the launch floor and ceiling (JPCO P58000EGCU80-1, Naddod QSFP-100G-ZR4: +2.0..+6.5) and disagree only on the receiver ceiling: they print -3.5 dBm average receive maximum where ROBOfiber prints -7, and AddOn's QSFP28-100GB-ZR4-AO prints +4.5. The row keeps -7 because a lower overload point is the stricter figure - a module bought on a -3.5 sheet will still be safe behind a pad sized against -7, and a pad sized against -3.5 would overdrive it. 100GBASE-ZR4 is NOT an IEEE 802.3 class: 802.3's 100G duplex rungs are LR4 and ER4, which this catalogue already carries, so this row cites vendor sheets exactly as the 1000BASE-ZX row does. Do not 'correct' the sourceUrl to a standards body - no clause publishes these four numbers. The FEC caveat is the whole 80 km claim: every sheet quotes the reach and the -28 dBm sensitivity at RS(528,514)/KR4 FEC. Without the host enabling FEC the receiver is -20.9 dBm, the pair's budget falls from 30 dB to 22.9 dB, and 80 km stops being a link at all (22.9 minus 0.6 of patch panels over 0.35 dB/km is 63.7 km at zero margin, 55 km inside the default 3 dB). A 100G host that will not run FEC is not this row. Arithmetic the engine performs, measured with budget.pointToPoint on this pair: budget = launch floor - sensitivity = 2.0 - (-28) = 30.0 dB. At G.652.D's 0.35 dB/km, 80 km of fibre alone is 28.0 dB, leaving 2.0 dB of headroom - so the vendor's 80 km reads FAIL against the default 3 dB margin (measured), exactly the LR4 story: reach and loss budget are separate verdicts and the loss binds first. The last bare span inside the margin is 76 km (3.4 dB, marginal); the last that reads ok is 71 km (5.15 dB). Add the usual plant and it shrinks: 80 km with five splices and two patch panels is 29.1 dB of ODN and 0.9 dB of headroom (measured, fail), and a spliced run has to be about 68 km ((30 - 1.1 - 5) / 0.35) to clear the same 5 dB. Overload is the trap at the other end, and it is not a reach problem: the +6.5 dBm ceiling is 13.5 dB above the -7 dBm receive maximum and the +2.0 dBm floor is 9 dB above it, so at 0.35 dB/km any span shorter than about 26 km is too loud at the launch floor and anything shorter than 38.6 km is too loud at the ceiling. Measured: a 10 km span with two patch panels reads -2.1 dBm at the far end against a -7 dBm maximum and the budget's attenuator verdict asks for a 10 dB pad (14 dB for a back-to-back pair); 26 km (9.1 dB of ODN) is the last length that is audible with no pad at the launch floor. The engine budgets one wavelength, so the row says 1310 nm - the top of the four LAN-WDM lanes (1294.53-1296.59, 1299.02-1301.09, 1303.54-1305.63, 1308.09-1310.19 nm) and the window the cables publish attenuation for; the figures above are the worst-lane ones, so the single-wavelength budget errs conservative. One consequence of that choice: ZR4 and ER4 both sit at 1310 nm and 100000 Mb/s, so budget.pointToPoint cannot tell them apart and accepts a mixed pair (measured) - which is then held to the shorter optic's 40 km reach and to a budget assembled from one end's launch floor and the other end's sensitivity (measured 22.9 dB: the ZR4's +2.0 dBm against the ER4's -20.9 dBm) - a figure no sheet publishes for either module. Pair ZR4 with ZR4; a ZR4 module is not qualified against an ER4 receiver. Auto-design's active ladder (1G-LX, 10G-LR, 10G-ER) does not offer this optic, so the row is for a hand-drawn link - a site-to-site leg over imported duct or metro-fibre geometry, which is where 80 km of 100G is the difference between one span and a regeneration site. Class figures from vendor sheets, not one measured module: replace the row with the module actually purchased before pricing a build.",
+  "tags": [
+    "100000",
+    "1310nm",
+    "100g",
+    "80km",
+    "long-reach"
+  ]
+}
