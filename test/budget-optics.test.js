@@ -156,6 +156,7 @@ test('a link that is too loud says which pad fixes it, and how much pad fits', f
   // less the 3 dB margin = 33; the class budget is 35 - 0.0011 = 34.99 dB. The tighter of the two wins
   // and a pad is a whole number, so 34.99 dB of class headroom funds 34 dB but the margin caps it at 33.
   assert.strictEqual(loud.attenuator.maxPadDb, 33, 'the most pad the margin and class budget allow');
+  assert.strictEqual(loud.attenuator.atTxDbm, 9, 'the requested launch is the launch the pad is sized for');
   assert.strictEqual(loud.attenuator.fits, true);
   assert.ok(loud.reasons.some(function (x) { return x.indexOf('fit a 17 dB inline pad') !== -1; }), loud.reasons.join(' | '));
 
@@ -175,6 +176,35 @@ test('when no pad can fix a too-loud design, the refusal says so instead of nami
   assert.strictEqual(r.attenuator.fits, false);
   assert.ok(r.attenuator.maxPadDb < r.attenuator.padDb, 'no whole-dB pad satisfies both limits');
   assert.ok(r.reasons.some(function (x) { return x.indexOf('no inline pad clears the overload point') !== -1; }), r.reasons.join(' | '));
+});
+
+test('the pad is sized for the strongest launch the transmitter can make, not the weakest', function () {
+  // A 1000BASE-ZX pair patched through 1 km of G.652.D and two connectors: 1 km x 0.19 = 0.19 dB at
+  // 1550 nm + 2 x 0.3 dB = 0.81 dB of ODN. The ZX launch window is 0..+5 dBm against a -3 dBm
+  // receiver overload point, so the far optic is 2.19 dB too loud at the floor (0 - 0.81 = -0.81)
+  // and 7.19 dB too loud at the ceiling (5 - 0.81 = +4.19). A pad is bought once and fitted once, so
+  // it is the 8 dB that clears the ceiling - the 3 dB this used to quote came from the launch floor
+  // and left the receiver at +1.19 dBm, still above its overload point on a module that runs hot.
+  const r = budget.pointToPoint({
+    headEnd: { model: 'sfp-1g-zx-80km' }, cpe: { model: 'sfp-1g-zx-80km' },
+    spans: [{ cable: 'g652d-loose-12', lengthM: 1000 }], splices: 0, connectors: 2
+  }, registry);
+  close(r.rxPowerDbm, -0.81, 0.001, 'the receiver at the weakest launch');
+  assert.strictEqual(r.attenuator.atTxDbm, 5, 'sized at the top of the launch window');
+  close(r.attenuator.overDb, 7.19, 0.001, 'overload at the strongest launch, not the weakest');
+  assert.strictEqual(r.attenuator.padDb, 8, 'the smallest whole-dB pad that clears +5 dBm');
+  assert.ok(5 - r.odnLossDb - r.attenuator.padDb <= -3, 'the pad clears the hottest launch');
+  assert.ok(5 - r.odnLossDb - 3 > -3, 'a pad sized off the launch floor does not');
+
+  // A requested launch power *is* the launch being sized for - the planner has said which one - so
+  // the pad follows it rather than widening to the part's own maximum.
+  const asked = budget.pointToPoint({
+    headEnd: { model: 'sfp-1g-zx-80km' }, cpe: { model: 'sfp-1g-zx-80km' }, txDbm: 2,
+    spans: [{ cable: 'g652d-loose-12', lengthM: 1000 }], splices: 0, connectors: 2
+  }, registry);
+  assert.strictEqual(asked.attenuator.atTxDbm, 2);
+  close(asked.attenuator.overDb, 4.19, 0.001, '2 dBm - 0.81 dB - (-3 dBm)');
+  assert.strictEqual(asked.attenuator.padDb, 5);
 });
 
 test('overload is caught: too much power is a failure too', function () {

@@ -66,10 +66,14 @@ test('a 1:64 XG-PON at class N2 budgets green', function () {
 });
 
 test('a short run on an N2 port is an attenuator job, not a pass', function () {
-  // G.987.2 Table 6-1 puts N2's ODN attenuation range at 16-31 dB: a 100 m patch is 0.02 dB, so a
-  // +4 dBm launch arrives 11.98 dB above the ONT's -8.0 dBm overload point and needs a 12 dB pad.
-  // (The verdict's pad is the smallest that clears the receiver, not the class's 16 dB floor - check
-  // a pad against Table 6-1 before ordering it.)
+  // G.987.2 Table 6-1 puts N2's ODN attenuation range at 16-31 dB: a 100 m patch is 0.02 dB, so the
+  // ONT sees +3.98 dBm at N2's weakest launch (+4) and +7.98 dBm at its strongest (+8) - 15.98 dB
+  // above the -8.0 dBm overload point. The pad is sized at the strongest launch, because that is the
+  // module that may land in the chassis: this assertion used to read 12 dB, which was 11.98 taken at
+  // the +4 floor and leaves the ONT at -4.02 dBm, still 3.98 dB over its overload point, on a card
+  // that paints +8. The smallest pad that clears the top of the window is 16 dB, which lands it at
+  // -8.02 dBm. (It is the smallest that clears the receiver, not the class's 16 dB floor - check a
+  // pad against Table 6-1 before ordering it.)
   const r = budget.opticalBudget({
     olt: { model: 'xg-pon-n2-16' },
     ont: { model: 'xg-pon-ont-1xge' },
@@ -79,8 +83,13 @@ test('a short run on an N2 port is an attenuator job, not a pass', function () {
     connectors: 0
   }, registry);
   assert.ok(r.attenuator, 'a 4 dBm launch into a -8 dBm receiver must report an attenuator');
-  assert.strictEqual(r.attenuator.overDb, 11.98);
-  assert.strictEqual(r.attenuator.padDb, 12);
+  // +8 (N2 launch MAX) - 0.02 (100 m of G.652.D at 1490 nm) - (-8) = 15.98 dB of overload.
+  assert.strictEqual(r.attenuator.overDb, 15.98);
+  assert.strictEqual(r.attenuator.padDb, 16);
+  assert.strictEqual(r.attenuator.atTxDbm, 8, 'the pad is sized for the top of the launch window');
+  // The pad has to hold the receiver at every launch: +8 - 0.02 - 16 = -8.02 dBm, inside the -8 dBm
+  // overload point. A 15 dB pad would leave it at -7.02 dBm, still above it.
+  assert.ok(8 - r.odnLossDb - r.attenuator.padDb <= -8, 'a whole-dB pad clears the hottest launch');
   assert.ok(r.reasons.some(function (why) { return why.indexOf('overload point') !== -1; }),
     'the verdict must say why: ' + r.reasons.join(' | '));
 });

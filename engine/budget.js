@@ -207,17 +207,33 @@ function verdictFor(headroomDb, marginDb, classHeadroomDb, reasons) {
  *
  * Returns null when the receiver is at or below its overload point - a healthy link needs no pad, and
  * reporting "0 dB" would be a plate somebody orders.
+ *
+ * **The pad is sized for the strongest launch, not the weakest.** A pad is fitted once and the optic
+ * that lands in the chassis can sit anywhere in its own `txPowerDbmMin..txPowerDbmMax` window - a
+ * C+ OLT line card may paint +3 or +7 dBm, and the head-end optic a -4.7 or a +4. A pad computed from
+ * the minimum launch is therefore sized for the one case that cannot hurt the receiver, and leaves it
+ * above its overload point whenever the module runs hot: 4 dB short on every OLT in the catalogue,
+ * whose launch windows are 3-4 dB wide. The number a crew buys must cover the worst case, so `overDb`
+ * and `padDb` are taken at `rxPowerMaxDbm` (the receiver's power at the transmitter's maximum launch,
+ * or at a requested `txDbm` when one is given) and `atTxDbm` says which launch the pad is sized for.
+ *
+ * Which end is *too loud* is still judged at the minimum launch: that is the worst-case loss budget
+ * the class verdict is built on, and a link that is inside its overload point there can always be
+ * brought to full launch by the pad this function returns.
  */
-function attenuatorFor(rxPowerDbm, rxSpec, headroomDb, marginDb, classHeadroomDb) {
+function attenuatorFor(rxPowerDbm, rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb) {
   if (!(rxPowerDbm > rxSpec.overload)) return null;
-  const overDb = round(rxPowerDbm - rxSpec.overload, 2);
+  const overDb = round(rxPowerMaxDbm - rxSpec.overload, 2);
   const padDb = Math.ceil(overDb);
   // Floor as well as min: the pad itself is a whole number of dB, so a 14.6 dB allowance funds 14 dB.
+  // The margin bound is the headroom at the *minimum* launch - the tight side - so a pad that clears
+  // it leaves the margin intact at every launch.
   const maxPadDb = Math.floor(round(Math.min(classHeadroomDb, headroomDb - marginDb), 2));
   return {
     overDb: overDb,
     padDb: padDb,
     maxPadDb: maxPadDb,
+    atTxDbm: round(txDbmMax, 2),
     fits: maxPadDb >= padDb
   };
 }
@@ -229,7 +245,8 @@ function attenuatorClause(pad, marginDb) {
     return '; no inline pad clears the overload point without breaking the ' + marginDb +
       ' dB margin, so this needs a shorter-reach optic or a different split';
   }
-  return '; fit a ' + pad.padDb + ' dB inline pad (up to ' + pad.maxPadDb +
+  return '; fit a ' + pad.padDb + ' dB inline pad, which holds the receiver inside its overload point ' +
+    'even at the ' + pad.atTxDbm + ' dBm top of its launch window (up to ' + pad.maxPadDb +
     ' dB still passes the ' + marginDb + ' dB margin and the class budget)';
 }
 
@@ -295,13 +312,17 @@ function opticalBudget(design, registry) {
     ? { sensitivity: ont.rxSensitivityDbm, overload: ont.rxOverloadDbm, who: 'ONT ' + ont.model }
     : { sensitivity: olt.rxSensitivityDbm, overload: olt.rxOverloadDbm, who: 'OLT ' + olt.model };
 
+  // The same loss, at the other end of the transmitter's window: what the receiver sees when the
+  // optic that lands in the chassis is a hot one. Only the pad uses this - see `attenuatorFor`.
+  const txDbmMax = design.txDbm !== undefined ? txDbm : txSpec.max;
+  const rxPowerMaxDbm = round(txDbmMax - totalLossDb, 2);
   const headroomDb = round(rxPowerDbm - rxSpec.sensitivity, 2);
   const budgetDb = olt.budgetDb;
   const classHeadroomDb = round(budgetDb - odnLossDb, 2);
 
   const reasons = [];
   // A pad is ODN loss, so the same figures that decide headroom decide how much of it fits.
-  const attenuator = attenuatorFor(rxPowerDbm, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  const attenuator = attenuatorFor(rxPowerDbm, rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb);
   if (attenuator) {
     reasons.push(rxPowerDbm + ' dBm at the ' + rxSpec.who + ' is above its overload point ' + rxSpec.overload + ' dBm - too much power' + attenuatorClause(attenuator, marginDb));
   }
@@ -418,13 +439,17 @@ function pointToPoint(design, registry) {
   const budgetDb = direction === 'down'
     ? round(headEnd.txPowerDbmMin - cpe.rxSensitivityDbm, 2)
     : round(cpe.txPowerDbmMin - headEnd.rxSensitivityDbm, 2);
+  // What the customer (or head-end) receiver sees when the launching optic is at the top of its
+  // window - the power the pad has to cover. Only the pad uses it; see `attenuatorFor`.
+  const txDbmMax = design.txDbm !== undefined ? txDbm : txSpec.max;
+  const rxPowerMaxDbm = round(txDbmMax - totalLossDb, 2);
   const headroomDb = round(rxPowerDbm - rxSpec.sensitivity, 2);
   const classHeadroomDb = round(budgetDb - odnLossDb, 2);
   const reachM = Math.min(headEnd.reachM, cpe.reachM);
 
   const reasons = [];
   // A pad is ODN loss, so the same figures that decide headroom decide how much of it fits.
-  const attenuator = attenuatorFor(rxPowerDbm, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  const attenuator = attenuatorFor(rxPowerDbm, rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb);
   if (attenuator) {
     reasons.push(rxPowerDbm + ' dBm at the ' + rxSpec.who + ' is above its overload point ' + rxSpec.overload + ' dBm - too much power' + attenuatorClause(attenuator, marginDb));
   }
