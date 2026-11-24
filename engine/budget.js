@@ -201,6 +201,47 @@ function verdictFor(headroomDb, marginDb, classHeadroomDb, reasons) {
 }
 
 /**
+ * Why a budget is `marginal`, in the engine's own words.
+ *
+ * `marginal` is a verdict this engine invented because a design inside 2 dB of its margin - or with
+ * under 1 dB of class budget left - is not a clean sign-off, it is a decision somebody has to make
+ * (`docs/SPEC.md` §4, `test/budget-optics.test.js`). But the verdict carried no sentence: `reasons` is
+ * empty by definition (a reason means `fail`) and `warnings` is the launch-window list, so every caller
+ * that wanted to say *why* rebuilt the same subtraction by hand - the printed plan (#138) built one,
+ * and the auto-design report built none at all and called the candidate clean.
+ *
+ * The clause names the figure that is tight, and only that figure:
+ *
+ *   headroom-tight  headroom 4.56 dB is only 1.56 dB above the 3 dB design margin (sensitivity -30 dBm)
+ *   class-tight     only 0.62 dB of the GPON B+ budget of 28 dB is left
+ *
+ * Both when both are tight. `null` for `ok` and for `fail`: a failing budget has `reasons`, which name
+ * the fault and the fix, and a healthy one has nothing to explain. A marginal verdict that reached here
+ * with neither figure tight would mean `verdictFor` and this function disagree, so it says the general
+ * case rather than going silent.
+ *
+ * figures: { headroomDb, marginDb, classHeadroomDb, sensitivityDbm, budgetLabel }
+ */
+function marginalReasonFor(figures) {
+  const clauses = [];
+  // `headroomDb - marginDb` is the slack the marginal band is measured in; rounding to 2 places so the
+  // sentence prints the number the same way the rest of the budget does.
+  const slackDb = round(figures.headroomDb - figures.marginDb, 2);
+  if (slackDb < 2) {
+    clauses.push('headroom ' + figures.headroomDb + ' dB is only ' + slackDb + ' dB above the ' +
+      figures.marginDb + ' dB design margin (sensitivity ' + figures.sensitivityDbm + ' dBm)');
+  }
+  if (figures.classHeadroomDb < 1) {
+    clauses.push('only ' + figures.classHeadroomDb + ' dB of the ' + figures.budgetLabel + ' is left');
+  }
+  if (!clauses.length) {
+    return 'the design passes with under 2 dB above the ' + figures.marginDb +
+      ' dB margin or under 1 dB of its budget left - a decision to make, not a clean sign-off';
+  }
+  return clauses.join(', and ');
+}
+
+/**
  * The three numbers a pad is bought on, from the power the receiver sees at its strongest launch.
  *
  * Overload is the one failure more power cannot fix: a long-reach optic on a short duct run receives
@@ -407,10 +448,23 @@ function opticalBudget(design, registry) {
   }
 
   const verdict = verdictFor(headroomDb, marginDb, classHeadroomDb, reasons);
+  // A marginal verdict carries the figure it is tight on, so no caller rebuilds the subtraction by
+  // hand - see `marginalReasonFor`. `null` for `ok` (nothing to explain) and for `fail` (its `reasons`
+  // name the fault and the fix).
+  const marginalReason = verdict === 'marginal'
+    ? marginalReasonFor({
+      headroomDb: headroomDb,
+      marginDb: marginDb,
+      classHeadroomDb: classHeadroomDb,
+      sensitivityDbm: rxSpec.sensitivity,
+      budgetLabel: String(olt.pon).toUpperCase() + ' ' + olt.class + ' budget of ' + budgetDb + ' dB'
+    })
+    : null;
 
   return {
     ok: verdict !== 'fail',
     verdict: verdict,
+    marginalReason: marginalReason,
     technology: 'pon',
     direction: direction,
     wavelength: wavelength,
@@ -540,10 +594,21 @@ function pointToPoint(design, registry) {
   }
 
   const verdict = verdictFor(headroomDb, marginDb, classHeadroomDb, reasons);
+  // Same sentence as the PON path, with the link's own loss budget named instead of a PON class.
+  const marginalReason = verdict === 'marginal'
+    ? marginalReasonFor({
+      headroomDb: headroomDb,
+      marginDb: marginDb,
+      classHeadroomDb: classHeadroomDb,
+      sensitivityDbm: rxSpec.sensitivity,
+      budgetLabel: budgetDb + ' dB this optic pair can afford'
+    })
+    : null;
 
   return {
     ok: verdict !== 'fail',
     verdict: verdict,
+    marginalReason: marginalReason,
     technology: 'p2p',
     direction: direction,
     wavelength: wavelength,

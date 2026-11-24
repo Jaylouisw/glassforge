@@ -874,6 +874,14 @@ function evaluate(plant, opts, registry, meta) {
   // synthesised plan is the last place it is cheap to say so.
   const hotLaunch = budgets.filter(function (b) { return b.result && b.result.launchWindowPad; });
 
+  // The other verdict that is not a failure and not a clean pass. `marginal` exists because a design
+  // inside 2 dB of its margin, or with under 1 dB of class budget left, is a decision rather than a
+  // sign-off (`docs/SPEC.md` §4) - and the report counted neither it nor its number, so a synthesised
+  // plan whose ONTs all landed in the band was offered as `feasible` and ranked as the best design with
+  // nothing said. `marginalReasonFor` in `budget.js` supplies the sentence; this counts the ONTs and
+  // reports the tightest, once for the plant, the way `launchWindowNote` does for the band.
+  const marginalOnts = budgets.filter(function (b) { return b.result && b.result.verdict === 'marginal'; });
+
   const bom = bomOf(plant, registry, opts);
   const closures = plant.nodes.filter(function (n) { return n.type === 'closure'; }).length;
   const splitters = plant.nodes.filter(function (n) { return n.type === 'splitter'; }).length;
@@ -907,6 +915,7 @@ function evaluate(plant, opts, registry, meta) {
     designM: bom.designM,
     worstHeadroomDb: headrooms.length ? Math.min.apply(null, headrooms) : null,
     launchWindowOnts: hotLaunch.length,
+    marginalOnts: marginalOnts.length,
     bestHeadroomDb: headrooms.length ? Math.max.apply(null, headrooms) : null,
     longestRunM: plant.spans.reduce(function (n, s) { return Math.max(n, s.lengthM); }, 0),
     drums: bom.lines.reduce(function (n, l) { return n + l.drums; }, 0)
@@ -982,6 +991,33 @@ function evaluate(plant, opts, registry, meta) {
         ' dB margin and the class budget, so those need a different split or optic' : '');
   }
 
+  // One sentence for the plant, naming the ONT whose figure is tightest. `feasible` stays true and the
+  // verdict stays `marginal`: this is a report of the decision, not a second failure rule - the same
+  // product line as the launch-window band (#111, #132). Ties break on the ONT id so the chosen row
+  // never depends on build order.
+  let marginalNote = null;
+  if (marginalOnts.length) {
+    const tightness = function (b) {
+      // How much room is left on the two verdicts, in dB: the smaller of the margin slack and the
+      // class headroom is what makes a design marginal, so the smallest of those is the worst row.
+      const marginSlack = b.result.headroomDb - (isNum(opts.marginDb) ? opts.marginDb : DEFAULTS.marginDb);
+      return Math.min(marginSlack, b.result.classHeadroomDb);
+    };
+    const ordered = marginalOnts.slice().sort(function (a, b) {
+      const diff = tightness(a) - tightness(b);
+      if (diff !== 0) return diff;
+      return cmpIds(String(a.ont), String(b.ont));
+    });
+    const worst = ordered[0];
+    const others = marginalOnts.length - 1;
+    marginalNote = marginalOnts.length + ' of ' + budgets.length + ' ONT' +
+      (budgets.length === 1 ? '' : 's') + ' pass' + (marginalOnts.length === 1 ? 'es' : '') +
+      ' only marginally: ' + (worst.name || worst.ont) + ' - ' + worst.result.marginalReason +
+      (others > 0 ? ' (and ' + others + ' more ONT' + (others === 1 ? '' : 's') + ' in the same band)' : '') +
+      '. The design still builds - marginal is not a failure - but the figure is inside 2 dB of the ' +
+      'design margin or 1 dB of the class budget, so it is a decision to make, not a clean plan';
+  }
+
   return {
     technology: meta.technology,
     label: meta.label,
@@ -991,7 +1027,9 @@ function evaluate(plant, opts, registry, meta) {
     // candidates it is about to compare, and the candidate table never carries this field.
     unpricedCable: Array.from(new Set(unpricedCable)).sort(),
     reasons: reasons,
-    warnings: structural.warnings.concat(launchWindowNote ? [launchWindowNote] : []),
+    warnings: structural.warnings
+      .concat(launchWindowNote ? [launchWindowNote] : [])
+      .concat(marginalNote ? [marginalNote] : []),
     metrics: metrics,
     bom: bom,
     budgets: budgets.map(function (b) {
@@ -999,6 +1037,7 @@ function evaluate(plant, opts, registry, meta) {
         ont: b.ont,
         name: b.name,
         verdict: b.result ? b.result.verdict : 'fail',
+        marginalReason: b.result ? b.result.marginalReason : null,
         headroomDb: b.result ? b.result.headroomDb : null,
         rxPowerDbm: b.result ? b.result.rxPowerDbm : null,
         launchWindowPad: b.result ? b.result.launchWindowPad : null,
