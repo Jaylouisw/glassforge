@@ -1,0 +1,18 @@
+{
+  "kind": "splitter",
+  "model": "plc-1x4-sca-conn",
+  "vendor": "generic",
+  "label": "PLC 1x4 SC/APC connectorised cassette",
+  "ratio": 4,
+  "splitLossDb": 6.02,
+  "excessLossDb": 1.18,
+  "termination": "connectorised",
+  "technology": "plc",
+  "notes": "The connectorised form of plc-1x4-sca: the same 1:4 PLC chip shipped with SC/APC adapters instead of a bare input pigtail to splice. The chip figures are that row's, unchanged and from the same place: 6.02 dB ideal split (10*log10(4)) plus 1.18 dB excess = 7.2 dB without connectors, inside ITU-T G.671's insertion-loss requirement for a 1x4 branching component on a normal-reach span (WR1) of 5.4 dB min / 7.4 dB max. Both chip numbers are typical values, the excess being the difference between the observed total and the ideal split, not a figure from a vendor sheet. What the termination changes is what is charged at the splitter's input: `termination: \"connectorised\"` bills two SC/APC matings (the catalogue's own sc-apc row, 2 x 0.3 = 0.6 dB) where the spliced cassette bills one fusion splice (fusion, 0.1 dB), so this row reads 0.5 dB more ODN than the same chip spliced - the \"about 0.5 dB\" the spliced row's notes promise, and the two connectors the input actually has. Why this row exists: the two-stage 1:4-then-1:8 architecture puts a pre-terminated 1:4 cassette in the FDH or the pedestal, and the catalogue offered the connectorised choice only at 1:8 and 1:16, so a plant drawn by hand had to budget its first stage as a spliced cassette - understating that ODN by 0.5 dB - or name a product nobody sells. The trap when replacing this row: a cassette sheet that prints 'insertion loss <= 7.8 dB, SC/APC' has already counted its own connectors - compare that figure against 6.02 + 1.18 + 0.6 = 7.8 dB and leave excessLossDb alone; raising it for the connectors charges them twice. buildPon resolves a splitter as 'plc-1x' + ratio + '-sca', so auto-design never picks this row - it is for a plant that is drawn by hand, or a splitter box whose cassettes arrive pre-terminated. Replace with the bought cassette's datasheet.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.671/en",
+  "tags": [
+    "plc",
+    "1x4",
+    "connectorised"
+  ]
+}
