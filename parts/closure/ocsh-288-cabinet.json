@@ -1,0 +1,19 @@
+{
+  "kind": "closure",
+  "model": "ocsh-288-cabinet",
+  "vendor": "Channell",
+  "label": "Optimus OCSH cabinet, 288F distribution, SC/APC",
+  "type": "cabinet",
+  "ports": 288,
+  "spliceCapacity": 288,
+  "trays": 16,
+  "sourceUrl": "https://www.channell.com/wp-content/uploads/2025/05/OCSH_DS_ENG_050725.pdf",
+  "notes": "The first pad-mount cabinet in the catalogue, and the only part behind the validator's `cabinet` closure type: the FDH a feeder ends in when it hands 288 distribution fibres to the street. Figures are Channell's Optimus Fiber Distribution Hub Splice Cabinet (OCSH) data sheet, revision OCSH_DS_ENG_050725, product matrix row `OCSH 288 C` and the recommended part number OCSH288CABBNAS2AN ('288F, SC-APC, 24F feeder, 288F distribution, 12\" skirt, single-fibre'): 288F distribution capacity, splice capacity 288 carried as up to 16 Universal Splice Trays for single-fibre or ribbon splicing (16 x 18 = 288, which is why `trays` is 16 and not 288/12), 10 cable entry ports, 16 SMFH splitter module slots taking any module from 1x2 to 1x64, 24F recommended feeder (48F optional), 43 x 21.5 x 13 in shell in 5052 H32 aluminium to NEMA 4, pad/pole/wall mounting. What the engine reads: `ports` is the distribution termination count, compared against the number of cables touching the node, so a cabinet in the ordinary shape - one feeder in, two 144F distribution cables out - never trips it; `spliceCapacity` 288 is what the through-joint check weighs, and 288 strands of G.652.D ribbon are exactly at capacity, allowed rather than warned. Not modelled, and worth knowing: the 16 splitter slots and the SC/APC adapters inside the box. A splitter placed in a cabinet is still its own splitter node and is charged its own connector or splice loss; the cabinet carries no lossDb, so it buys capacity, not dB, and the patch-panel matings at a cabinet are the connector rows on the spans. Replace with the bought cabinet's configuration sheet before ordering: the tray stack is the box's rating, and the pigtails that fill it arrive pre-installed.",
+  "tags": [
+    "cabinet",
+    "fdh",
+    "feeder",
+    "distribution",
+    "288"
+  ]
+}

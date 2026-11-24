@@ -1,0 +1,19 @@
+{
+  "kind": "closure",
+  "model": "ocsh-144-cabinet",
+  "vendor": "Channell",
+  "label": "Optimus OCSH cabinet, 144F distribution, 288F splice, SC/APC",
+  "type": "cabinet",
+  "ports": 144,
+  "spliceCapacity": 288,
+  "trays": 16,
+  "sourceUrl": "https://www.channell.com/wp-content/uploads/2025/05/OCSH_DS_ENG_050725.pdf",
+  "notes": "The half-filled OCSH: the same cabinet and the same tray stack as ocsh-288-cabinet, shipped with 144 distribution adapters fitted instead of 288 (Channell data sheet OCSH_DS_ENG_050725, recommended part number OCSH288CABANAS2AN - '288F, SC-APC, 24F feeder, 144F distribution', against the 288F distribution OCSH288CABBNAS2AN). The product matrix carries one splice capacity for the whole OCSH family - `OCSH 288 C`, 288 splices in up to 16 Universal Splice Trays - so the smaller cabinet is deliberately NOT a 144-splice box: `ports` is 144 and `spliceCapacity` is 288, and that asymmetry is the point of the row. A 288F ribbon through-joint in this cabinet is at capacity, not over it, and a designer who reads '144F' as the splice figure would order that joint a bigger box for nothing. The upgrade path is the sheet's 144F quick upgrade kit (12F adapter expansion panels plus a tray-stack assembly) - this row is the before state of that kit, so swapping it to ocsh-288-cabinet models the upgrade without redrawing the plant. What the engine reads: `ports` against the cables touching the node, `spliceCapacity` against the strands passing through it; 10 cable entry ports, 16 SMFH splitter module slots (1x2 to 1x64) and the SC/APC adapters are published figures the engine has no field for, and the cabinet carries no lossDb. Replace with the bought cabinet's configuration sheet before ordering.",
+  "tags": [
+    "cabinet",
+    "fdh",
+    "feeder",
+    "distribution",
+    "144"
+  ]
+}
