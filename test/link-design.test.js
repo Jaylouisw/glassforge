@@ -209,3 +209,36 @@ test('a link with one end missing is a caller error, not a design', function () 
   throws(function () { link.design({ sites: { a: A, b: B }, optics: ER, protection: 'maybe' }, registry); }, 'protection must be');
   throws(function () { link.design({ sites: { a: A, b: B }, optics: { a: 'sfp-1g-lx-10km', b: 'sfp-plus-10g-lr-10km' } }, registry); }, 'different rates');
 });
+
+test('a cable that cannot carry the fibres asked for is refused, not bought short', function () {
+  // A 24-fibre link on a 2-fibre drop cable used to come back `verdict: 'ok'` with one 2-fibre cable in
+  // the BOM: the leg reported `fiberCount: 2` next to `fibres: 24` and nothing objected. That is the
+  // failure `network.strandLedger` exists to catch in a plant - a cable somebody orders and cannot
+  // splice - and a link is the one place a cable may be named by hand, so it is the one place the
+  // ladder cannot guarantee the fit.
+  const err = throws(function () {
+    link.design({ sites: { a: A, b: B }, optics: ER, fibres: 24, cable: 'g657a2-drop-2' }, registry);
+  }, 'carries 2 fibres but this link asks for 24');
+  // The refusal names cables that do fit, so the caller knows what to choose instead.
+  assert.ok(String(err.message).indexOf('g652d-loose-24') !== -1, err.message);
+
+  // The ladder falls back to its largest cable when nothing in it carries the count, which is right
+  // for an auto-design tree (it bundles) and wrong for a link: 200 fibres on a 144-fibre ladder is a
+  // refusal, and the catalogue's 288-fibre ribbon is named as the way out.
+  const over = throws(function () {
+    link.design({ sites: { a: A, b: B }, optics: ER, fibres: 200 }, registry);
+  }, 'carries 144 fibres but this link asks for 200');
+  assert.ok(String(over.message).indexOf('g652d-ribbon-288') !== -1, over.message);
+
+  // Nothing in the catalogue is big enough: say so instead of inventing a suggestion.
+  throws(function () {
+    link.design({ sites: { a: A, b: B }, optics: ER, fibres: 400 }, registry);
+  }, 'no cable in the catalogue carries 400 fibres');
+
+  // Fewer strands than the cable carries is normal - a 24-fibre cable used for 24 fibres passes.
+  const fits = link.design({ sites: { a: A, b: B }, optics: ER, fibres: 24, cable: 'g652d-loose-24' }, registry);
+  assert.strictEqual(fits.ok, true, fits.reasons.join(' | '));
+  assert.strictEqual(fits.legs[0].fiberCount, 24);
+  assert.strictEqual(fits.bom.cable.length, 1);
+  assert.strictEqual(fits.bom.cable[0].model, 'g652d-loose-24');
+});

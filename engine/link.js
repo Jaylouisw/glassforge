@@ -182,6 +182,29 @@ function jointNodes(graph, nodes) {
   return out;
 }
 
+/**
+ * A span may use fewer strands than its cable carries, never more.
+ *
+ * `design.cableFor` answers with the largest cable in the ladder when nothing in the ladder fits, which
+ * is correct for an auto-design tree (the tree bundles cables per span) and wrong for a circuit (one
+ * cable per leg). An explicit `cable` is never checked by the ladder at all, so a 24-fibre link could be
+ * designed on 2-fibre drop cable and come back `ok` with a BOM nobody can splice - the overbooking
+ * `network.strandLedger` refuses in a plant. The refusal names the cables that would carry the count,
+ * because "that one is too small" is only half an answer.
+ */
+function cableForFibres(cable, fibres, registry) {
+  if (cable.fiberCount >= fibres) return cable;
+  const fits = registry.all('cable')
+    .filter(function (c) { return c.fiberCount >= fibres; })
+    .map(function (c) { return c.model; })
+    .sort();
+  throw new Error('cable "' + cable.model + '" carries ' + cable.fiberCount +
+    ' fibres but this link asks for ' + fibres + ' per leg - a span cannot use more strands than its cable has' +
+    (fits.length
+      ? '; cables that carry ' + fibres + ' fibres: ' + fits.join(', ')
+      : '; no cable in the catalogue carries ' + fibres + ' fibres'));
+}
+
 function describeShared(segment) {
   if (segment.kind === 'site-spur') return segment.lengthM + ' m of site drop shared by both legs';
   return segment.lengthM + ' m of duct ' + latLon(segment.from) + ' -> ' + latLon(segment.to) +
@@ -370,9 +393,11 @@ function design(input, registry) {
     const leasedM = round(sum(leased, function (seg) { return seg.lengthM; }), 2);
     const joints = graph ? jointNodes(graph, routed.nodes) : [];
     const splices = opts.splices !== undefined ? opts.splices : round(joints.length * opts.splicesPerJoint, 0);
-    const cable = opts.cable
-      ? registry.get('cable', opts.cable)
-      : designModule.cableForSpan(opts.fibres, ownM, opts.ladder, registry);
+    const cable = cableForFibres(
+      opts.cable
+        ? registry.get('cable', opts.cable)
+        : designModule.cableForSpan(opts.fibres, ownM, opts.ladder, registry),
+      opts.fibres, registry)
 
     const budgetResult = budget.pointToPoint({
       headEnd: { model: opts.optics.a },
