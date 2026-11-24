@@ -104,4 +104,60 @@ test('an XG-PON OLT and a GPON ONT cannot share a PON', function () {
   }, 'cannot share a PON', 'xg-pon OLT with a gpon ONT');
 });
 
+test('the reduced-budget XG-PON ONU carries the receiver Table 9-3 prints for N2b/E2b', function () {
+  // G.987.2 (2023) Amd. 1, Table 9-3: the ONU receiver row is -28.0 / -28.0 / -21.5 / -28.0 / -28.0 /
+  // -21.5 dBm over N1 / N2a / N2b / E1 / E2a / E2b, and -8.0 / -8.0 / -3.5 / -8.0 / -8.0 / -3.5 for
+  // overload - two ONU types, one per sensitivity. Table 9-4 has no N2b column, so the launch is the
+  // ordinary XG-PON ONT's +2.0..+7.0 dBm.
+  const ont = registry.get('ont', 'xg-pon-ont-n2b-1xge');
+  assert.strictEqual(ont.rxSensitivityDbm, -21.5, 'N2b/E2b ONU sensitivity is -21.5 dBm');
+  assert.strictEqual(ont.rxOverloadDbm, -3.5, 'N2b/E2b ONU overload is -3.5 dBm');
+  assert.strictEqual(ont.txPowerDbmMin, 2, 'ONU launch MIN is +2.0 dBm on every class');
+  assert.strictEqual(ont.txPowerDbmMax, 7, 'ONU launch MAX is +7.0 dBm on every class');
+
+  // The cost of the cheaper receiver on an ordinary card, measured on one span both ways:
+  // 20 km x 0.22 (G.652.D at 1490 nm) = 4.4; 2 splices = 0.2; 2 connector pairs = 0.6 -> ODN 5.2 dB.
+  // N2a launches +4.0 at its floor, so the receiver sees -1.2 dBm: 28 - 1.2 = 26.8 dB of headroom into
+  // the -28 dBm ONT and 21.5 - 1.2 = 20.3 dB into this one - the 6.5 dB the class spends elsewhere.
+  const design = {
+    olt: { model: 'xg-pon-n2-16' },
+    wavelength: '1490',
+    spans: [{ cable: 'g652d-loose-12', lengthM: 20000 }],
+    splices: 2,
+    connectors: 2
+  };
+  const plain = budget.opticalBudget(Object.assign({}, design, { ont: { model: 'xg-pon-ont-1xge' } }), registry);
+  const cheap = budget.opticalBudget(Object.assign({}, design, { ont: { model: 'xg-pon-ont-n2b-1xge' } }), registry);
+  close(plain.odnLossDb, 5.2, 0.001, 'ODN loss');
+  close(plain.headroomDb, 26.8, 0.01, 'headroom into the -28 dBm ONT');
+  close(cheap.headroomDb, 20.3, 0.01, 'headroom into the -21.5 dBm ONT');
+  close(plain.headroomDb - cheap.headroomDb, 6.5, 0.001, 'the reduced receiver costs 6.5 dB');
+  // Both rows still clear the 31 dB N2 class: 31 - 5.2 = 25.8 dB of class headroom. The class verdict
+  // cannot tell the two ONTs apart - only the receiver headroom can, which is why both are kept.
+  close(cheap.classHeadroomDb, 25.8, 0.01, 'class headroom');
+});
+
+test('the N2b ONU is only safe at or above the class floor, and the pad is sized at the ceiling', function () {
+  // -3.5 dBm overload against N2's 16 dB minimum ODN loss is the same number twice: 12.5 (N2b launch
+  // MAX) + 3.5 = 16.0. A 100 m span is 0.02 dB, so an N2a card paints 8 - 0.02 = 7.98 dBm at the ONT,
+  // 7.98 + 3.5 = 11.48 dB over its overload point, and the pad must hold at the top of the window:
+  // 8 - 0.02 - 12 = -4.02 dBm, inside -3.5.
+  const r = budget.opticalBudget({
+    olt: { model: 'xg-pon-n2-16' },
+    ont: { model: 'xg-pon-ont-n2b-1xge' },
+    wavelength: '1490',
+    spans: [{ cable: 'g652d-loose-12', lengthM: 100 }],
+    splices: 0,
+    connectors: 0
+  }, registry);
+  close(r.headroomDb, 25.48, 0.01, 'headroom at the launch floor');
+  assert.ok(r.attenuator, 'a 4 dBm launch into a -3.5 dBm receiver must report an attenuator');
+  assert.strictEqual(r.attenuator.overDb, 11.48);
+  assert.strictEqual(r.attenuator.padDb, 12);
+  assert.strictEqual(r.attenuator.atTxDbm, 8, 'the pad is sized for the top of the launch window');
+  assert.strictEqual(r.verdict, 'fail', 'a pad is still a fail until it is in the BOM');
+  assert.ok(r.reasons.some(function (why) { return why.indexOf('xg-pon-ont-n2b-1xge') !== -1 && why.indexOf('overload') !== -1; }),
+    'the verdict must name the ONT and the overload point: ' + r.reasons.join(' | '));
+});
+
 done();

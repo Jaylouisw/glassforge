@@ -1,0 +1,21 @@
+{
+  "kind": "ont",
+  "model": "xg-pon-ont-n2b-1xge",
+  "vendor": "generic",
+  "label": "XG-PON1 ONT class N2b/E2b 1x 10GE",
+  "pon": "xg-pon",
+  "txPowerDbmMin": 2,
+  "txPowerDbmMax": 7,
+  "rxSensitivityDbm": -21.5,
+  "rxOverloadDbm": -3.5,
+  "ports": {
+    "10ge": 1
+  },
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.987.2/en",
+  "tags": [
+    "xg-pon",
+    "n2b",
+    "e2b"
+  ],
+  "notes": "The reduced-sensitivity XG-PON ONU, per ITU-T G.987.2 (2023) Amd. 1 (06/2023). Clause 9.2 opens with 'There are two ONU types, based on different ONU receiver sensitivity', and Table 9-3 (9.95328 Gbit/s downstream) gives both on one row: ODN class N1 / N2a / N2b / E1 / E2a / E2b has ONU minimum sensitivity -28.0 / -28.0 / -21.5 / -28.0 / -28.0 / -21.5 dBm and minimum overload -8.0 / -8.0 / -3.5 / -8.0 / -8.0 / -3.5 dBm. N2b and E2b therefore print the same receiver, which is why one row serves both classes: -21.5 dBm sensitivity, -3.5 dBm overload. The upstream figures are NOT split: Table 9-4 (2.48832 Gbit/s upstream) has only the four class columns N1 / N2 / E1 / E2 - OLT receiver -27.5 / -29.5 / -31.5 / -33.5 dBm, overload -7.0 / -9.0 / -11 / -13 dBm - and one ONU transmit range of +2.0..+7.0 dBm for every class, so this row's launch is the ordinary XG-PON ONT's. The N2b/E2b split is a downstream-receiver split, not an upstream one. Where the 6.5 dB went: the OLT side of the pair pays for the cheaper receiver with a hotter launch, Table 9-3 mean launched power N2b +10.5..+12.5 dBm and E2b +14.5..+16.5 dBm, against an N2a card's +4.0..+7.0 and an E2a card's +8.0..+11.0. Those land the same 1 dB of slack every other XG-PON row here has: 10.5 - (-21.5) = 32.0 dB downstream against the 31 dB N2 class (Table 6-1: N2 is 16-31 dB), and 14.5 - (-21.5) = 36.0 dB against the 35 dB E2 class (20-35 dB). The -3.5 dBm overload is not a defect, it is the other end of the class floor: at the N2b ceiling 12.5 - (-3.5) = 16.0 dB, exactly N2's published minimum ODN loss, and 16.5 + 3.5 = 20.0 dB is exactly E2's. So this ONU is safe only on an ODN at or above the class floor - a back-to-back test patch or a 2 km spur into an N2b port overdrives it, and the budget's attenuator verdict names the pad rather than more reach - measured on this row against an N2a card: a 100 m span arrives at 3.98 dBm, 11.48 dB above the -3.5 dBm point, and the verdict asks for a 12 dB pad sized at the 8 dBm top of the launch window. What the catalogue cannot express yet: there is no N2b/E2b OLT row, because the class table in engine/parts.js CLASS_BUDGET_DB has no 'xg-pon-n2b' key and an OLT spec whose class is unknown to that table is rejected outright. So a boosted port cannot be entered as one today. Pairing this ONU with the ordinary card (xg-pon-n2-16, launch floor +4.0 dBm) is what can be budgeted, and it reads 4.0 - (-21.5) = 25.5 dB of downstream headroom against the card's 31 dB class - 6.5 dB less than the -28.0 dBm row would claim for the same ODN. That 25.5 dB is the true limit of the pairing, not a bug: a reduced-budget ONU on an ordinary port gives up 6.5 dB. Measured: 20 km of G.652.D with two splices and two connector pairs is 5.2 dB of ODN and reads 20.3 dB of headroom into this ONU against 26.8 dB into xg-pon-ont-1xge - the same span, the same card, 6.5 dB apart. Caveats that travel with the figures: sensitivity is quoted at the recommendation's BER reference level of 10^-3 (Table 9-3, Note 4 pointing at G-Sup.39 clause 9.4.1), the pre-FEC operating point, so a host with XG-PON FEC disabled is not this row; and Note 5 requires it in the presence of G-PON and video overlay on the same ODN. Class figures from the recommendation, not one measured ONT: replace the row with the ONT actually purchased before construction."
+}
