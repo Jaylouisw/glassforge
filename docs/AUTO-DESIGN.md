@@ -24,6 +24,18 @@ cheapest feasible one wins.
 
 Each candidate is reported whether it wins or not, with its numbers and the reason it was refused.
 
+## In the UI
+
+The same request is the **Auto-design** panel in `web/`: paste the list into the demand box, type the
+head-end's latitude and longitude, optionally import a street network (KML/KMZ) for the panel to send
+as `network`, and press **Design**. The result opens on the Auto tab with the winner's label, the
+`rationale` lines, the winning design's budget warnings and the candidate table. The panel's
+technology select is the endpoint's `technology`: `auto`, `pon` or `active`.
+
+**Apply to this project** re-sends the request with `applyToProject`, so the plant replaces the open
+project's plant in one undo step. With no project open the button does nothing, because there is
+nothing to apply it to.
+
 ## The pipeline
 
 ```
@@ -328,4 +340,5 @@ the path the light takes).
   `bom.splices`. It is a labour estimate, not a splice plan. Folding the labour count into the budget
   charged a 24-fibre leg 24 × 0.10 dB at a single joint: the same duct route passed on 2 fibres and
   failed on 24 with nothing changed in the glass or the optics.
-- No UI yet: the endpoint and the engine are the contract this landed with.
+- No geocoding and no basemap in the panel: the head-end is typed as latitude and longitude, and a
+  street network has to be imported rather than fetched.
