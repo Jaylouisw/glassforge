@@ -44,6 +44,13 @@ const PON_DESIGN_FIELDS = ['direction', 'wavelength', 'olt', 'ont', 'spans', 'sp
   'connectors', 'connectorModel', 'splitters', 'thirdParty', 'allowanceDb', 'marginDb', 'txDbm'];
 const ACTIVE_DESIGN_FIELDS = ['direction', 'wavelength', 'headEnd', 'cpe', 'spans', 'splices', 'spliceModel',
   'connectors', 'connectorModel', 'thirdParty', 'allowanceDb', 'marginDb', 'txDbm'];
+// The **project** budget (`network.designForOnt` as the server calls it) is not handed a design: it
+// builds the spans, splices and connectors from the plant it traced, and reads only these knobs off the
+// request body. `ontId` is the server's own narrowing key, not a budget field, and is listed because a
+// body carrying it is not a typo. Kept separate from the two design lists for the same reason they are
+// separate from each other: a near miss is refused against the fields the reader really reads.
+const PROJECT_BUDGET_FIELDS = ['ontId', 'direction', 'wavelength', 'spliceModel', 'connectorModel',
+  'marginDb', 'allowanceDb', 'txDbm'];
 
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 function round(n, places) {
@@ -672,6 +679,20 @@ function assertDesignKnobs(design, what) {
 }
 
 /**
+ * Refuse a **project budget** body whose key is a near miss of one the budget reads.
+ *
+ * The project budget is the one endpoint that takes its knobs off a hand-written body and then hands
+ * that body to `network.designForOnt`, which reads eight named fields. Without this guard a near miss
+ * was simply not read: `{"margindb": 40}` answered `200` with `marginDb: 3` echoed, so a link 30 dB
+ * short of the reserve the caller asked for was signed off - the same defect `opticalBudget` refuses
+ * one endpoint over, and the same narrow rule (case, plural, prefix, one letter wrong); a key that is
+ * not a near miss of a field that exists is still ignored.
+ */
+function assertProjectBudgetFields(body) {
+  designFields.assertKnownFields(body, PROJECT_BUDGET_FIELDS, 'the project budget');
+}
+
+/**
  * Run a PON budget.
  *
  * `design` (all lengths in metres):
@@ -964,6 +985,7 @@ function pointToPoint(design, registry) {
 
 module.exports = {
   assertDesignKnobs: assertDesignKnobs,
+  assertProjectBudgetFields: assertProjectBudgetFields,
   DEFAULT_MARGIN_DB: DEFAULT_MARGIN_DB,
   DEFAULT_SPLICE_MODEL: DEFAULT_SPLICE_MODEL,
   DEFAULT_CONNECTOR_MODEL: DEFAULT_CONNECTOR_MODEL,

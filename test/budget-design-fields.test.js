@@ -252,4 +252,53 @@ test('an endpoint object carrying its own metadata still budgets, unchanged', fu
   close(rich.rxPowerDbm, plain.rxPowerDbm, 0.001, 'same launch with metadata on the ends');
 });
 
+// The third reader: the **project** budget. The server hands a request body to `designForOnt`, which
+// reads eight named keys off it, so a near miss there is the same skipped setting - and it was not
+// refused at all. A body of `{ "margindb": 40 }` answered 200 with `marginDb: 3` echoed: the reserve was
+// never applied and a link 30 dB short of the one the caller asked for came back `ok`.
+test('the project budget refuses a near miss of a key it reads', function () {
+  throws(function () { budget.assertProjectBudgetFields({ margindb: 40 }); }, 'marginDb', 'the field that was meant');
+  throws(function () { budget.assertProjectBudgetFields({ ontid: 'd1-ont-d1' }); }, 'ontId', 'the narrowing key');
+  throws(function () { budget.assertProjectBudgetFields({ margin: 6 }); }, 'marginDb', 'the prefix of a real field');
+});
+
+test('every key the project budget reads passes, and so does metadata', function () {
+  // The refusal is narrow, so a body made only of the eight keys must pass - a guard that refused one of
+  // them would refuse the endpoint correct request - and so must unrelated metadata, because a caller
+  // who is not wrong is not refused.
+  let error = null;
+  try {
+    budget.assertProjectBudgetFields({
+      ontId: 'd1-ont-d1', direction: 'up', wavelength: '1310', spliceModel: 'fusion',
+      connectorModel: 'sc-apc', marginDb: 4, allowanceDb: 1, txDbm: 5,
+      notes: 'surveyed 2026-11-19', name: 'west estate'
+    });
+  } catch (err) { error = err; }
+  assert.strictEqual(error, null, error ? error.message : 'an allowed key was refused');
+});
+
+// Reading the list against the reader: a key the budget reads but the guard forgot is unprotected, and a
+// key the guard lists but nobody reads is a refusal nobody should trust. A case slip, a plural or a
+// prefix on each of the eight is refused with the real name, so the list cannot silently shrink.
+test('a slip on each of the eight project-budget keys is refused with the real name', function () {
+  const slips = [
+    ['ontid', 'ontId'],
+    ['directions', 'direction'],
+    ['wavelengths', 'wavelength'],
+    ['splicemodel', 'spliceModel'],
+    ['connectormodel', 'connectorModel'],
+    ['margin', 'marginDb'],
+    ['allowance', 'allowanceDb'],
+    ['txdbm', 'txDbm']
+  ];
+  slips.forEach(function (pair) {
+    const body = {};
+    body[pair[0]] = 1;
+    let message = '';
+    try { budget.assertProjectBudgetFields(body); } catch (err) { message = err.message; }
+    assert.ok(message.indexOf('did you mean "' + pair[1] + '"') !== -1,
+      'key "' + pair[0] + '" should name ' + pair[1] + ', got: ' + (message || 'no refusal'));
+  });
+});
+
 done();

@@ -420,6 +420,12 @@ async function handle(req, res, ctx) {
       // the typo the caller actually made. `marginDb: -5` used to pass every link that was short.
       try {
         engine.budget.assertDesignKnobs(body, 'the project budget');
+        // The knobs this endpoint reads off the body are a fixed list, and a *near miss* of one is the
+        // same defect `/api/design/budget` refuses by name: `{"margindb": 40}` was not read, so the
+        // budget answered 200 with `marginDb: 3` echoed and a link 30 dB short of the reserve the
+        // caller asked for came back `ok`. The guard stays narrow - only a case slip, a plural, a
+        // prefix or one letter wrong - so a caller's own metadata still passes through.
+        engine.budget.assertProjectBudgetFields(body);
       } catch (err) {
         throw asBadRequest(err);
       }

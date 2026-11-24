@@ -481,6 +481,25 @@ async function main() {
     assert.ok(projectNegativeMargin.body.error.indexOf('marginDb') !== -1, projectNegativeMargin.body.error);
   });
 
+  // The project budget reads eight keys off the body and hands it to `designForOnt`. A near miss of one
+  // of them is the same defect the design budget refuses by name, one endpoint over: `margindb: 40`
+  // answered 200 with `marginDb: 3` echoed, so a link short of the reserve the caller asked for came
+  // back `ok` - the typo removed a requirement without removing a number from the answer.
+  const typoProjectMargin = await request('POST', '/api/projects/' + id + '/budget', { margindb: 6 });
+  const bookkeeping = await request('POST', '/api/projects/' + id + '/budget', {
+    notes: 'surveyed 2026-11-19', name: 'west estate'
+  });
+  test('a near-miss budget field is a 400 on the project budget too', function () {
+    assert.strictEqual(typoProjectMargin.status, 400,
+      'status ' + typoProjectMargin.status + ': ' + JSON.stringify(typoProjectMargin.body));
+    assert.ok(typoProjectMargin.body.error.indexOf('"margindb"') !== -1, typoProjectMargin.body.error);
+    assert.ok(typoProjectMargin.body.error.indexOf('marginDb') !== -1, typoProjectMargin.body.error);
+    // The refusal stays narrow: a key that is not a near miss of one the budget reads is still ignored,
+    // because refusing every unknown key would refuse a caller who is not wrong.
+    assert.strictEqual(bookkeeping.status, 200,
+      'status ' + bookkeeping.status + ': ' + JSON.stringify(bookkeeping.body));
+  });
+
   // A JSON body of `null` is valid JSON and is what a client sends when it has no object to send.
   // Every handler reads a field off the body, so the first access threw a TypeError and the generic
   // handler answered 500 "Cannot read properties of null (reading 'demand')" - the caller was told
