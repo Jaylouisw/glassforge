@@ -87,15 +87,22 @@ async function main() {
   });
 
   // The other half of the guard: a design that is clean at every launch must still print as clean.
-  // 1:4 (7.2 dB) over 600 m of G.652.D (0.13 dB) plus 2 splices and 2 connectors is about 8.4 dB,
-  // an ODN loss no C+ line card can overdrive - the warning list must stay empty.
+  //
+  // This used to seed 1:4 over 600 m - about 8.4 dB of ODN - and call it clean because the *warning*
+  // list was empty. It was not clean: 8.4 dB against a +3..+7 dBm C+ launch puts the ONT at -5.4 to
+  // -1.4 dBm, over its -8 dBm overload point, so the budget was `fail` and the plan printed
+  // "No errors and no warnings" over it (#138). A genuinely clean plant needs an ODN deep enough
+  // that the top of the launch window is still inside overload: 1:8 (9.03 + 1.47 = 10.50) over
+  // 20 km of G.652.D (4.40), 2 splices (0.20), connectors and the 40 m drop (0.51) = 15.61 dB.
+  // Rx is -12.61 dBm at +3 dBm (17.39 dB of headroom) and -8.61 dBm at +7 dBm - 0.61 dB inside the
+  // overload point, so neither `attenuator` nor the launch-window band is set.
   const clean = await request('POST', '/api/projects', { name: 'Clean' });
   const cleanId = clean.body.id;
   for (const step of [
     { op: 'add-node', node: { type: 'olt', model: 'gpon-c-plus-8', name: 'OLT' } },
-    { op: 'add-node', node: { type: 'splitter', model: 'plc-1x4-sca', name: 'Splitter' } },
+    { op: 'add-node', node: { type: 'splitter', model: 'plc-1x8-sca', name: 'Splitter' } },
     { op: 'add-node', node: { type: 'ont', model: 'gpon-ont-4ge', name: 'Casa 40' } },
-    { op: 'add-span', span: { from: 'n1', to: 'n2', cable: 'g652d-loose-24', lengthM: 600, splices: 2, closures: 1 } },
+    { op: 'add-span', span: { from: 'n1', to: 'n2', cable: 'g652d-loose-24', lengthM: 20000, splices: 2, closures: 1 } },
     { op: 'add-span', span: { from: 'n2', to: 'n3', cable: 'g657a2-drop-1', lengthM: 40 } }
   ]) {
     const answer = await request('POST', '/api/projects/' + cleanId + '/ops', step);
@@ -108,6 +115,73 @@ async function main() {
       JSON.stringify(cleanBudget.body.budgets[0].result.warnings));
     assert.ok(cleanPrinted.text.indexOf('No errors and no warnings.') !== -1,
       'the plan now claims a warning for a design with none');
+  });
+
+  // ---- the verdict itself, not only its warnings (#138) ------------------------------------------
+  //
+  // The plan's Checks section carried `project.check` (structural, and by its own comment it never
+  // runs an optical budget) plus every budget's *warnings*. A budget's `reasons` - and the verdict
+  // at all - were never asked for, so a link the engine calls `fail` printed "No errors and no
+  // warnings." on the page a crew signs off.
+  //
+  // Numbers: B+ (28 dB class) through a 1:64 at 20 km of G.652.D with one closure and a 40 m drop.
+  // The budget follows the topology, not `span.splices`: 20 km x 0.22 = 4.40, drop 0.01, one closure
+  // = one splice 0.10, 2 connectors 0.60, 1:64 = 20.50 (18.06 ideal + 2.44 excess) -> ODN 25.61 dB.
+  // Tx +1.5 dBm puts -24.11 dBm on a -27 dBm receiver: 2.89 dB of headroom, below the 3 dB margin,
+  // so `fail`. At 16 km the fibre is 3.52 dB instead of 4.40: ODN 24.73 dB, 3.77 dB of headroom -
+  // inside the `marginal` band (< margin + 2) rather than failing.
+  function longFeeder(metres, ontName) {
+    return [
+      { op: 'add-node', node: { type: 'olt', model: 'gpon-b-plus-8', name: 'OLT' } },
+      { op: 'add-node', node: { type: 'splitter', model: 'plc-1x64-sca', name: 'Splitter' } },
+      { op: 'add-node', node: { type: 'ont', model: 'gpon-ont-1ge', name: ontName } },
+      { op: 'add-span', span: { from: 'n1', to: 'n2', cable: 'g652d-loose-96', lengthM: metres, closures: 2 } },
+      { op: 'add-span', span: { from: 'n2', to: 'n3', cable: 'g657a2-drop-1', lengthM: 40 } }
+    ];
+  }
+
+  async function seedPlant(name, steps) {
+    const created = await request('POST', '/api/projects', { name: name });
+    const id = created.body.id;
+    for (const step of steps) {
+      const answer = await request('POST', '/api/projects/' + id + '/ops', step);
+      if (answer.status !== 200) throw new Error('seed op ' + step.op + ' failed: ' + answer.text);
+    }
+    return id;
+  }
+
+  const failingId = await seedPlant('Failing link', longFeeder(20000, 'Casa 7'));
+  const failingBudget = await request('POST', '/api/projects/' + failingId + '/budget', {});
+  const failingRing = failingBudget.body.budgets[0].result;
+  const failingPrinted = await request('GET', '/print/project/' + failingId);
+
+  test('a budget that fails is an error on the printed plan, in its own words', function () {
+    assert.strictEqual(failingRing.verdict, 'fail', 'the engine must call this link a failure first');
+    assert.strictEqual(failingRing.reasons.length, 1, failingRing.reasons.join(' | '));
+    assert.ok(failingPrinted.text.indexOf('No errors and no warnings') === -1,
+      'the plan a crew signs off says there is nothing to report while its budget fails');
+    assert.ok(failingPrinted.text.indexOf('Casa 7') !== -1,
+      'a failing budget in a plan must name the ONT it is about');
+    assert.ok(failingPrinted.text.indexOf(failingRing.reasons[0]) !== -1,
+      'the plan does not carry the reason the engine gave: ' + failingRing.reasons[0]);
+  });
+
+  const marginalId = await seedPlant('Marginal link', longFeeder(16000, 'Casa 8'));
+  const marginalBudget = await request('POST', '/api/projects/' + marginalId + '/budget', {});
+  const marginalRing = marginalBudget.body.budgets[0].result;
+  const marginalPrinted = await request('GET', '/print/project/' + marginalId);
+
+  test('a marginal budget is a warning on the printed plan, never a failure and never silence', function () {
+    assert.strictEqual(marginalRing.verdict, 'marginal', 'this plant is the marginal band');
+    assert.strictEqual(marginalRing.reasons.length, 0, marginalRing.reasons.join(' | '));
+    assert.ok(marginalPrinted.text.indexOf('No errors and no warnings') === -1,
+      'a marginal design is a decision somebody has to make, and the plan says nothing');
+    assert.ok(marginalPrinted.text.indexOf('Casa 8') !== -1,
+      'the marginal line must name the ONT it is about');
+    assert.ok(marginalPrinted.text.indexOf('marginal') !== -1,
+      'the plan does not carry the verdict word the engine returned');
+    assert.strictEqual(marginalPrinted.text.indexOf('class="err"'), -1,
+      'a marginal verdict builds; only a fail is an error on the plan');
   });
 
   // The app's Signal tab is the other surface. It is an IIFE with no exports, so the guard here is

@@ -828,28 +828,55 @@ function printPage(req, res, project, registry) {
   // structural - it never runs an optical budget - so a link that is clean only at the bottom of
   // its launch window (#111) printed as "No errors and no warnings" while the Signal tab said
   // nothing either. A plan is signed off from this page, so the band has to be on it.
+  //
+  // The *verdict* belongs on it too (#138). `warnings` was the only field asked for, so a budget the
+  // engine calls `fail` - headroom under the margin, or an ODN over the PON class - printed
+  // "No errors and no warnings." on the page somebody signs the build off from. `project.check` is
+  // structural by design and cannot catch it, and `reasons` is the field a crew acts on.
   const signalWarnings = [];
+  const signalErrors = [];
   let budgetRows = [];
   try {
     budgetRows = engine.network.allOntBudgets(project, registry, {});
   } catch (err) {
-    signalWarnings.push('the optical budget could not be run: ' + err.message);
+    // A budget that cannot be run is not a clean plan: an unknown link is exactly what nobody can
+    // sign off. As a warning it read as a remark beside a section that said nothing about the verdict.
+    signalErrors.push('the optical budget could not be run: ' + err.message);
   }
   for (const row of budgetRows) {
-    if (!row.result) continue;
     const label = row.name || row.ont;
-    (row.result.warnings || []).forEach(function (w) {
+    if (row.error) {
+      // An ONT whose path cannot be budgeted (an unknown model, no route to the OLT) is a row with
+      // an `error`, not a result - it used to be dropped from this page entirely.
+      signalErrors.push(label + ': ' + row.error);
+      continue;
+    }
+    if (!row.result) continue;
+    const result = row.result;
+    if (result.verdict === 'fail') {
+      signalErrors.push(label + ': ' + (result.reasons.length
+        ? result.reasons.join('; ')
+        : 'the optical budget failed'));
+    } else if (result.verdict === 'marginal') {
+      // `marginal` has no sentence of its own - it is the band the engine invented because the
+      // design builds but needs a decision - so the plan names the figure that put it there.
+      signalWarnings.push(label + ': the optical budget is marginal, not ok - headroom ' +
+        result.headroomDb + ' dB against the ' + result.marginDb + ' dB margin, ' +
+        result.classHeadroomDb + ' dB of class budget left');
+    }
+    (result.warnings || []).forEach(function (w) {
       signalWarnings.push(label + ': ' + w);
     });
   }
 
   out.push('<h2>Checks</h2>');
+  const planErrors = check.errors.concat(signalErrors);
   const planWarnings = check.warnings.concat(signalWarnings);
-  if (!check.errors.length && !planWarnings.length) {
+  if (!planErrors.length && !planWarnings.length) {
     out.push('<p class="muted">No errors and no warnings.</p>');
   } else {
-    if (check.errors.length) {
-      out.push('<ul class="err">' + check.errors.map(function (e) { return '<li>' + escapeHtml(e) + '</li>'; }).join('') + '</ul>');
+    if (planErrors.length) {
+      out.push('<ul class="err">' + planErrors.map(function (e) { return '<li>' + escapeHtml(e) + '</li>'; }).join('') + '</ul>');
     }
     if (planWarnings.length) {
       out.push('<ul class="warn">' + planWarnings.map(function (w) { return '<li>' + escapeHtml(w) + '</li>'; }).join('') + '</ul>');
