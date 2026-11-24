@@ -66,6 +66,12 @@ Operations for `/ops`:
 
 A refused operation returns `400` with the reason and leaves the saved project untouched.
 
+`summary.capacity` carries the OLT's limits (`ports`, `maxSplitRatio`, `splitterCascade`,
+`theoreticalMaxOnts`) and, per splitter site, `splitterPorts: [{ node, name, model, ratio,
+portsUsed, overbooked }]` — the ratio is the cassette's output count and `portsUsed` is the branches
+leaving that site, so a downstream splitter costs its parent one port. An overbooked site also
+appears in `capacity.problems`, which is what turns a `PUT` into a `400`.
+
 ## Auto-design
 
 ```

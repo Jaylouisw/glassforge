@@ -34,6 +34,19 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A splitter has its own port count, and the plant check now reads it.** `engine.network.capacity`
+  measured the plant only against the OLT's limits (deepest cascade, total ONTs against
+  `maxSplitRatio`), so a 1:8 cassette with nine or twelve drops hanging off it validated clean: nine
+  ONTs on one 1:8 site is a cascade of 8, well inside 128, and 9 is inside `ports x ratio`. Ports are
+  now counted per site by the branches that leave it toward the customers — a downstream splitter
+  costs its parent one port however many ONTs sit behind it — and an overbooked site is an error that
+  names the node's label and id, the count, the part and the ratio. `capacity` also exposes
+  `splitterPorts: [{ node, name, model, ratio, portsUsed, overbooked }]` (`[]` for an active plant or
+  a plant whose root count cannot be resolved). New suite `test/splitter-ports` adds 8 assertions:
+  exactly eight drops pass, nine are refused by name, a legal 1:8 → 1:8 cascade keeps sp1 at one port,
+  the overbooked site is the one named, eight drops plus a child splitter is nine outputs, an
+  unconnected splitter is a not-connected warning rather than a port error, an active plant reports
+  no splitter ports, and two sites are counted one at a time.
 - **A splitter is not a splice.** `engine.network.spliceTable` reported every strand at a splitter as
   joined to the chain on the other side, so a 1:8 site's sheet said the feeder fibre was spliced
   straight through to a customer's drop — the one mis-wiring the schedule exists to prevent. A

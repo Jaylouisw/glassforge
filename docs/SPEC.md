@@ -42,6 +42,10 @@ Rules the engine enforces:
   accepts supplied ids and refuses duplicates.
 - **A cycle or an extra span is a warning, not a refusal.** You may be mid-drawing. A *contradiction*
   (two OLTs, an unknown splitter model, a split ratio over the class limit) is an error.
+- **A splitter has as many branches as it has ports.** The port count is the part's ratio, counted per
+  site: a downstream splitter costs its parent one port, and a ninth drop on a 1:8 is a contradiction,
+  because the OLT-level checks (deepest cascade, total ONTs) cannot see it — nine ONTs behind one 1:8
+  is a cascade of 8, well inside any `maxSplitRatio`.
 
 Why a tree and not a general graph: every number the planner produces — budget, splice diagram, cable
 order — is derived from the path between the OLT and one ONT. A general graph would let two of those

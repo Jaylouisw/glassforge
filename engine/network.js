@@ -300,7 +300,8 @@ function strandLedger(plant, registry) {
   };
 }
 
-/** Capacity of the plant against the OLT's own limits: ports, split ratio, ONTs per port. */
+/** Capacity of the plant against the OLT's limits and each splitter's own: ports, split ratio, ONTs
+ * per port, branches per splitter. */
 function capacity(plant, registry) {
   const onts = (plant.nodes || []).filter(function (n) { return n.type === 'ont'; });
   const splitters = (plant.nodes || []).filter(function (n) { return n.type === 'splitter'; });
@@ -319,6 +320,7 @@ function capacity(plant, registry) {
       splitters: splitters.length,
       splitterCascade: 1,
       theoreticalMaxOnts: null,
+      splitterPorts: [],
       problems: ['capacity needs exactly one olt/headend root, found ' + roots.length]
     };
   }
@@ -339,6 +341,7 @@ function capacity(plant, registry) {
       splitters: 0,
       splitterCascade: 1,
       theoreticalMaxOnts: null,
+      splitterPorts: [],
       problems: []
     };
   }
@@ -349,8 +352,8 @@ function capacity(plant, registry) {
   // Multiplying them all turned six 1:8 splitters at six different sites into a 1:262144 cascade that
   // no ONT was actually behind - and refused a perfectly good PON design.
   let maxCascade = 1;
+  const adj = adjacency(plant);
   {
-    const adj = adjacency(plant);
     const oltOrHead = (plant.nodes || []).find(function (n) {
       return n.type === 'olt' || n.type === 'headend';
     });
@@ -372,6 +375,50 @@ function capacity(plant, registry) {
     }
   }
 
+  // A splitter's own output ports, counted per site.
+  //
+  // A 1:8 cassette has eight outputs; a ninth drop behind it is a fibre with nowhere to go, and the
+  // OLT-level checks above cannot see it: nine ONTs on one 1:8 site is a cascade of 8, inside any
+  // maxSplitRatio, and 9 is inside ports x ratio too. Ports are counted by the branches that leave the
+  // splitter toward the customers, so a downstream splitter costs its site one port however many ONTs
+  // sit behind it - the mistake the cascade rule already exists to avoid, one level down. A branch is
+  // one cabled output, whether it ends at an ONT or at another splitter; a node that is drawn but
+  // never connected to the root is not behind the splitter at all, keeps its own "not connected"
+  // warning from `validate`, and is not charged to a port here.
+  const splitterPorts = [];
+  {
+    const parentOf = new Map();
+    const seen = new Set();
+    const stack = [root.id];
+    while (stack.length) {
+      const id = stack.pop();
+      if (seen.has(id)) continue;
+      seen.add(id);
+      for (const edge of adj.get(id) || []) {
+        if (seen.has(edge.to) || parentOf.has(edge.to)) continue;
+        parentOf.set(edge.to, id);
+        stack.push(edge.to);
+      }
+    }
+    const branches = new Map();
+    for (const parent of parentOf.values()) {
+      branches.set(parent, (branches.get(parent) || 0) + 1);
+    }
+    for (const node of plant.nodes || []) {
+      if (node.type !== 'splitter' || !node.model || !registry.has('splitter', node.model)) continue;
+      const part = registry.get('splitter', node.model);
+      const used = branches.get(node.id) || 0;
+      splitterPorts.push({
+        node: node.id,
+        name: node.name || node.id,
+        model: part.model,
+        ratio: part.ratio,
+        portsUsed: used,
+        overbooked: used > part.ratio
+      });
+    }
+  }
+
   const ports = olt ? olt.ports : null;
   const limitRatio = olt ? olt.maxSplitRatio : null;
   const theoreticalMax = ports && limitRatio ? ports * limitRatio : null;
@@ -380,6 +427,15 @@ function capacity(plant, registry) {
   if (olt && maxCascade > limitRatio) {
     problems.push('the deepest splitter cascade is 1:' + maxCascade + ', beyond the ' + olt.model + ' limit of 1:' + limitRatio);
   }
+  splitterPorts.forEach(function (row) {
+    if (!row.overbooked) return;
+    // Name the node by its label and its id: the label is what the planner sees on the canvas, the id
+    // is what an API caller greps for, and an unnamed node has only the id.
+    const who = row.name === row.node ? '"' + row.node + '"' : '"' + row.name + '" (' + row.node + ')';
+    const extra = row.portsUsed - row.ratio;
+    problems.push('splitter ' + who + ' has ' + row.portsUsed + ' branches on ' + row.ratio + ' output ports (' +
+      row.model + ') - ' + extra + (extra === 1 ? ' branch has' : ' branches have') + ' no port');
+  });
   if (theoreticalMax !== null && onts.length > theoreticalMax) {
     problems.push(onts.length + ' ONTs exceed ' + ports + ' ports x 1:' + limitRatio + ' = ' + theoreticalMax);
   }
@@ -393,6 +449,7 @@ function capacity(plant, registry) {
     splitters: splitters.length,
     splitterCascade: maxCascade,
     theoreticalMaxOnts: theoreticalMax,
+    splitterPorts: splitterPorts,
     problems: problems
   };
 }

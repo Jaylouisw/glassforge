@@ -22,6 +22,13 @@ point-to-point or active-over-tree design. The root node type selects the budget
 **Splitter site** — a closure that holds a splitter, reached by a 1 m **splitter tail** so a feeder
 cable passing three sites is not mistaken for three cascaded splitters.
 
+**Splitter ports** — a cassette's output count is its ratio: a 1:8 PLC has eight. Counted **per
+site**, by the branches that leave that splitter toward the customers, so a downstream splitter costs
+its parent one port however many ONTs sit behind it — the cascade rule one level down. More branches
+than ports is a contradiction (an error, not a warning): a ninth drop on a 1:8 is a fibre with nowhere
+to go. `capacity().splitterPorts` reports each site as `{ node, name, model, ratio, portsUsed,
+overbooked }`, and the overbooked ones also appear in `problems`, which `validate` turns into errors.
+
 **Cascade** — the end-to-end split ratio of the deepest root-to-leaf path: the ratios of the
 splitters on that one path multiplied together, so two 1:8 splitters in line read as
 `splitterCascade: 64`. It is not the product of every splitter in the plant — six 1:8 splitters on six
