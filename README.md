@@ -17,9 +17,11 @@ cd glassforge
 node server/index.js          # then open http://127.0.0.1:8000
 ```
 
-Node 18 or newer. No `npm install`, because there is nothing to install: the server is `http` and
-`fs`, the UI is one HTML file and three scripts (`app.js`, `scene.js`, `dom.js`), and the engine is
-plain CommonJS.
+Node 18 or newer. Nothing has to be installed to run it, because it has no runtime dependencies: the
+server is `http` and `fs`, the UI is one HTML file and three scripts (`app.js`, `scene.js`, `dom.js`)
+served verbatim, and the engine is CommonJS. New engine modules are TypeScript (`engine/geo.ts`),
+compiled in place with the emitted `.js` committed, so a clone still starts with no build — see
+[ADR 0004](docs/adr/0004-typescript-hybrid-and-no-any.md) and [Development](#development).
 
 <!-- parts:start -->
 **51 parts across 8 kinds** — 8 cables, 8 splitters, 9 OLTs, 4 ONTs, 11 transceiver, 5 closures, 4 connectors, 2 splices.
@@ -143,7 +145,9 @@ Adding a part is dropping a file in `parts/<kind>/` and running `node scripts/co
 ## Development
 
 ```bash
+npm install              # devDependencies only: the TypeScript compiler, nothing at runtime
 npm test                 # part counts, control bytes, Node 18 surface, every suite
+npm run build            # tsc in place: engine/x.ts -> engine/x.js; commit the emitted .js
 node scripts/smoke-http.js
 node scripts/audit-parts.js
 node scripts/syntax-check.js
@@ -152,6 +156,12 @@ node scripts/syntax-check.js
 `npm test` is `node scripts/run-tests.js` plus the guards that catch the failures a green suite
 cannot: a control byte inside a regex, an API that does not exist on Node 18, a README count that has
 drifted from the catalogue.
+
+`npm run build` is the gate the TypeScript modules live behind. `allowJs` is off, so a new module is a
+`.ts` file beside the legacy `.js` ones, and the compiled output is committed — CI fails when the
+committed `.js` disagrees with its source, so build before pushing and commit the emitted file.
+`any` is refused outright (`node scripts/check-no-any.js`): use `unknown` and narrow it, as
+`engine/geo.ts` does.
 
 Development happens on [the Forgejo instance](https://git.jayw.uk/jaylouisw/glassforge):
 one issue ↔ one pull request, and the CI matrix has to be green before it merges.

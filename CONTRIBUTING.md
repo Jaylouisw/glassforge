@@ -9,6 +9,7 @@ forge.
 ```bash
 git clone https://git.jayw.uk/jaylouisw/glassforge.git
 cd glassforge
+npm install   # devDependencies only — the TypeScript compiler; nothing is installed at runtime
 npm test
 ```
 
@@ -41,6 +42,16 @@ registration, which is the only way a suite cannot be silently left out of the r
   rather than with an old run.
 - **When an existing assertion fails because the behaviour it recorded was the bug, correct the
   assertion with a comment naming what it used to claim.** Never weaken the fix to keep it green.
+
+## New modules are TypeScript
+
+`engine/foo.ts` compiles in place to `engine/foo.js`, and the emitted `.js` is committed so a clone
+still runs with no build. Run `npm run build` before pushing: CI fails when the committed `.js`
+disagrees with its source, and `git status` on `*.js` after the build has to be empty. `any` is
+refused (`node scripts/check-no-any.js`) — use `unknown` and narrow it, with `engine/geo.ts` as the
+reference. A test stays `.js`, because `scripts/run-tests.js` only discovers `*.test.js`; a suite that
+exists solely as `.ts` is silently skipped. The reasoning and the pitfalls are in
+[docs/adr/0004-typescript-hybrid-and-no-any.md](docs/adr/0004-typescript-hybrid-and-no-any.md).
 
 ## Documentation is part of the change
 
