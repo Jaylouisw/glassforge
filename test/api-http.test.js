@@ -306,6 +306,29 @@ async function main() {
     assert.ok(badBudget.body.error.indexOf('design.olt.model') !== -1, badBudget.body.error);
   });
 
+  // A JSON body of `null` is valid JSON and is what a client sends when it has no object to send.
+  // Every handler reads a field off the body, so the first access threw a TypeError and the generic
+  // handler answered 500 "Cannot read properties of null (reading 'demand')" - the caller was told
+  // the server broke when the request was the thing that was wrong. A body that is not an object has
+  // no fields, so it is refused once, at the door, naming what arrived.
+  const nullBodyCreate = await request('POST', '/api/projects', null);
+  const nullBodyDemand = await request('POST', '/api/import/demand', null);
+  const nullBodySynthesis = await request('POST', '/api/design/synthesise', null);
+  test('a null JSON body is a 400 naming the body, not a 500 TypeError', function () {
+    [nullBodyCreate, nullBodyDemand, nullBodySynthesis].forEach(function (answer) {
+      assert.strictEqual(answer.status, 400, 'status ' + answer.status + ': ' + JSON.stringify(answer.body));
+      assert.strictEqual(answer.body.error, 'the request body must be a JSON object, got null');
+    });
+  });
+
+  // A projection or a bare CSV line can tempt a caller into posting `[ ... ]`; the endpoints all
+  // take named fields, so an array is the same mistake as `null` and gets the same answer.
+  const arrayBody = await request('POST', '/api/design/length', [{ lat: 51.5, lon: -0.1 }]);
+  test('an array body is refused as "not an object", not read as one', function () {
+    assert.strictEqual(arrayBody.status, 400, 'status ' + arrayBody.status + ': ' + JSON.stringify(arrayBody.body));
+    assert.ok(arrayBody.body.error.indexOf('got an array') !== -1, arrayBody.body.error);
+  });
+
   const badLength = await request('POST', '/api/design/length', {});
   const goodLength = await request('POST', '/api/design/length', { routeM: 3000 });
   test('a cable calculation with no route is a 400, and a real one still answers', function () {

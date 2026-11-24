@@ -110,14 +110,32 @@ function readBody(req, limit) {
   });
 }
 
+function describeJsonBody(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'an array';
+  return 'a ' + typeof value;
+}
+
 async function readJsonBody(req, limit) {
   const buf = await readBody(req, limit || MAX_BODY_BYTES);
   if (!buf.length) return {};
+  let body;
   try {
-    return JSON.parse(buf.toString('utf8'));
+    body = JSON.parse(buf.toString('utf8'));
   } catch (err) {
     throw Object.assign(new Error('invalid JSON body: ' + err.message), { status: 400 });
   }
+  // Every endpoint below reads a named field off the body. `null` is valid JSON and is what a client
+  // sends when it has no object to send, and an array is what a caller posts when it mistakes the
+  // body for the list it wants to send - neither has fields, so the first access threw a TypeError
+  // and the generic handler answered 500 "Cannot read properties of null (reading 'demand')". That
+  // told the caller the server broke when the request did. The body must be an object; say what
+  // arrived, once, before any handler can misnarrate it.
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    throw Object.assign(new Error('the request body must be a JSON object, got ' + describeJsonBody(body)),
+      { status: 400 });
+  }
+  return body;
 }
 
 function serveStatic(req, res, urlPath) {
