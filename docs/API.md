@@ -17,16 +17,16 @@ The server binds `127.0.0.1:8000` by default (`HOST`, `PORT`), and stores projec
 ```
 GET /api/health
 → { ok: true, name: "glassforge", version: "0.4.0",
-    parts: { total: 55, byKind: { cable: 8, splitter: 8, olt: 9, ont: 5, transceiver: 13,
-                                 closure: 6, connector: 4, splice: 2 } },
+    parts: { total: 61, byKind: { cable: 8, splitter: 8, olt: 11, ont: 5, transceiver: 15,
+                                 closure: 8, connector: 4, splice: 2 } },
     projects: 0, uptimeS: 4 }
 ```
 
 `version` is `package.json`'s. `parts.total` and `parts.byKind` are the catalogue on disk, so they
-change whenever a part is added. The block above is a **snapshot, not a contract**: recorded on `main` on
-2026-11-24, it is illustrative and will drift as the catalogue grows. The authorities are the endpoint
-itself and `node scripts/count-parts.js`, whose `--check` mode keeps README's copy of that line honest —
-re-record the block with the command below, never by editing the numbers by hand.
+change whenever a part is added. The block above is a **snapshot, not a contract**: recorded on `main` at
+`6f46a81` on 2026-11-24, it is illustrative and will drift as the catalogue grows. The authorities are
+the endpoint itself and `node scripts/count-parts.js`, whose `--check` mode keeps README's copy of that
+line honest — re-record the block with the command below, never by editing the numbers by hand.
 
 ```
 GF_DATA=/tmp/gf-port node server/index.js &
