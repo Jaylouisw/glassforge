@@ -1,0 +1,23 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp28-50g-er-40km",
+  "vendor": "generic",
+  "label": "QSFP28 50GBASE-ER 40 km",
+  "speedMbps": 50000,
+  "wavelengthNm": 1310,
+  "reachM": 40000,
+  "txPowerDbmMin": 0.4,
+  "txPowerDbmMax": 6.6,
+  "rxSensitivityDbm": -17.6,
+  "rxOverloadDbm": -3.4,
+  "polish": "upc",
+  "sourceUrl": "https://standards.ieee.org/ieee/802.3cn/7472/",
+  "notes": "IEEE 802.3cn-2019 added 50GBASE-ER to the Clause 139 family (Tables 139-6 and 139-7, 50GBASE-ER column): one 26.5625 GBd PAM4 carrier at 1311 nm over 1304.5-1317.5 nm, duplex LC, an APD receiver, 40 km on G.652 and RS(544,514) KP4 FEC. Average launch power +0.4..+6.6 dBm, average receive power -17.6..-3.4 dBm, receiver sensitivity in OMA -15.1 dBm, damage threshold -2.4 dBm, and the class's channel insertion loss is 18 dB, which is exactly 0.4 - (-17.6). The draft printed 6.63 and -3.37; the working-group ballot rounded both to one decimal place, and the row keeps the rounded class figures. Corroboration: HS Genuine MTRQ-1EA42 prints 0.4..6.63 dBm launch and an OMA sensitivity better than -15.1 dBm, and FS QSFP28-ER-50G prints 0.4..6.6 dBm launch, -17.6..-7.0 dBm receive and a -6 dBm damage threshold - both ends tighter than the class on the receive side. The row keeps the class -3.4 dBm receive maximum; if the FS module is the one bought, size the pad to its -7.0 dBm receive maximum and keep the receiver under -6 dBm to stay inside its damage threshold. Reach and loss: 40 km x 0.35 dB/km = 14.0 dB of fibre leaves 4.0 dB at the default 3 dB margin, so a bare full-reach link reads marginal; a patch-panel pair at 0.3 dB each makes it 14.6 dB and 3.4 dB of headroom, still marginal; ok needs 5 dB and begins at 37.14 km bare ((18 - 5) / 0.35) or 35.43 km with the pair. Reach binds separately: 40001 m is refused by name even though the loss budget still has room for it. Overload is the sharp end: the launch floor +0.4 dBm sits 3.8 dB above the receiver's -3.4 dBm maximum, so a span with less than 3.8 dB of loss overdrives the far end; at the +6.6 dBm ceiling the same window is 10.0 dB, and the engine sizes the pad against that ceiling, not the floor - a 100 m duct run asks for a 10 dB inline pad, and 14 dB is the most that still passes the 3 dB margin and the 18 dB budget (measured). On the FS module the pad has to be at least 12.6 dB (6.6 - (-6.0)) to keep the receiver under its -6 dBm damage threshold, and the 10 dB pad leaves it at about -3.4 dBm, so that module's own limit, not the class, sets the pad. Class figures from the amendment, not one measured module: replace the row with the module actually purchased before pricing a build.",
+  "tags": [
+    "50000",
+    "1310nm",
+    "50g",
+    "long-reach",
+    "dc-to-dc"
+  ]
+}

@@ -24,7 +24,7 @@ compiled in place with the emitted `.js` committed, so a clone still starts with
 [ADR 0004](docs/adr/0004-typescript-hybrid-and-no-any.md) and [Development](#development).
 
 <!-- parts:start -->
-**65 parts across 8 kinds** — 8 cables, 8 splitters, 13 OLTs, 5 ONTs, 17 transceiver, 8 closures, 4 connectors, 2 splices.
+**67 parts across 8 kinds** — 8 cables, 8 splitters, 13 OLTs, 5 ONTs, 19 transceiver, 8 closures, 4 connectors, 2 splices.
 <!-- parts:end -->
 
 ## What it does today
