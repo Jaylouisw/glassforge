@@ -242,3 +242,51 @@ test('a cable that cannot carry the fibres asked for is refused, not bought shor
   assert.strictEqual(fits.bom.cable.length, 1);
   assert.strictEqual(fits.bom.cable[0].model, 'g652d-loose-24');
 });
+
+test('a joint costs the light one splice, however many strands the cable carries', function () {
+  // Main street west-east with a side street leaving the midway point: the route passes one degree-3
+  // node, so the leg carries one joint. A joint splices every strand the cable carries - that is the
+  // crew's count - but the light on any one strand crosses the joint once (SPEC §3). Handing the
+  // crew's count to the budget charged a 24-fibre leg 24 x 0.10 dB = 2.40 dB of splice loss at a
+  // single joint, against 0.20 dB for the same route on 2 fibres: 2.2 dB that came from the cable's
+  // fibre count and had nothing to do with the light. Same cable, same route, so the fibre term is
+  // identical by construction and the splice line is the whole difference.
+  const tee = { edges: [
+    { id: 'main', coords: [p(51.5, -0.1020), p(51.5, -0.0960)] },
+    { id: 'side', coords: [p(51.5, -0.0990), p(51.5030, -0.0990)] }
+  ] };
+  const two = link.design({ sites: { a: A, b: B }, network: tee, optics: ER, protection: 'single',
+    fibres: 2, cable: 'g652d-loose-24' }, registry);
+  const many = link.design({ sites: { a: A, b: B }, network: tee, optics: ER, protection: 'single',
+    fibres: 24, cable: 'g652d-loose-24' }, registry);
+  [two, many].forEach(function (r) {
+    assert.strictEqual(r.legs[0].joints.length, 1, 'one junction on the route');
+    assert.strictEqual(r.legs[0].spliceEvents, 1, 'one splice event on the path');
+    const lines = r.legs[0].budget.breakdown.filter(function (b) { return b.kind === 'splice'; });
+    assert.strictEqual(lines.length, 1, 'one splice line in the budget');
+    close(lines[0].db, 0.1, 0.001, 'one fusion splice at 0.10 dB');
+  });
+  assert.strictEqual(many.legs[0].budget.odnLossDb, two.legs[0].budget.odnLossDb,
+    'the same route and cable cost the light the same, whatever the strand count');
+  assert.strictEqual(many.legs[0].budget.headroomDb, two.legs[0].budget.headroomDb);
+  // The crew's count does scale with the cable: 2 splices on 2 fibres, 24 on 24.
+  assert.strictEqual(two.legs[0].splices, 2, '2 fibres at one joint');
+  assert.strictEqual(many.legs[0].splices, 24, '24 fibres at one joint');
+  assert.strictEqual(two.bom.splices, 2);
+  assert.strictEqual(many.bom.splices, 24);
+});
+
+test('an explicit splice count is splice events on the leg, and the crew count follows splicesPerJoint', function () {
+  // 3 events x 0.10 dB = 0.30 dB of splice loss; the crew performs 3 x 2 fibres = 6 splices.
+  const r = link.design({ sites: { a: A, b: B }, optics: ER, protection: 'single', splices: 3 }, registry);
+  const lines = r.legs[0].budget.breakdown.filter(function (b) { return b.kind === 'splice'; });
+  close(lines[0].db, 0.3, 0.001, '3 splice events at 0.10 dB');
+  assert.strictEqual(r.legs[0].spliceEvents, 3);
+  assert.strictEqual(r.legs[0].splices, 6, '3 events on 2 fibres');
+  assert.strictEqual(r.bom.splices, 6);
+  // A joint worked once per event (a mass-fusion pass, or a single-strand circuit) says so directly.
+  const once = link.design({ sites: { a: A, b: B }, optics: ER, protection: 'single', splices: 3, splicesPerJoint: 1 }, registry);
+  assert.strictEqual(once.legs[0].spliceEvents, 3);
+  assert.strictEqual(once.legs[0].splices, 3);
+  assert.strictEqual(once.bom.splices, 3);
+});

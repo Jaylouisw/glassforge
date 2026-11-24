@@ -45,6 +45,13 @@ other side (`splicedTo`); `parked` when it arrives and leaves on no cable; `spli
 the feeder fibre terminates on the splitter and the fibres below it leave from numbered ports. Built
 from the same `span.strands` the strand ledger counts.
 
+**Splice event** — one splice on the path the light takes, which is what a budget charges: a strand
+crosses a joint once, however many strands the cable carries (SPEC §3 says a closure node is one
+splice). The crew's count at the same joint is one splice per strand — `splicesPerJoint`, default
+`fibres` — and a link reports the two separately as `legs[].spliceEvents` (the event) and
+`legs[].splices` (the crew's count, which `bom.splices` sums). Charging the crew's count as loss put
+24 splices on one joint of a 24-fibre leg.
+
 **Drop cable** — the small 1–2 fibre cable used on the last leg, only at or below `DROP_CABLE_MAX_M`
 (300 m). Anything longer goes to the 12-fibre ladder whatever the fibre count.
 

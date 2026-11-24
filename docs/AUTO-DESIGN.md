@@ -285,6 +285,11 @@ the path the light takes).
 ### What it does not do
 
 - No amplifiers or regeneration, no CWDM/DWDM multi-wavelength budgets, no per-segment duct capacity.
-- No per-joint splice count for a fat cable: a joint splices the circuit's fibres (`fibres`, default 2),
-  and that is the budget's splice allowance, not a splice plan.
+- No splice plan for a fat cable, and no per-strand count in the budget: a joint costs the light **one**
+  splice whatever the cable carries (`legs[].spliceEvents`), because the strand crosses it once
+  (SPEC §3). The crew's count - one per strand per joint, `spliceEvents × splicesPerJoint`
+  (`splicesPerJoint` defaults to `fibres`) - is reported as `legs[].splices` and summed in
+  `bom.splices`. It is a labour estimate, not a splice plan. Folding the labour count into the budget
+  charged a 24-fibre leg 24 × 0.10 dB at a single joint: the same duct route passed on 2 fibres and
+  failed on 24 with nothing changed in the glass or the optics.
 - No UI yet: the endpoint and the engine are the contract this landed with.

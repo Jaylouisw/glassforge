@@ -392,7 +392,14 @@ function design(input, registry) {
     const leased = opts.thirdParty.filter(function (seg) { return seg.leg === 'both' || seg.leg === id; });
     const leasedM = round(sum(leased, function (seg) { return seg.lengthM; }), 2);
     const joints = graph ? jointNodes(graph, routed.nodes) : [];
-    const splices = opts.splices !== undefined ? opts.splices : round(joints.length * opts.splicesPerJoint, 0);
+    // One splice event per joint on the path, not one per strand. A joint splices every strand the
+    // cable carries - that is the crew's count (`splices`, below, times `splicesPerJoint`) - but the
+    // light on any one strand crosses the joint once, which is what the budget charges (SPEC §3: "a
+    // closure node: one splice"). Handing the crew's count to `budget.pointToPoint` charged a 24-fibre
+    // leg 24 splices at a single joint and lost 2.3 dB to the cable's fibre count: the same duct route
+    // came out `ok` on 2 fibres and `fail` on 24 with no change to the glass or the optics.
+    const spliceEvents = opts.splices !== undefined ? opts.splices : joints.length;
+    const splices = round(spliceEvents * opts.splicesPerJoint, 0);
     const cable = cableForFibres(
       opts.cable
         ? registry.get('cable', opts.cable)
@@ -403,7 +410,7 @@ function design(input, registry) {
       headEnd: { model: opts.optics.a },
       cpe: { model: opts.optics.b },
       spans: ownM > 0 ? [{ cable: cable.model, lengthM: ownM }] : [],
-      splices: splices,
+      splices: spliceEvents,
       connectors: opts.connectors,
       thirdParty: leased.map(function (seg) {
         return { provider: seg.provider, lengthM: seg.lengthM, lossDb: seg.lossDb };
@@ -423,6 +430,7 @@ function design(input, registry) {
       leasedM: leasedM,
       lengthM: round(ownM + leasedM, 2),
       joints: joints,
+      spliceEvents: spliceEvents,
       splices: splices,
       cable: cable.model,
       fiberCount: cable.fiberCount,

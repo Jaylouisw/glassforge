@@ -75,6 +75,18 @@ Merged after 0.4.0 while the version stays at 0.4.0:
   `scripts/repo-state.js` for a one-call view of the repo (#23).
 - **Test gaps the mutation audit found are closed**: 20 suites / 197 assertions (was 18 / 174).
 
+### Fixed
+
+- **A joint costs the light one splice, not one per strand it terminates.** `engine/link.js` computed
+  `splices = joints × splicesPerJoint` (default `fibres`) and handed that number to
+  `budget.pointToPoint`, whose `splices` is a count of loss events: one 24-fibre leg through one joint
+  was charged 24 × 0.10 dB = 2.40 dB against 0.20 dB for the same duct on 2 fibres, and the same route
+  could pass on 2 fibres and fail on 24 with nothing changed in the glass or the optics. SPEC §3's
+  model — a closure node is one splice as the thread passes — now holds in link mode too: the budget
+  gets one splice event per joint (or the `splices` option) and the crew's count moved to `splices`
+  (`spliceEvents × splicesPerJoint`, summed in `bom.splices`, unchanged for the default call). New
+  field `legs[].spliceEvents`. Tests: `link-design` adds two.
+
 ## [0.4.0] — 2026-11-23
 
 Site-to-site links: a DC-to-DC circuit with both legs routed along the duct graph, diversity measured
