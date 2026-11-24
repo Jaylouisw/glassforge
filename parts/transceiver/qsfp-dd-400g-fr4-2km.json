@@ -1,0 +1,22 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp-dd-400g-fr4-2km",
+  "vendor": "cisco",
+  "label": "Cisco QDD-400G-FR4-S 400GBASE-FR4 2 km",
+  "speedMbps": 400000,
+  "wavelengthNm": 1310,
+  "reachM": 2000,
+  "txPowerDbmMin": -3.2,
+  "txPowerDbmMax": 3.5,
+  "rxSensitivityDbm": -7.3,
+  "rxOverloadDbm": 3.5,
+  "polish": "upc",
+  "notes": "Cisco 400G QSFP-DD data sheet, optical specifications table, row QDD-400G-FR4-S: average transmit power per lane -3.2..+3.5 dBm, average receive power per lane -7.3 (min) .. +3.5 (max) dBm, 1270/1290/1310/1330 nm, duplex LC SMF, 2 km with a maximum supported insertion loss of 4 dB. 400GBASE-FR4 is IEEE 802.3cu, and that standard's table prints a launch floor of -3.3 dBm where this sheet prints -3.2: the row keeps the vendor figure because the vendor module is what it names, and 0.1 dB is inside the +-3 dB DDM accuracy the same sheet gives its own power readings, so buy against the class's 4.0 dB of channel insertion loss rather than against either floor. Budget -3.2 - (-7.3) = 4.1 dB, the same 4 dB the IL column and Cisco's 2 km note both quote. Four CWDM lanes on ONE duplex pair, like the 100G-LR4 row: the row says 1310 nm because the engine budgets one wavelength and that is the window the cables publish attenuation for, and the per-lane figures are worst-lane. Near end: the launch ceiling (+3.5 dBm) equals the receive maximum (+3.5 dBm), so there is no overload band and no pad to size - a 0 m patch loses 0.6 dB at two SC/APC matings, reads -3.8 dBm at the receiver and the budget proposes no attenuator (measured). That is the opposite of 40GBASE-ER4, whose -4.5 dBm receive maximum sits below its own launch floor; do not carry ER4's pad habit onto this row. Reach is the tight number, not the class: the default margin is 3 dB, two matings cost 0.6 dB, so 1.1 dB of the 4.1 is left for fibre, which is 1.44 km at 0.35 dB/km. Measured: 2 km - the declared reach - is 0.7 dB of fibre, 1.3 dB of ODN, 2.8 dB of headroom and a fail; 1.4 km is 3.01 dB and the last length that clears the margin; two optics patched together read 3.5 dB, so no length of this row reaches the 5 dB the engine calls ok. Treat it as a 1.4 km optic here, or lower marginDb on purpose for a short intra-site run. Where the row earns its place is fibre count: one duplex pair carries 400G, where four 100GBASE-LR4 rows would charge four pairs and four modules for the same service. Datasheet figures for one module family, not a purchase-tested part: replace with the QSFP-DD actually bought before pricing a build.",
+  "sourceUrl": "https://www.cisco.com/c/en/us/products/collateral/interfaces-modules/transceiver-modules/datasheet-c78-743172.html",
+  "tags": [
+    "400000",
+    "1310nm",
+    "400g",
+    "dc-to-dc"
+  ]
+}

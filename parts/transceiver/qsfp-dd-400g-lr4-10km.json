@@ -1,0 +1,23 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp-dd-400g-lr4-10km",
+  "vendor": "cisco",
+  "label": "Cisco QDD-400G-LR4-S 400GBASE-LR4 10 km",
+  "speedMbps": 400000,
+  "wavelengthNm": 1310,
+  "reachM": 10000,
+  "txPowerDbmMin": -2.7,
+  "txPowerDbmMax": 5.1,
+  "rxSensitivityDbm": -9,
+  "rxOverloadDbm": 5.1,
+  "polish": "upc",
+  "notes": "Cisco 400G QSFP-DD data sheet, optical specifications table, row QDD-400G-LR4-S: average transmit power per lane -2.7..+5.1 dBm, average receive power per lane -9.0 (min) .. +5.1 (max) dBm, 1270/1290/1310/1330 nm, duplex LC SMF, 10 km with a maximum supported insertion loss of 6.3 dB. The class behind it is IEEE 802.3cu 400GBASE-LR4-6, and Cisco's own footnote says that requirement is 6 km while this module declares 10: the row keeps the 10 km the datasheet declares and the loss budget refuses a long run before the distance does. Budget -2.7 - (-9.0) = 6.3 dB, the same figure as the IL column. Reach and loss, measured: 10 km x 0.35 dB/km = 3.5 dB of fibre, 4.1 dB of ODN with two SC/APC matings, 2.2 dB of headroom -> fail against the default 3 dB margin; 6 km (the IEEE class reach) is 2.7 dB of ODN and 3.6 dB of headroom -> marginal; the last length that clears the margin is 7.72 km; up to 2 km reads 5.0 dB and ok. So the honest reading is a 7.7 km optic in this tool, 6 km if you only need the class to be met. Four CWDM lanes on one duplex pair: the row says 1310 nm because the engine budgets one wavelength, and the per-lane figures are worst-lane. Near end: the receive maximum (+5.1 dBm) equals the launch ceiling, so no attenuator is ever proposed and none is needed - a 0 m patch reads -3.3 dBm and 5.7 dB of headroom (measured), which is why a 400G LR4 pair tolerates the short duct run that a 40GBASE-ER4 pair would not. Fibre count is what this row buys: one duplex pair carries 400G, where four 100GBASE-LR4 rows charge four pairs and four modules for one service. Datasheet figures for one module family, not a purchase-tested part: replace with the QSFP-DD actually bought before pricing a build.",
+  "sourceUrl": "https://www.cisco.com/c/en/us/products/collateral/interfaces-modules/transceiver-modules/datasheet-c78-743172.html",
+  "tags": [
+    "400000",
+    "1310nm",
+    "400g",
+    "long-reach",
+    "dc-to-dc"
+  ]
+}
