@@ -149,7 +149,9 @@ fifty-first edit is the one that becomes permanent. The server persists projects
 - A GPON OLT with an XGS-PON ONT → **error** from the budget, not from `network.validate`, which
   checks plant structure and capacity and says nothing about PON family. The refusal is
   `budget.opticalBudget`'s: `the OLT is gpon and the ONT is xgs-pon - they cannot share a PON`
-  (`engine/budget.js:220`). A plant that mixes them validates clean and fails at budget time.
+  (`engine/budget.js`, the `olt.pon !== ont.pon` guard at the top of `opticalBudget` - named by symbol
+  rather than by line, because a line number rots on the next edit that moves it). A plant that mixes
+  them validates clean and fails at budget time.
 - Two optics of different rates or wavelengths → **error**; they cannot form a link.
 - A splitter in an active plant, or a transceiver at the customer end of a PON → **error**.
 - An unknown part model → **error** naming the models that do exist, up to eight of them sorted
