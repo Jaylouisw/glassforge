@@ -287,6 +287,12 @@ async function handle(req, res, ctx) {
     return fail(req, res, 400, 'the request path is not valid percent-encoding: "' + url.pathname + '"');
   }
   const method = req.method || 'GET';
+  // `HEAD` follows `GET` (docs/API.md), and the gate below admits it by collapsing HEAD to GET when
+  // it checks `Allow`. The handlers have to make the same collapse: Node suppresses the body of a
+  // HEAD response, so the only work a read does is answer as it would to a GET - and four of them
+  // did not, so the gate opened the door and the handler answered `405`/`404` for an endpoint that
+  // exists and that the same response's `Allow` had just said answers HEAD.
+  const isRead = method === 'GET' || method === 'HEAD';
   const registry = ctx.registry;
 
   // The method gate runs before dispatch, so every endpoint below is reached with a method it
@@ -324,7 +330,7 @@ async function handle(req, res, ctx) {
   }
 
   if (pathname === '/api/projects') {
-    if (method === 'GET') return sendJson(req, res, 200, { projects: store.listProjects(ctx.dataRoot) });
+    if (isRead) return sendJson(req, res, 200, { projects: store.listProjects(ctx.dataRoot) });
     if (method === 'POST') {
       const body = await readJsonBody(req);
       // The name is the other field a create can get wrong that the caller then cannot see. An object
@@ -367,7 +373,7 @@ async function handle(req, res, ctx) {
       return fail(req, res, 404, err.message);
     }
 
-    if (!action && method === 'GET') return sendJson(req, res, 200, withDerived(project, registry));
+    if (!action && isRead) return sendJson(req, res, 200, withDerived(project, registry));
     if (!action && method === 'DELETE') return sendJson(req, res, 200, store.removeProject(id, ctx.dataRoot));
 
     if (!action && method === 'PUT') {
@@ -456,7 +462,7 @@ async function handle(req, res, ctx) {
       return sendJson(req, res, 200, { budgets: budgets });
     }
 
-    if (action === '/bom' && method === 'GET') {
+    if (action === '/bom' && isRead) {
       // A project on disk can predate the save-time check, or be edited by hand, so a span may name
       // a cable the catalogue does not have. That plant cannot be priced - it is not a broken
       // server - so answer 400 naming the span instead of letting the lookup's throw become a 500.
@@ -490,7 +496,7 @@ async function handle(req, res, ctx) {
       return sendJson(req, res, 200, bom);
     }
 
-    if (action === '/strands' && method === 'GET') {
+    if (action === '/strands' && isRead) {
       return sendJson(req, res, 200, engine.network.strandLedger(project, registry));
     }
 
