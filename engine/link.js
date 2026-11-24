@@ -82,6 +82,42 @@ function options(input) {
   // at a different wavelength - `direction` was answered as `down` and nothing said so.
   designFields.assertNumberField(input, 'marginDb', 0, 'the link design');
   designFields.assertChoiceField(input, 'direction', ['up', 'down'], 'the link design');
+  // The routing, BOM and crew knobs below are normalised the same way and move a number the plan is
+  // bought on: `routeFactor: '1.4'` fell back to 1.2 (a leg 15% short of what was asked for),
+  // `splicesPerJoint: '2'` fell back to the fibre count (12 splices at every joint instead of 2), and
+  // `overlengthPct: '10'` to the cable default. A string is exactly what a JSON form field arrives as.
+  designFields.assertNumberField(input, 'routeFactor', 1, 'the link design', {
+    measure: 'a number of metres of route per metre of straight line',
+    unusable: 'A route factor the link design cannot read falls back to ' + DEFAULTS.routeFactor +
+      ', so both legs are quoted on a route the caller did not ask for.',
+    belowMin: 'A route factor below 1 claims a leg shorter than the crow flies, so it cannot be a ' +
+      'tighter detour - it is a duct length nobody can build.'
+  });
+  designFields.assertNumberField(input, 'maxSnapM', 0, 'the link design', {
+    measure: 'a number of metres',
+    unusable: 'A snap radius the link design cannot read falls back to ' + DEFAULTS.maxSnapM +
+      ' m, which attaches a site to a manhole it is not on and measures the leg from there.',
+    belowMin: 'A negative snap radius attaches nothing, so it is a link with no route rather than a tight one.'
+  });
+  designFields.assertNumberField(input, 'joinToleranceM', 0, 'the link design', {
+    measure: 'a number of metres',
+    unusable: 'A join tolerance the link design cannot read falls back to ' + DEFAULTS.joinToleranceM +
+      ' m, which joins duct segments the caller kept apart or leaves a corner open.',
+    belowMin: 'A negative tolerance joins nothing, so it is a graph in pieces rather than a tight one.'
+  });
+  designFields.assertNumberField(input, 'overlengthPct', 0, 'the link design', {
+    measure: 'a percentage of design length',
+    unusable: 'An overlength the link BOM cannot read falls back to the cable default, so both legs ' +
+      'are quoted short of what the caller asked to buy.',
+    belowMin: 'A negative overlength quotes less cable than the legs measure, which is a BOM nobody can pull.'
+  });
+  designFields.assertNumberField(input, 'splicesPerJoint', 1, 'the link design', {
+    measure: 'a number of splices per joint',
+    unusable: 'A splices-per-joint the link design cannot read falls back to the fibre count, which ' +
+      'bills a 24-fibre joint as 24 splices the crew does not make.',
+    belowMin: 'A joint that splices nothing is not a cheaper joint - it is a cable that was cut and ' +
+      'never joined, so the count has to be at least 1.'
+  });
   const o = input || {};
   const sitesInput = o.sites || { a: o.a || o.from, b: o.b || o.to };
   const sites = {

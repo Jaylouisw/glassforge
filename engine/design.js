@@ -121,6 +121,42 @@ function options(input) {
   // luck), and `marginDb: -5` passed through to every candidate - which then came back infeasible,
   // one copy of the refusal per demand point, instead of one sentence naming the field.
   designFields.assertNumberField(o, 'marginDb', 0, 'the design');
+  // The routing and BOM knobs are read the same way, and for the same measured reason: each is
+  // normalised with `isNum(x) ? x : default`, so a value the design cannot use silently becomes the
+  // default and every length in the plan follows it. `routeFactor: '1.6'` (a string, which is what a
+  // form field arrives as) designed a 690 m estate at 707 m of route instead of 940 m;
+  // `overlengthPct: '10'` quoted 707 m of design length at 3% instead of 10%, 48 m short in the BOM.
+  designFields.assertNumberField(o, 'routeFactor', 1, 'the design', {
+    measure: 'a number of metres of route per metre of straight line',
+    unusable: 'A route factor the design cannot read falls back to ' + DEFAULTS.routeFactor +
+      ', so every span, drum and fibre-metre in the plan is measured on a route the caller did not ask for.',
+    belowMin: 'A route factor below 1 claims a route shorter than the crow flies, so it cannot be a ' +
+      'tighter detour - it is a plan whose lengths understate the duct somebody has to build.'
+  });
+  designFields.assertNumberField(o, 'maxSnapM', 0, 'the design', {
+    measure: 'a number of metres',
+    unusable: 'A snap distance the design cannot read falls back to ' + DEFAULTS.maxSnapM +
+      ' m, which moves a property onto a street it is not on and measures the drop from there.',
+    belowMin: 'A negative snap radius places nothing, so it is a design with no properties on the graph ' +
+      'rather than a tight one.'
+  });
+  designFields.assertNumberField(o, 'joinToleranceM', 0, 'the design', {
+    measure: 'a number of metres',
+    unusable: 'A join tolerance the design cannot read falls back to ' + DEFAULTS.joinToleranceM +
+      ' m, which joins street segments the caller kept apart or leaves a corner open.',
+    belowMin: 'A negative tolerance joins nothing, so it is a graph in pieces rather than a tight one.'
+  });
+  designFields.assertNumberField(o, 'overlengthPct', 0, 'the design', {
+    measure: 'a percentage of design length',
+    unusable: 'An overlength the BOM cannot read falls back to ' + DEFAULTS.overlengthPct +
+      '%, so every cable length in the plan is quoted short of what the caller asked to buy.',
+    belowMin: 'A negative overlength quotes less cable than the route measures, which is a BOM nobody ' +
+      'can pull.'
+  });
+  designFields.assertChoiceField(o, 'technology', ['auto', 'pon', 'active'], 'the design', {
+    wrong: 'A technology it cannot place is refused rather than searched: "PON" is not "pon", and the ' +
+      'answer to it was "no candidate topology could be built", which blames the estate for a typo.'
+  });
   return {
     technology: o.technology || DEFAULTS.technology,
     routeFactor: isNum(o.routeFactor) && o.routeFactor >= 1 ? o.routeFactor : DEFAULTS.routeFactor,

@@ -136,19 +136,45 @@ function kindOf(value: unknown): string {
  * `design` is `unknown` because it arrives as API JSON; a non-object is the entry point's business.
  * A field that is absent is absent - the budget's own default applies and is reported in the result.
  */
-export function assertNumberField(design: unknown, field: string, min: number, what: string): void {
+/**
+ * How a number field's refusal reads, when the field is not a budget reserve.
+ *
+ * The budget's knobs are all dB, so their wording is the default. A route factor is metres of route
+ * per metre of straight line and an overlength percentage is a fraction of the design length; both
+ * were normalised with the same `isNum(x) ? x : default` fallback and both move a length, so both
+ * need a refusal whose second sentence is about a length rather than about a verdict.
+ */
+export interface NumberFieldWording {
+  /** What the field counts, after the field's own name: "a number of dB", "a percentage". */
+  measure?: string;
+  /** Why a value that is not a number is refused instead of falling back to the default. */
+  unusable?: string;
+  /** Why a value below `min` is not simply a smaller version of the same thing. */
+  belowMin?: string;
+}
+
+/** The budget knobs' wording - the default, so the refusals #147 pinned read exactly as they did. */
+const RESERVE_WORDING: Required<NumberFieldWording> = {
+  measure: 'a number of dB',
+  unusable: 'A value it cannot use is refused rather than skipped: a reserve that is ignored leaves a ' +
+    'verdict computed without the loss the caller asked for.',
+  belowMin: 'A design reserve is loss the route is allowed to spend, so a negative one is not a small ' +
+    'reserve - it passes links that are short of the reserve it names.'
+};
+
+export function assertNumberField(design: unknown, field: string, min: number, what: string,
+  wording?: NumberFieldWording): void {
   if (typeof design !== 'object' || design === null || Array.isArray(design)) return;
   const value = (design as Record<string, unknown>)[field];
   if (value === undefined) return;
+  const text = Object.assign({}, RESERVE_WORDING, wording || {});
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new TypeError(what + ' reads "' + field + '" as a number of dB and got ' + showValue(value) +
-      ' (' + kindOf(value) + '). A value it cannot use is refused rather than skipped: a reserve that ' +
-      'is ignored leaves a verdict computed without the loss the caller asked for.');
+    throw new TypeError(what + ' reads "' + field + '" as ' + text.measure + ' and got ' + showValue(value) +
+      ' (' + kindOf(value) + '). ' + text.unusable);
   }
   if (value < min) {
-    throw new TypeError(what + ' reads "' + field + '" as a number of dB at or above ' + min +
-      ' and got ' + showValue(value) + '. A design reserve is loss the route is allowed to spend, so a ' +
-      'negative one is not a small reserve - it passes links that are short of the reserve it names.');
+    throw new TypeError(what + ' reads "' + field + '" as ' + text.measure + ' at or above ' + min +
+      ' and got ' + showValue(value) + '. ' + text.belowMin);
   }
 }
 
@@ -161,14 +187,22 @@ export function assertNumberField(design: unknown, field: string, min: number, w
  * wrong wavelength. The result does echo `direction`, but a typo a caller has to spot in the answer
  * is a typo that reaches the plan. Nothing is refused for *being absent*: the default still applies.
  */
-export function assertChoiceField(design: unknown, field: string, allowed: readonly string[], what: string): void {
+/** How a choice field's refusal ends, when the choice is not a budget direction. */
+export interface ChoiceFieldWording {
+  /** Why a value outside the set is refused instead of being read as the default. */
+  wrong?: string;
+}
+
+export function assertChoiceField(design: unknown, field: string, allowed: readonly string[], what: string,
+  wording?: ChoiceFieldWording): void {
   if (typeof design !== 'object' || design === null || Array.isArray(design)) return;
   const value = (design as Record<string, unknown>)[field];
   if (value === undefined) return;
   if (typeof value === 'string' && allowed.indexOf(value) !== -1) return;
   const quoted = allowed.map(function (v) { return '"' + v + '"'; });
-  throw new TypeError(what + ' reads "' + field + '" as one of ' + quoted.join(', ') + ' and got ' +
-    showValue(value) + ' (' + kindOf(value) + '). A direction it cannot place is refused rather than ' +
+  const why = (wording && wording.wrong) || ('A direction it cannot place is refused rather than ' +
     'read as "' + String(allowed[allowed.length - 1]) + '": the two directions are different receivers ' +
     'at different wavelengths.');
+  throw new TypeError(what + ' reads "' + field + '" as one of ' + quoted.join(', ') + ' and got ' +
+    showValue(value) + ' (' + kindOf(value) + '). ' + why);
 }
