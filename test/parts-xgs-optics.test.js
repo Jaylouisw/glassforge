@@ -66,6 +66,12 @@ test('the XGS-PON optics publish the launch and receive figures of G.9807.1', fu
   assert.strictEqual(ont.txPowerDbmMax, 9, 'ONU mean launch MAX is +9.0 dBm');
   assert.strictEqual(ont.rxSensitivityDbm, -28, 'ONU sensitivity is -28.0 dBm for every class');
   assert.strictEqual(ont.rxOverloadDbm, -9, 'ONU overload is -9.0 dBm, not -7');
+
+  // The row is a 10-gigabit ONT and says so in its label ('XGS-PON ONT 1x 10GE'), so its user
+  // port map has to be a 10ge port. It declared { ge: 1 } - a 1 GbE port on a 9.953 Gbit/s ONT -
+  // which contradicted the label and understated the CPE in every BOM built from this row. The
+  // validator accepts any key here, so nothing but this assertion refuses the slip.
+  assert.deepStrictEqual(ont.ports, { '10ge': 1 }, 'the 1x 10GE ONT declares a 10ge port, not a GE port');
 });
 
 done();

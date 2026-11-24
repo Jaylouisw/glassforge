@@ -9,9 +9,9 @@
   "rxSensitivityDbm": -28,
   "rxOverloadDbm": -9,
   "ports": {
-    "ge": 1
+    "10ge": 1
   },
-  "notes": "ITU-T G.9807.1 Table B.9.3: ONU sensitivity -28.0 dBm and minimum overload -9.0 dBm for every ODN class (N1/N2/E1/E2), met in the presence of G-PON and video overlay. Upstream mean launch per Table B.9.4: +4.0..+9.0 dBm. The class names describe the ODN loss the pair may span, not a difference in ONU receiver: a -28 dBm ONT is the N2-class receiver as much as the N1 one. A GPON OLT and an XGS-PON ONT cannot share a PON port; the engine refuses the pair. Replace with the bought ONT's datasheet before construction.",
+  "notes": "ITU-T G.9807.1 Table B.9.3: ONU sensitivity -28.0 dBm and minimum overload -9.0 dBm for every ODN class (N1/N2/E1/E2), met in the presence of G-PON and video overlay. Upstream mean launch per Table B.9.4: +4.0..+9.0 dBm. The class names describe the ODN loss the pair may span, not a difference in ONU receiver: a -28 dBm ONT is the N2-class receiver as much as the N1 one. A GPON OLT and an XGS-PON ONT cannot share a PON port; the engine refuses the pair. 10GE is the user port a 9.95 Gbit/s downstream can fill, and the engine reports `ports` without budgeting it: one 10-gigabit port, not the single GE port this row used to declare - a GE-only map contradicted the label that names the 10GE port and understated the CPE a build would buy. Replace with the bought ONT's datasheet before construction.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-G.9807.1/en",
   "tags": [
     "xgs-pon"
