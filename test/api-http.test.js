@@ -630,6 +630,44 @@ async function main() {
       'a file outside web/ was served: ' + served.slice(0, 120));
   });
 
+  // The endpoint answers ONE row shape: `{ ont, name, result }` or `{ ont, name, error }`, with
+  // `ont` the node id. With `ontId` it used to hand back the bare budget result instead - no row
+  // wrapper, `ont` holding the ONT *model*, and a refusal the list call reports as an error row
+  // escaping the handler as a 500. A single-ONT call is the same answer with one row in it.
+  const ids = applied.body.plant.nodes.filter(function (n) { return n.type === 'ont'; }).map(function (n) { return n.id; });
+  const firstOnt = ids[0];
+  const orphan = await request('POST', '/api/projects/' + id + '/ops', {
+    op: 'add-node', node: { type: 'ont', model: 'gpon-ont-4ge', name: 'Sin acometida' }
+  });
+  const orphanId = orphan.body.nodes[orphan.body.nodes.length - 1].id;
+  test('an ONT with no span yet is a warning, not a refused edit', function () {
+    assert.strictEqual(orphan.status, 200, JSON.stringify(orphan.body));
+  });
+  const oneOnt = await request('POST', '/api/projects/' + id + '/budget', { ontId: firstOnt });
+  const everyOnt = await request('POST', '/api/projects/' + id + '/budget', {});
+  const noAcometida = await request('POST', '/api/projects/' + id + '/budget', { ontId: orphanId });
+  test('a single-ONT budget is one row of the shape the list returns', function () {
+    assert.strictEqual(oneOnt.status, 200, JSON.stringify(oneOnt.body));
+    assert.strictEqual(oneOnt.body.budgets.length, 1);
+    const row = oneOnt.body.budgets[0];
+    assert.deepStrictEqual(Object.keys(row).sort(), ['name', 'ont', 'result']);
+    assert.strictEqual(row.ont, firstOnt, 'ont is the node id, not the ONT model');
+    const fromList = everyOnt.body.budgets.filter(function (b) { return b.ont === firstOnt; })[0];
+    assert.strictEqual(row.name, fromList.name);
+    assert.ok(!row.result.ont || row.result.ont !== row.ont, 'the model lives in result.ont, the row names the node');
+    assert.strictEqual(row.result.verdict, fromList.result.verdict);
+    assert.strictEqual(row.result.headroomDb, fromList.result.headroomDb);
+  });
+  test('a disconnected ONT is the same 200 error row from either call, never a 500', function () {
+    assert.strictEqual(noAcometida.status, 200, JSON.stringify(noAcometida.body));
+    const row = noAcometida.body.budgets[0];
+    assert.deepStrictEqual(Object.keys(row).sort(), ['error', 'name', 'ont']);
+    assert.strictEqual(row.ont, orphanId);
+    assert.ok(/not connected/.test(row.error), row.error);
+    const fromList = everyOnt.body.budgets.filter(function (b) { return b.ont === orphanId; })[0];
+    assert.deepStrictEqual(row, fromList);
+  });
+
   await new Promise(function (resolve) { server.close(resolve); });
   fs.rmSync(dataRoot, { recursive: true, force: true });
   done();

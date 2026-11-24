@@ -260,16 +260,30 @@ function designForOnt(plant, ontId, registry, opts) {
   return result;
 }
 
+/**
+ * One ONT's budget, in the row shape every caller of the budget endpoint receives.
+ *
+ * `{ ont, name, result }` on a link, `{ ont, name, error }` when the path cannot be budgeted at all,
+ * and `ont` is always the **node id**. Stated once here because it was not: the endpoint's list form
+ * answered this row, while its `ontId` form answered the bare `result` - no wrapper, `ont` holding
+ * the ONT *model*, so a caller reading the documented `budgets[0].result` got `undefined`, and a
+ * path that cannot be budgeted escaped the handler as a 500 while the list call reported the same
+ * fault as an error row. Two shapes for one endpoint is a contract nobody can code against.
+ */
+function budgetRow(plant, ontId, registry, opts) {
+  const node = nodeById(plant, ontId);
+  const name = node ? (node.name === undefined ? null : node.name) : null;
+  try {
+    return { ont: ontId, name: name, result: designForOnt(plant, ontId, registry, opts) };
+  } catch (err) {
+    return { ont: ontId, name: name, error: err.message };
+  }
+}
+
 /** Every ONT's budget, in one pass. This is the "signal" page of the planner. */
 function allOntBudgets(plant, registry, opts) {
   const onts = (plant.nodes || []).filter(function (n) { return n.type === 'ont'; });
-  return onts.map(function (node) {
-    try {
-      return { ont: node.id, name: node.name, result: designForOnt(plant, node.id, registry, opts) };
-    } catch (err) {
-      return { ont: node.id, name: node.name, error: err.message };
-    }
-  });
+  return onts.map(function (node) { return budgetRow(plant, node.id, registry, opts); });
 }
 
 /**
@@ -865,6 +879,7 @@ module.exports = {
   trace: trace,
   designForOnt: designForOnt,
   allOntBudgets: allOntBudgets,
+  budgetRow: budgetRow,
   strandLedger: strandLedger,
   spliceTable: spliceTable,
   capacity: capacity,

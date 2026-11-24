@@ -417,8 +417,12 @@ async function handle(req, res, ctx) {
             '", not "ont" - /budget takes an ONT id');
         }
       }
+      // Both forms answer the same row (`{ ont, name, result }` or `{ ont, name, error }`, with
+      // `ont` the node id): `ontId` is the whole plant's answer with one row in it, not a second
+      // schema. The bare result it used to send carried the ONT *model* in `ont` and turned a path
+      // that cannot be budgeted into a 500 the list call reports as an error row.
       const budgets = body.ontId
-        ? [engine.network.designForOnt(project, body.ontId, registry, body)]
+        ? [engine.network.budgetRow(project, body.ontId, registry, body)]
         : engine.network.allOntBudgets(project, registry, body);
       return sendJson(req, res, 200, { budgets: budgets });
     }
