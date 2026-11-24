@@ -347,6 +347,23 @@ async function main() {
     assert.ok(typoBudget.body.error.indexOf('splitters') !== -1, typoBudget.body.error);
   });
 
+  // A launch power written inside the end object is the shape the engine's own doc block advertised
+  // (`olt { model, txDbm? }`) and has never read: it budgeted at the transmitter's minimum and answered
+  // 200 - on this 15 km design, -13.30 dBm instead of -9.80 dBm, 3.50 dB optimistic. A refusal the
+  // caller can act on names both the path that arrived and the field that works, and `asBadRequest`
+  // makes it a 400 rather than a 500.
+  const nestedLaunch = await request('POST', '/api/design/budget', {
+    design: {
+      olt: { model: 'gpon-b-plus-8', txDbm: 5 }, ont: { model: 'gpon-ont-1ge' },
+      spans: [{ cable: 'g652d-loose-12', lengthM: 15000 }], splitters: [{ model: 'plc-1x8-sca' }]
+    }
+  });
+  test('a launch power inside the end object is a 400 naming the field that works', function () {
+    assert.strictEqual(nestedLaunch.status, 400, 'status ' + nestedLaunch.status + ': ' + JSON.stringify(nestedLaunch.body));
+    assert.ok(nestedLaunch.body.error.indexOf('design.olt.txDbm') !== -1, nestedLaunch.body.error);
+    assert.ok(nestedLaunch.body.error.indexOf('"txDbm"') !== -1, nestedLaunch.body.error);
+  });
+
   // The other half of that: a field the budget *does* read, holding a value it cannot use. `marginDb`
   // is the reserve the headroom test is measured against, so `-5` passes every link that is 2.2 dB
   // short of the 3 dB default - it answered 200 `marginal` for a design that is `fail` untouched, and

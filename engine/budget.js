@@ -425,6 +425,29 @@ function launchWindowWarning(pad, rxPowerDbm, txDbm, txSpec, rxSpec, marginDb) {
         ' dB margin or the class budget, so this needs a different split or optic');
 }
 
+/**
+ * A launch power inside an end object is refused, because the launch is a design field.
+ *
+ * Both doc blocks used to advertise the ends as `{ model, txDbm? }` from 0.1.0 until this guard, and
+ * `opticalBudget`/`pointToPoint` have only ever read `design.txDbm`. A caller who followed the shape
+ * got the launch silently reset to the transmitter's minimum: on the 15 km GPON B+ design in
+ * `test/budget-design-fields.test.js` that is -13.30 dBm instead of -9.80 dBm - 3.50 dB optimistic,
+ * with the headroom, the overload check and the pad all sized for a module running cold.
+ * `assertKnownFields` cannot catch it: it guards the design's top level, and the typo is one object
+ * down, so the refusal has to live where the end is read.
+ *
+ * Only `txDbm` is refused, because it is the one knob the shape ever advertised. An end object may
+ * carry whatever else a caller likes - pass the whole catalogue entry, vendor and ports and all - and
+ * the budget still reads `model` and nothing else from it: a guard that refused every unknown key
+ * would refuse a part object, which is a shape the API hands straight through.
+ */
+function refuseEndpointLaunch(end, path) {
+  if (!end || typeof end !== 'object' || end.txDbm === undefined) return;
+  throw new TypeError(path + '.txDbm is not a field the budget reads and got ' + showValue(end.txDbm) +
+    ' - the launch power is the design field "txDbm", beside the end and not inside it: {"' +
+    path.split('.')[1] + '":{"model":"..."},"txDbm":5}');
+}
+
 /** The clause an overload reason carries, so the refusal says what to do about it. */
 function attenuatorClause(pad, marginDb) {
   if (!pad) return '';
@@ -460,7 +483,7 @@ function assertDesignKnobs(design, what) {
  * `design` (all lengths in metres):
  *   direction    'down' | 'up'                       (default 'down')
  *   wavelength   '1310' | '1490' | '1550'            (default 1490 down / 1310 up)
- *   olt          { model, txDbm? }
+ *   olt          { model }                           the launch is `txDbm`, below
  *   ont          { model }
  *   spans        [{ cable: model, lengthM }]
  *   splitters    [{ model }]                         (cascade, in order from the OLT)
@@ -468,6 +491,7 @@ function assertDesignKnobs(design, what) {
  *   connectors   number | { count, model }
  *   allowanceDb  extra design allowance              (default 0)
  *   marginDb     design reserve required             (default 3)
+ *   txDbm        launch power to budget at           (default: the transmitter's minimum)
  */
 function opticalBudget(design, registry) {
   if (!design || typeof design !== 'object') throw new TypeError('opticalBudget needs a design object');
@@ -485,6 +509,8 @@ function opticalBudget(design, registry) {
   if (!design.ont || !design.ont.model) throw new TypeError('design.ont.model is required');
   const olt = registry.get('olt', design.olt.model);
   const ont = registry.get('ont', design.ont.model);
+  refuseEndpointLaunch(design.olt, 'design.olt');
+  refuseEndpointLaunch(design.ont, 'design.ont');
 
   if (olt.pon !== ont.pon) {
     throw new Error('the OLT is ' + olt.pon + ' and the ONT is ' + ont.pon + ' - they cannot share a PON');
@@ -595,11 +621,11 @@ function opticalBudget(design, registry) {
  * Run an active (point-to-point) budget between two optics.
  *
  * `design`:
- *   headEnd   { model, txDbm? }        the optic at the aggregation end
+ *   headEnd   { model }                the optic at the aggregation end
  *   cpe       { model }                the optic at the customer end
  *   direction 'down' | 'up'            (default 'down')
  *   wavelength                         (default: the head-end optic's wavelength)
- *   spans, splices, connectors, allowanceDb, marginDb   — as for the PON budget
+ *   spans, splices, connectors, allowanceDb, marginDb, txDbm   — as for the PON budget
  *
  * The second verdict here is the link's own loss budget, `launch(min) − sensitivity`, rather than a
  * PON class: an active link has no class, it has two datasheets. Reach is checked separately, because
@@ -615,6 +641,8 @@ function pointToPoint(design, registry) {
 
   const headEnd = registry.get('transceiver', design.headEnd.model);
   const cpe = registry.get('transceiver', design.cpe.model);
+  refuseEndpointLaunch(design.headEnd, 'design.headEnd');
+  refuseEndpointLaunch(design.cpe, 'design.cpe');
 
   if (headEnd.speedMbps !== cpe.speedMbps) {
     throw new Error('the optics run at different rates (' + headEnd.speedMbps + ' and ' + cpe.speedMbps +

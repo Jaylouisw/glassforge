@@ -180,4 +180,76 @@ test('a site-to-site link refuses the same two values', function () {
   throws(function () { engine.link.design(Object.assign({ marginDb: '3' }, linkOpts), registry); }, 'marginDb', 'a text link margin');
 });
 
+// A launch power written inside the end object is not a field the budget reads - and it is the shape
+// both doc blocks advertised (`olt { model, txDbm? }`, `headEnd { model, txDbm? }`) from 0.1.0 until
+// this fix. The engine has only ever read the top-level `design.txDbm`, so a caller who followed the
+// shape got the launch silently reset to the transmitter's minimum: on the 15 km B+ design below that
+// is -13.30 dBm instead of -9.80 dBm, 3.50 dB optimistic, with the headroom and the pad sized for a
+// module running cold. The top-level field is a real knob and stays; the nested spelling is refused so
+// the number the caller wrote is either used or named.
+test('a launch power inside the endpoint object is refused, not silently dropped', function () {
+  // The baseline first, so the size of the drop is the assertion's own arithmetic:
+  // ODN 14.80 dB from a +1.5 dBm floor  ->  -13.30 dBm  (headroom 13.70 dB against -27 dBm).
+  const plain = budget.opticalBudget(longPon(), registry);
+  close(plain.rxPowerDbm, 1.5 - 14.8, 0.001, 'the B+ launch floor is the default');
+  // `olt.txDbm: 5` as documented would have been 5.00 - 14.80 = -9.80 dBm. It was read as absent.
+  const err = throws(function () {
+    budget.opticalBudget(longPon({ olt: { model: 'gpon-b-plus-8', txDbm: 5 } }), registry);
+  }, 'txDbm', 'a nested launch on the OLT');
+  assert.ok(err.message.indexOf('design.olt.txDbm') !== -1, 'names where it got it: ' + err.message);
+  assert.ok(err.message.indexOf('"txDbm"') !== -1, 'names the field it reads instead: ' + err.message);
+  // The ONT is the other end, and upstream it launches: the same guard, the same reason.
+  throws(function () {
+    budget.opticalBudget(longPon({ ont: { model: 'gpon-ont-1ge', txDbm: 2 } }), registry);
+  }, 'txDbm', 'a nested launch on the ONT');
+});
+
+test('the top-level launch is still read, inside the window and outside it', function () {
+  // 4.00 - 14.80 = -10.80 dBm: a real launch, used, not defaulted.
+  const pinned = budget.opticalBudget(longPon({ txDbm: 4 }), registry);
+  close(pinned.txDbm, 4, 0.001, 'the pinned launch is the launch');
+  close(pinned.rxPowerDbm, 4 - 14.8, 0.001, 'receive power at the pinned launch');
+  // 0 dBm is under the 1.5 dBm floor this card can make: used, with a warning naming the window, which
+  // is the long-standing behaviour of this field and not part of the guard. 0.00 - 14.80 = -14.80 dBm.
+  const cold = budget.opticalBudget(longPon({ txDbm: 0 }), registry);
+  close(cold.txDbm, 0, 0.001, 'a launch below the window is still the launch');
+  close(cold.rxPowerDbm, 0 - 14.8, 0.001, 'receive power at the launch the caller asked for');
+  assert.strictEqual(cold.reasons.length, 0, JSON.stringify(cold.reasons));
+  assert.ok(cold.warnings.some(function (w) { return w.indexOf('outside the OLT gpon-b-plus-8 range') !== -1; }),
+    JSON.stringify(cold.warnings));
+});
+
+test('the active budget refuses a nested launch at either end', function () {
+  // `sfp-plus-10g-lr-10km` launches -8.2..+0.5 dBm; 500 m of g652d-loose-24 at 1310 nm is
+  // 0.5 x 0.35 = 0.175 dB, so a pinned +0.5 dBm floor reads -0.175 dBm at the far end.
+  const p2p = function (ends) {
+    return { headEnd: ends.headEnd, cpe: ends.cpe, spans: [{ cable: 'g652d-loose-24', lengthM: 500 }] };
+  };
+  const LR = { model: 'sfp-plus-10g-lr-10km' };
+  const plain = budget.pointToPoint(p2p({ headEnd: LR, cpe: LR }), registry);
+  close(plain.rxPowerDbm, -8.2 - 0.175, 0.01, 'the head-end launch floor, rounded to 2 places');
+  throws(function () {
+    budget.pointToPoint(p2p({ headEnd: { model: 'sfp-plus-10g-lr-10km', txDbm: 0.5 }, cpe: LR }), registry);
+  }, 'txDbm', 'a nested launch on the head-end optic');
+  throws(function () {
+    budget.pointToPoint(p2p({ headEnd: LR, cpe: { model: 'sfp-plus-10g-lr-10km', txDbm: 0.5 } }), registry);
+  }, 'txDbm', 'a nested launch on the customer optic');
+  // Pinned at the top of the window upstream: 0.50 - 0.175 = 0.325 dBm, and the pad is sized for the
+  // launch the caller pinned rather than for the module's ceiling.
+  const up = budget.pointToPoint(Object.assign(p2p({ headEnd: LR, cpe: LR }), { txDbm: 0.5, direction: 'up' }), registry);
+  close(up.rxPowerDbm, 0.5 - 0.175, 0.01, 'upstream at a pinned launch');
+});
+
+test('an endpoint object carrying its own metadata still budgets, unchanged', function () {
+  // The guard refuses the one knob the doc block advertised, not the object: a caller that passes a
+  // whole catalogue entry (vendor, class, ports and all) gets the same arithmetic it got before.
+  const rich = budget.opticalBudget(longPon({
+    olt: { model: 'gpon-b-plus-8', vendor: 'generic', class: 'B+', ports: 8 },
+    ont: { model: 'gpon-ont-1ge', vendor: 'generic' }
+  }), registry);
+  const plain = budget.opticalBudget(longPon(), registry);
+  close(rich.odnLossDb, plain.odnLossDb, 0.001, 'same loss with metadata on the ends');
+  close(rich.rxPowerDbm, plain.rxPowerDbm, 0.001, 'same launch with metadata on the ends');
+});
+
 done();
