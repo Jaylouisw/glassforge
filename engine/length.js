@@ -16,6 +16,7 @@
  */
 
 const geo = require('./geo');
+const network = require('./network');
 
 const DEFAULTS = {
   overlengthPct: 3,
@@ -171,8 +172,18 @@ function billOfMaterials(plant, registry, opts) {
     }
     const splices = span.splices === undefined ? 0 : span.splices;
     const closures = span.closures === undefined ? 0 : span.closures;
+    // A span is one route, not always one cable: `bundles` is how many cables run it, set by
+    // auto-design when the span's fibres do not fit the largest cable in the ladder. The purchase is
+    // every cable it pulls - reading the map length once bought half the cable for a 160-fibre trunk,
+    // and the design that produced the plant had already ranked it on both. Absent means one cable; a
+    // count that is not a positive whole number is refused by name, never read as one or as zero.
+    const bundles = span.bundles === undefined ? 1 : span.bundles;
+    if (!network.isBundleCount(bundles)) {
+      throw new Error('span "' + (span.id || '#' + i) + '" has an invalid bundles count "' +
+        String(span.bundles) + '" - a span runs one whole cable or more');
+    }
     const calc = cableToBuy({
-      routeM: span.lengthM,
+      routeM: round(span.lengthM * bundles, 2),
       overlengthPct: o.overlengthPct,
       splices: splices,
       spliceReserveM: o.spliceReserveM,
@@ -192,7 +203,10 @@ function billOfMaterials(plant, registry, opts) {
       to: span.to,
       cable: cable.model,
       fiberCount: cable.fiberCount,
-      routeM: calc.routeM,
+      bundles: bundles,
+      // The measured route, so the line still traces back to the map; `designM` is what is bought,
+      // which covers every cable in the bundle.
+      routeM: round(span.lengthM, 2),
       designM: calc.designM
     });
     const prev = byModel.get(cable.model) || { model: cable.model, label: cable.label, fiberCount: cable.fiberCount, designM: 0, drumM: cable.drumM || o.drumM || 0, lengths: 0 };

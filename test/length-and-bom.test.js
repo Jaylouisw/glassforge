@@ -164,4 +164,80 @@ test('the BOM refuses a minimum that is not a number, even with no spans', funct
   }, 'minimumPurchaseM');
 });
 
+test('a span that needs two cables buys both of them', function () {
+  // 160 customer fibres do not fit one 144-fibre cable, so auto-design marks the span `bundles: 2`.
+  // Two 1200 m cables is 2400 m of cable; +3% overlength = 2472 m, which is two 2000 m drums
+  // (4000 m bought). The BOM read the span's map length once, so the order was 1236 m / one drum -
+  // half the cable for a span whose strands cannot fit the one cable it priced.
+  const plant = {
+    nodes: [
+      { id: 'n1', type: 'olt', model: 'gpon-c-plus-8' },
+      { id: 'n2', type: 'closure', model: 'nap-8' },
+      { id: 'n3', type: 'ont', model: 'gpon-ont-1ge' }
+    ],
+    spans: [
+      { id: 's1', from: 'n1', to: 'n2', cable: 'g652d-loose-144', lengthM: 1200, bundles: 2 },
+      { id: 's2', from: 'n2', to: 'n3', cable: 'g657a2-drop-1', lengthM: 40 }
+    ]
+  };
+  const bom = length.billOfMaterials(plant, registry, { overlengthPct: 3 });
+  const trunk = bom.byCable.filter(function (r) { return r.model === 'g652d-loose-144'; })[0];
+  close(trunk.designM, 2472, 0.01, 'two 1200 m cables + 3%');
+  assert.strictEqual(trunk.drums, 2);
+  assert.strictEqual(trunk.purchaseM, 4000);
+  const line = bom.lines.filter(function (l) { return l.span === 's1'; })[0];
+  assert.strictEqual(line.bundles, 2);
+  assert.strictEqual(line.routeM, 1200, 'the span line still traces the measured route');
+  close(line.designM, 2472, 0.01, 'the span line buys both cables');
+});
+
+test('a span with no bundles field is one cable, as it always was', function () {
+  const plant = {
+    nodes: [{ id: 'n1', type: 'olt', model: 'gpon-c-plus-8' }, { id: 'n2', type: 'ont', model: 'gpon-ont-1ge' }],
+    spans: [{ id: 's1', from: 'n1', to: 'n2', cable: 'g652d-loose-24', lengthM: 1000 }]
+  };
+  const bom = length.billOfMaterials(plant, registry, { overlengthPct: 3 });
+  assert.strictEqual(bom.lines[0].bundles, 1);
+  close(bom.lines[0].designM, 1030, 0.01, '1000 m + 3%');
+});
+
+test('a bundles count that is not a positive whole number is refused by name', function () {
+  // Zero would buy no cable for a span that is drawn on the map, and 1.5 is not a cable count.
+  // The refusal names the span and the value, the way splices and closures do.
+  const plant = {
+    nodes: [{ id: 'n1', type: 'olt', model: 'gpon-c-plus-8' }, { id: 'n2', type: 'ont', model: 'gpon-ont-1ge' }],
+    spans: [{ id: 's1', from: 'n1', to: 'n2', cable: 'g652d-loose-24', lengthM: 1000 }]
+  };
+  [0, -1, 1.5, '2', null].forEach(function (bad) {
+    plant.spans[0].bundles = bad;
+    const err = throws(function () { length.billOfMaterials(plant, registry, {}); }, 'invalid bundles count', 'bundles ' + String(bad));
+    assert.ok(err.message.indexOf('s1') !== -1, 'the refusal names the span: ' + err.message);
+  });
+});
+
+test('the design BOM and the cable page buy the same cable for one plant', function () {
+  // One plant, one cable order. `synthesise` counts a span's bundles in its own BOM (fibre-metres and
+  // cableM), and /bom prices the same span from the same plant - so the two lines have to agree. They
+  // did not: 80 customers x 2 fibres put 160 fibres on the first tree edges, two 144-fibre cables per
+  // span, and the cable page quoted half the cable the design had just ranked.
+  const demand = [];
+  for (let i = 1; i <= 80; i++) demand.push({ id: 'p' + i, label: 'H' + i, lat: 0, lon: i * 0.0002 });
+  const out = engine.design.synthesise(demand, {
+    headEnd: { lat: 0, lon: 0, name: 'HE' }, technology: 'active', includeAllPlants: true
+  }, registry);
+  const tree = out.candidates.filter(function (c) { return c.label.indexOf('shared cable tree') !== -1; })[0];
+  assert.ok(tree && tree.plant, 'the active tree candidate should carry a plant');
+  assert.ok(tree.plant.spans.some(function (s) { return (s.bundles || 1) > 1; }),
+    'the fixture must need a bundled span or this test proves nothing');
+  const bom = length.billOfMaterials(tree.plant, registry, {});
+  const byModel = new Map(bom.byCable.map(function (r) { return [r.model, r]; }));
+  tree.bom.lines.forEach(function (line) {
+    const row = byModel.get(line.model);
+    assert.ok(row, 'the cable page is missing ' + line.model);
+    // Per-span rounding of the 3% overlength moves the sum by under a metre; the bug was a factor.
+    close(row.designM, line.designM, 2, line.model + ' design length');
+    assert.strictEqual(row.drums, line.drums, line.model + ' drums');
+  });
+});
+
 done();

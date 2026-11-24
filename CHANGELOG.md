@@ -34,6 +34,20 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A span that needs two cables buys two cables.** Auto-design writes `spans[].bundles` when the
+  fibres a span carries do not fit the largest cable in the ladder — 160 customer fibres is two
+  144-fibre cables over one measured route — and its own BOM counts them (fibre-metres, `cableM`,
+  the per-model purchase). `GET /api/projects/:id/bom` read the route length once, so the cable page
+  for that plant quoted **half the cable** the design had just ranked and bought one drum where two
+  were needed: a 1.2 km trunk with `bundles: 2` priced 1236 m instead of 2472 m. `billOfMaterials` now
+  multiplies the measured route by the bundle count and reports it, keeping `routeM` as the map length
+  and `designM` as what is bought; `strandLedger` counts every cable's capacity, so 18 strands on a
+  2 × 12 span is 75% rather than overbooked, and an overbooked bundle names its capacity as
+  `2 x 12-fibre`. `network.validate` refuses a `bundles` that is not a positive whole number (a
+  hand-edited `0` would buy no cable for a span drawn on the map) and `/bom` names that span instead of
+  answering 500. Tests: `length-and-bom` adds 4, including one that prices the same auto-designed plant
+  through both BOMs and requires them to agree; `strand-ledger` adds 2, `plant-validation` 1 and
+  `api-ops-validation` 2.
 - **A strand is addressed in its own cable's tube size, not always twelve.** Every cable part publishes
   `fibersPerTube` and `parts.validate` holds it to 1..24, but nothing read it: `network.spliceTable`
   called `fiber.addressFor(index)` with no options, so a 24-per-tube ribbon's strand 25 was printed

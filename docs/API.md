@@ -136,7 +136,7 @@ POST /api/projects/:id/budget   { ontId?, direction?, marginDb?, wavelength? }
   → { budgets: [ { ont, name, result } | { ont, name, error } ] }
 
 GET  /api/projects/:id/bom       → { lines: [...per span], byCable: [...per model], spanCount }
-                                   lines[]   { span, from, to, cable, fiberCount, routeM, designM }
+                                   lines[]   { span, from, to, cable, fiberCount, bundles, routeM, designM }
                                    byCable[] { model, label, fiberCount, designM, lengths, drumM, drums, purchaseM, spareM }
 GET  /api/projects/:id/strands   → { rows: [...per span], totalStrands, totalUsed, utilisation, overbooked }
 
@@ -145,6 +145,12 @@ POST /api/design/length          { routeM, overlengthPct?, splices?, closures?, 
                                  or { points: [{lat, lon}, ...], ... }
 GET  /api/design/splitter?ratio=8 → { ratio, idealSplitLossDb }
 ```
+
+A span is one route but not always one cable: `bundles` is how many cables run it, and auto-design sets
+it above one when the fibres a span carries do not fit the largest cable in the ladder. `routeM` stays
+the measured route and `designM` is what is bought for **every** cable in the bundle, so a 1.2 km span
+with `bundles: 2` prices 2.4 km of that cable. The strand page counts the same capacity: 18 strands on
+a 2 × 12 span is three-quarters full, not overbooked.
 
 `/api/design/budget` runs the **PON** budget and nothing else: it calls `budget.opticalBudget`, so
 `design.olt.model` is required. A design with no OLT model — including a point-to-point body of

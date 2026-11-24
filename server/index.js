@@ -446,6 +446,9 @@ async function handle(req, res, ctx) {
           if (!engine.network.isSpanCount(span.closures)) {
             return 'span "' + span.id + '" has an invalid closures count "' + String(span.closures) + '"';
           }
+          if (!engine.network.isBundleCount(span.bundles)) {
+            return 'span "' + span.id + '" has an invalid bundles count "' + String(span.bundles) + '"';
+          }
           return null;
         }).filter(function (problem) { return problem !== null; });
         if (!unpriceable.length) throw err;

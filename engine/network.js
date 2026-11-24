@@ -69,6 +69,20 @@ function isSpanCount(value) {
   return Array.isArray(value) || (typeof value === 'number' && Number.isInteger(value) && value >= 0);
 }
 
+/**
+ * How many cables run a span.
+ *
+ * A span is one route but not always one cable: auto-design sets `bundles` when the fibres it has to
+ * carry do not fit the largest cable in the ladder, so a 160-fibre trunk is two 144-fibre cables over
+ * the same measured route. Absent means one cable. Zero is not a cable count - it would buy no cable
+ * for a span that is drawn on the map - and a fraction is not one either, so both are refused by name
+ * rather than read as one.
+ */
+function isBundleCount(value) {
+  if (value === undefined) return true;
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1;
+}
+
 function nodeById(plant, id) {
   return (plant.nodes || []).find(function (n) { return n.id === id; }) || null;
 }
@@ -276,18 +290,27 @@ function strandLedger(plant, registry) {
     const unique = new Set(strands);
     const used = unique.size;
     const fiberCount = cable ? cable.fiberCount : null;
+    // A span's `bundles` is how many cables run it, so its capacity is every cable's fibres: 18 strands
+    // in use on a 2 x 12 span is three-quarters full, not overbooked, and a second cable's twelve
+    // spare strands are on the order whether or not the ledger counted them.
+    const bundles = span.bundles === undefined ? 1 : (isBundleCount(span.bundles) ? span.bundles : 1);
+    const capacityFibres = fiberCount === null ? null : fiberCount * bundles;
     const row = {
       span: span.id || '#' + i,
       cable: span.cable,
+      bundles: bundles,
       fiberCount: fiberCount,
       used: used,
-      spare: fiberCount === null ? null : Math.max(0, fiberCount - used),
-      utilisation: fiberCount ? Math.round((used / fiberCount) * 1000) / 10 : null,
-      overbooked: fiberCount !== null && used > fiberCount
+      spare: capacityFibres === null ? null : Math.max(0, capacityFibres - used),
+      utilisation: capacityFibres ? Math.round((used / capacityFibres) * 1000) / 10 : null,
+      overbooked: capacityFibres !== null && used > capacityFibres
     };
-    if (row.overbooked) row.error = 'span "' + row.span + '" uses ' + used + ' strands of a ' + fiberCount + '-fibre cable';
+    if (row.overbooked) {
+      row.error = 'span "' + row.span + '" uses ' + used + ' strands of ' +
+        (bundles > 1 ? bundles + ' x ' + fiberCount + '-fibre cable' : 'a ' + fiberCount + '-fibre cable');
+    }
     rows.push(row);
-    if (fiberCount !== null) totalStrands += fiberCount;
+    if (capacityFibres !== null) totalStrands += capacityFibres;
     totalUsed += used;
   });
 
@@ -530,6 +553,9 @@ function validate(plant, registry) {
     }
     if (!isSpanCount(span.closures)) {
       errors.push('span "' + span.id + '" has an invalid closures count "' + String(span.closures) + '"');
+    }
+    if (!isBundleCount(span.bundles)) {
+      errors.push('span "' + span.id + '" has an invalid bundles count "' + String(span.bundles) + '"');
     }
   }
 
@@ -817,5 +843,6 @@ module.exports = {
   capacity: capacity,
   validate: validate,
   isSpanCount: isSpanCount,
+  isBundleCount: isBundleCount,
   stats: stats
 };

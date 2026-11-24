@@ -16,6 +16,12 @@ customer's ONT: cable, closures, splices, connectors, splitters.
 `home-run` (one active cable per customer) or `link` (a leg of a site-to-site circuit, from
 `engine/link.js`).
 
+**Bundles** — how many cables run one span. A span is one route, not always one cable: when the
+fibres it carries do not fit the largest cable in the ladder, auto-design sets `bundles` to the number
+of cables needed (160 fibres over a 144-fibre ladder is two), and the cable purchase and the strand
+ledger count every one of them. Absent means one; `0` and fractions are a contradiction, refused by
+the validator and by the BOM by span and by field.
+
 **Head end** — where the provider's signal starts. `olt` for a PON, `headend` for an active
 point-to-point or active-over-tree design. The root node type selects the budget that is applied.
 

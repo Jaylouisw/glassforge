@@ -308,6 +308,37 @@ async function main() {
     assert.ok(handBom.body.error.indexOf('span "s1" has an invalid splices count "two"') !== -1, handBom.body.error);
   });
 
+  // ------------------------------------------------------------------ a bundle count that is not a count
+  // `bundles` is how many cables run a span - auto-design sets 2 when the fibres do not fit one cable.
+  // Reading it is only safe with a gate: `bundles: 0` in a hand-edited file would buy no cable for a
+  // span that is drawn on the map, so the write gate refuses it and /bom names the span rather than
+  // letting the purchase arithmetic throw through the 500 path.
+  const bundleId = (await request('POST', '/api/projects', { name: 'Bundle counts' })).body.id;
+  await build(bundleId, validPlant);
+  const storedBundle = await request('GET', '/api/projects/' + bundleId);
+  const putBadBundle = await request('PUT', '/api/projects/' + bundleId, {
+    nodes: storedBundle.body.nodes,
+    spans: storedBundle.body.spans.map(function (span, i) {
+      return i === 0 ? Object.assign({}, span, { bundles: 0 }) : span;
+    })
+  });
+  test('PUT refuses a bundles count of zero, naming the span and the field', function () {
+    assert.strictEqual(putBadBundle.status, 400, brief(putBadBundle));
+    assert.deepStrictEqual(putBadBundle.body.errors, ['span "s1" has an invalid bundles count "0"']);
+  });
+
+  const bundlePath = path.join(dataRoot, 'projects', bundleId + '.json');
+  const bundleFile = JSON.parse(fs.readFileSync(bundlePath, 'utf8'));
+  bundleFile.spans[0].bundles = 1.5;
+  fs.writeFileSync(bundlePath, JSON.stringify(bundleFile));
+  const bundleRead = await request('GET', '/api/projects/' + bundleId);
+  const bundleBom = await request('GET', '/api/projects/' + bundleId + '/bom');
+  test('a hand-edited bundles count is named by the validator and by the BOM, not blamed on the server', function () {
+    assert.deepStrictEqual(bundleRead.body.derived.errors, ['span "s1" has an invalid bundles count "1.5"']);
+    assert.strictEqual(bundleBom.status, 400, brief(bundleBom));
+    assert.ok(bundleBom.body.error.indexOf('span "s1" has an invalid bundles count "1.5"') !== -1, bundleBom.body.error);
+  });
+
   await new Promise(function (resolve) { server.close(resolve); });
   fs.rmSync(dataRoot, { recursive: true, force: true });
   done();

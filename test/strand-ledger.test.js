@@ -51,4 +51,31 @@ test('a span naming a cable the catalogue does not have still reports usage', fu
   assert.strictEqual(ledger.rows[0].spare, null);
 });
 
+test('a bundled span has every cable\'s strands, so 18 of 24 is half full', function () {
+  // Auto-design writes `bundles: 2` for a span that needs more fibres than one cable carries. The
+  // ledger counted one cable: 18 strands on a 2 x 12 span read as overbooked, and 12 in use read as
+  // 100% full with no spare even though a whole second cable was on the order.
+  const plant = plantWith([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
+  plant.spans[0].bundles = 2;
+  const ledger = engine.network.strandLedger(plant, registry);
+  assert.strictEqual(ledger.rows[0].bundles, 2);
+  assert.strictEqual(ledger.rows[0].used, 18);
+  assert.strictEqual(ledger.rows[0].spare, 6);
+  assert.strictEqual(ledger.rows[0].utilisation, 75);
+  assert.strictEqual(ledger.rows[0].overbooked, false, '18 strands fit two 12-fibre cables');
+  assert.strictEqual(ledger.totalStrands, 24, 'the total counts both cables');
+  assert.strictEqual(ledger.totalUsed, 18);
+  assert.strictEqual(ledger.utilisation, 75);
+});
+
+test('overbooking on a bundled span names both cables', function () {
+  // 25 strands do not fit 2 x 12. The message has to say which capacity it exceeded, or a planner
+  // reads "25 of a 12-fibre cable" and buys one cable instead of two.
+  const plant = plantWith([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]);
+  plant.spans[0].bundles = 2;
+  const ledger = engine.network.strandLedger(plant, registry);
+  assert.strictEqual(ledger.rows[0].overbooked, true);
+  assert.ok(/25 strands of 2 x 12-fibre cable/.test(ledger.rows[0].error), ledger.rows[0].error);
+});
+
 done();

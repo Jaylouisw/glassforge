@@ -126,6 +126,10 @@ per-span line so the total can be traced back to the map. The per-span line carr
 a drum count per span would contradict the model total it sits under, which is the rounding rule
 above stated as a shape.
 
+A span is one route, not always one cable. `spans[].bundles` is how many cables run it — auto-design
+sets it above one when the span's fibres do not fit the largest cable in the ladder — and the purchase
+and the strand ledger both count every cable, while `routeM` stays the measured route.
+
 ## 6. Strands are addressed the way the tray is
 
 `fiber.addressFor(31)` → `{ tube: 3, fiber: 7, label: 'T03-F07', fiberColor: red, tubeColor: green }`,

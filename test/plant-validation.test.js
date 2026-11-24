@@ -163,4 +163,21 @@ test('a splice list and a zero count are counts the BOM can price, so they valid
   assert.strictEqual(engine.length.billOfMaterials(p, registry, {}).lines[0].designM, 987);
 });
 
+test('a bundles count that is not a positive whole number is refused at the write gate', function () {
+  // `bundles` is how many cables run a span (auto-design sets it when the fibres do not fit one
+  // cable). It is read by the BOM and the strand ledger, so `0` would buy no cable for a span that is
+  // drawn on the map and `1.5` is not a cable count. Refused by span and by field, like splices.
+  const zero = base();
+  zero.spans[0].bundles = 0;
+  assert.deepStrictEqual(engine.network.validate(zero, registry).errors,
+    ['span "s1" has an invalid bundles count "0"']);
+  const fractional = base();
+  fractional.spans[1].bundles = 1.5;
+  assert.deepStrictEqual(engine.network.validate(fractional, registry).errors,
+    ['span "s2" has an invalid bundles count "1.5"']);
+  const good = base();
+  good.spans[0].bundles = 2;
+  assert.deepStrictEqual(engine.network.validate(good, registry).errors, []);
+});
+
 done();
