@@ -184,13 +184,19 @@ difference is almost exactly the detour to the junction, which is the whole poin
   "routeMethod": "straight-line x1.2",
   "technology": "pon",
   "best": { "label": "PON 1:8 with 3 splitter site(s)", "metrics": { "cableM": 2987.7, "fibreMetres": 26987.7,
-            "onts": 24, "splitters": 3, "closures": 21, "worstHeadroomDb": 20.7 } },
+            "onts": 24, "splitters": 3, "closures": 21, "worstHeadroomDb": 20.7, "marginalOnts": 0 } },
   "candidates": [ { "label": "...", "feasible": false, "reasons": ["..."], "metrics": {...} } ],
   "plant": { "nodes": [...], "spans": [...] },   // the winner, ready for network.validate
   "runs": [ { "id": "s-feed-1", "purpose": "feeder", "cable": "g652d-loose-12", "lengthM": 421.3, "feedsSplitters": 3 } ],
   "rationale": [ "Chosen: ...", "Rejected ...: feasible but needs ... (1.04x)" ]
 }
 ```
+
+`metrics.marginalOnts` counts the ONTs whose verdict is `marginal` — a design that passes, but with under
+2 dB above the design margin or under 1 dB of its class budget left (SPEC §4) — and `warnings` names the
+tightest one once for the whole plant. Each candidate's `budgets` carries one row per ONT,
+`{ ont, name, verdict, marginalReason, headroomDb, rxPowerDbm, launchWindowPad, error }`, so a marginal
+verdict can be read per address instead of only as a plant-level sentence.
 
 `rationale` is written to be checkable: every line quotes the numbers the comparison used. When
 `ok` is false there is no `plant`, and every candidate carries the reasons it was refused — a design

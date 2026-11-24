@@ -31,6 +31,9 @@ and the checks, and a PNG of the drawing at a stated scale.
 - Tests: `print-export` adds 9 assertions (scale bar, export arithmetic, splice schedule), `api-http`
   adds 5 (the page, its escaping, an empty plant, a missing id, an unpriceable cable) and
   `ui-dom-contract` adds 1 (the two toolbar controls are wired). The repository total is the runner's.
+- **`marginalReason` on a budget and `metrics.marginalOnts` in a design report** — a `marginal` verdict
+  names the figure it is tight on (the margin slack, the class headroom, or both), the per-ONT `budgets`
+  row carries the same sentence, and the plant-level warning names the ONT whose figure is tightest.
 
 ### Fixed
 

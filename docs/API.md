@@ -103,7 +103,11 @@ refused by row number — geocoding is off by default. `network` switches the ro
 straight-line factor to a street/duct graph; `/api/import/network` builds that graph and hands it back
 so the caller can preview it (and send it as `network` unchanged). `applyToProject` replaces the project's plant in
 one operation (one undo step) *after* validating it; without it, the design is returned and nothing is
-written. Candidates that fail are returned with `feasible: false` and their reasons, never dropped.
+written. Candidates that fail are returned with `feasible: false` and their reasons, never dropped. Every
+candidate carries `budgets`, one row per ONT (`{ ont, name, verdict, marginalReason, headroomDb,
+rxPowerDbm, launchWindowPad, error }`), and `metrics.marginalOnts` counts the ONTs that pass only
+marginally; the chosen design's `warnings` names the tightest one once for the whole plant — see
+[AUTO-DESIGN.md](AUTO-DESIGN.md#reading-a-result).
 With `costs`, `objective` is `cost` and every candidate's `metrics.cost` prices the drums the BOM buys
 (`purchaseM`) plus the priced splices, closures and splitters, with the terms in
 `metrics.costBreakdown: { cable, splices, closures, splitters, total }`; without `costs`, both are
@@ -205,8 +209,14 @@ A budget `result` carries: `verdict` (`ok`/`marginal`/`fail`), `reasons`, `warni
 do not move the verdict; the launch-window band
 [OPTICAL.md](OPTICAL.md#the-band-between-the-two-launches) describes is the one an ordinary estate
 carries), `rxPowerDbm`, `headroomDb`, `odnLossDb`, `budgetDb`, `classHeadroomDb`, `cascadeRatio`,
-`wavelength`, `direction`, `attenuator`, `launchWindowPad` and `breakdown` (one line per loss element).
-See [SPEC.md](SPEC.md) §2–4.
+`wavelength`, `direction`, `marginalReason`, `attenuator`, `launchWindowPad` and `breakdown` (one line per
+loss element). See [SPEC.md](SPEC.md) §2–4.
+
+`marginalReason` is the sentence a `marginal` verdict used to lack: it names the figure that is tight and
+only that figure — `headroom 3.22 dB is only 0.22 dB above the 3 dB design margin (sensitivity -27 dBm)`,
+`only 0.62 dB of the GPON B+ budget of 28 dB is left`, or both, joined with `, and `. It is `null` for
+`ok` (nothing to explain) and for `fail` (its `reasons` name the fault and the fix, and a failure dressed
+as marginal would soften a refusal).
 
 `attenuator` is `null` when the receiver is at or below its overload point, and otherwise
 `{ overDb, padDb, maxPadDb, atTxDbm, fits }` — how far above overload the receiver lands with the

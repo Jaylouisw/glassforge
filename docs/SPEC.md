@@ -110,6 +110,10 @@ They fail independently. A link can hear fine and still be outside what the OLT 
 `test/budget-optics.test.js` has exactly that case. Verdicts are `ok`, `marginal` (passes, but with
 under 2 dB above the margin or under 1 dB of class headroom) and `fail`.
 
+A `marginal` result carries `marginalReason`: one sentence naming the figure that is tight — the slack
+above the design margin, the class headroom, or both — and `null` for `ok` and `fail`, because a failure
+is named by `reasons` and must not be softened into a marginal.
+
 Every budget returns its `breakdown`: one line per fibre span, splice group, connector group and
 splitter, each with a `db` value. A verdict without its arithmetic is not reviewable.
 
