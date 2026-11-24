@@ -54,7 +54,7 @@ It returns every candidate with its metrics and the reason it lost, the winner's
 
 ```
 Chosen: Active Ethernet over a shared cable tree, 1 Gb/s 1G-LX-10KM: 3 ONT(s), 343.5 m of cable
-        (3404 fibre-metres), 0 splitter(s), 3 closure(s), worst headroom 9.48 dB.
+        (3404 fibre-metres), 0 splitter(s), 3 closure(s), worst headroom 6.98 dB.
 Rejected PON 1:8 with 1 splitter site(s): feasible but needs 414.1 m of cable and 3411.6
         fibre-metres (1x)
 Rejected Active Ethernet, one cable per customer, 1 Gb/s 1G-LX-10KM: feasible but needs 814.5 m
