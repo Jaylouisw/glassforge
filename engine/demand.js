@@ -60,13 +60,51 @@ function splitRow(line, delimiter) {
     if (quoted) {
       if (ch === '"' && line[i + 1] === '"') { field += '"'; i++; }
       else if (ch === '"') quoted = false;
-      else field += ch;
+      // A line break inside a quoted field is part of the value (RFC 4180). It is folded to a
+      // space rather than kept: a field becomes a node name and a line of the printed plan, and
+      // neither was ever meant to carry a newline into the table it is printed in.
+      else field += ch === '\n' ? ' ' : ch;
     } else if (ch === '"') quoted = true;
     else if (ch === delimiter) { out.push(field); field = ''; }
     else field += ch;
   }
   out.push(field);
   return out.map(function (f) { return f.trim(); });
+}
+
+/**
+ * Split CSV text into records, honouring quoted fields.
+ *
+ * A quoted field may carry the delimiter (that is `splitRow`'s job) and, per RFC 4180, a line
+ * break: `"Unit 4\n12 High Street"` is one address. Splitting the text on a newline first meant
+ * that address was cut at the break and its tail parsed as a row with no latitude, so a real address
+ * list came back as a truncated address plus a phantom `rejected` point nobody could find in the
+ * file. The field splitter already promised quoted fields; this is the record splitter keeping the
+ * same promise.
+ *
+ * An unterminated quote is not RFC 4180 and this importer cannot tell where that field ended, so it
+ * returns `null` and the caller falls back to the plain line split - malformed input keeps the answer
+ * it has always had instead of swallowing every row after the stray quote into one record.
+ */
+function splitRecords(text) {
+  const records = [];
+  let current = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { current += '""'; i++; continue; }
+      if (ch === '"') quoted = false;
+      current += ch;
+      continue;
+    }
+    if (ch === '"') { quoted = true; current += ch; continue; }
+    if (ch === '\n') { records.push(current); current = ''; continue; }
+    current += ch;
+  }
+  if (quoted) return null;
+  records.push(current);
+  return records;
 }
 
 function sniffDelimiter(headerLine) {
@@ -96,7 +134,11 @@ function indexOfAny(header, names) {
  */
 function parseCsv(text, opts) {
   const o = opts || {};
-  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n')
+  const raw = String(text || '').replace(/\r\n?/g, '\n');
+  // Records before lines: a quoted field may carry a line break, so the record splitter has to see
+  // the quote before the newline means anything. `null` means the quotes never balanced.
+  const records = splitRecords(raw) || raw.split('\n');
+  const lines = records
     .map(function (l) { return l.trim(); })
     .filter(function (l) { return l && l.charAt(0) !== '#'; });
 
@@ -138,18 +180,18 @@ function parseCsv(text, opts) {
     const rawLat = row[latIdx];
     const rawLon = row[lonIdx];
     if (rawLat === '' || rawLon === '' || rawLat === undefined || rawLon === undefined) {
-      rejected.push({ row: rowNumber, reason: 'latitude or longitude is empty', text: lines[i].slice(0, 120) });
+      rejected.push({ row: rowNumber, reason: 'latitude or longitude is empty', text: lines[i].replace(/\n/g, ' ').slice(0, 120) });
       continue;
     }
     const lat = Number(rawLat);
     const lon = Number(rawLon);
     if (!isNum(lat) || !isNum(lon)) {
-      rejected.push({ row: rowNumber, reason: 'latitude/longitude are not numbers', text: lines[i].slice(0, 120) });
+      rejected.push({ row: rowNumber, reason: 'latitude/longitude are not numbers', text: lines[i].replace(/\n/g, ' ').slice(0, 120) });
       continue;
     }
     const point = { lat: lat, lon: lon };
     if (!geo.isCoordinate(point)) {
-      rejected.push({ row: rowNumber, reason: 'latitude/longitude out of range', text: lines[i].slice(0, 120) });
+      rejected.push({ row: rowNumber, reason: 'latitude/longitude out of range', text: lines[i].replace(/\n/g, ' ').slice(0, 120) });
       continue;
     }
     const label = labelIdx !== -1 && row[labelIdx] ? row[labelIdx] : null;
