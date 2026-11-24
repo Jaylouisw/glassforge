@@ -540,6 +540,95 @@ function launchWindowNote(rows, opts) {
   };
 }
 
+/**
+ * The upstream half of every link over this ODN, said once for the plant.
+ *
+ * A PON is two links over one loss: the OLT launches into the ONT at 1490 nm and the ONT launches into
+ * the OLT at 1310 nm, which is the more lossy wavelength. `opticalBudget` answers either direction -
+ * `direction: 'up'` reads the OLT's own receiver - but every surface that summarised a *plant* asked
+ * for the default one, so a design that is `ok` on every ONT downstream and `fail` upstream was
+ * reported as clean (#185). This is the sentence that stops that, built from the rows
+ * `allOntBudgets(..., { direction: 'up' })` returned so the design report and any other consumer
+ * quote one implementation instead of two - the same contract as `launchWindowNote`.
+ *
+ * What it deliberately does **not** do is move a verdict. An upstream failure is reported, not made
+ * infeasible: no PON class floor is modelled (only the ceiling, `CLASS_BUDGET_DB`), so gating on the
+ * upstream direction would empty auto-design for an ordinary short-feed estate - the open decision in
+ * #185 and #111. The note says so in as many words, because a reader who sees one direction fail and
+ * a `feasible: true` beside it deserves the reason rather than a contradiction.
+ *
+ * `rows` are `{ ont, name, result }` as `allOntBudgets` returns them, and a row whose budget threw is
+ * not counted: "1 of 3" has to mean three budgeted ONTs. Returns null when nothing fails upstream, so
+ * a clean plant carries no sentence at all - the printed plan's own rule for a warning.
+ *
+ * The worst row is the one furthest past its verdict, not the one with the least headroom: an overload
+ * failure has plenty of headroom and still fails, so the figure compared is the largest of the three
+ * ways a budget fails - dB over the overload point, dB short of the margin, dB over the budget.
+ */
+function upstreamNote(rows, opts) {
+  const o = opts || {};
+  const marginDb = isNum(o.marginDb) ? o.marginDb : DEFAULT_MARGIN_DB;
+  const budgeted = (rows || []).filter(function (r) { return r && r.result; });
+  const failing = budgeted.filter(function (r) { return r.result.verdict === 'fail'; });
+  if (!failing.length) return null;
+
+  // How far past the verdict a row is, in dB, so overload, headroom and budget failures compare on
+  // one number. A row that fails none of them (a route longer than the optic reaches) scores 0 and is
+  // still nameable when it is the only failure.
+  function shortfallDb(row) {
+    const r = row.result;
+    const over = isNum(r.rxPowerDbm) && isNum(r.overloadDbm) ? r.rxPowerDbm - r.overloadDbm : -Infinity;
+    const tight = isNum(r.headroomDb) ? marginDb - r.headroomDb : -Infinity;
+    const overBudget = isNum(r.classHeadroomDb) ? -r.classHeadroomDb : -Infinity;
+    const worst = Math.max(over, tight, overBudget);
+    return worst === -Infinity ? 0 : worst;
+  }
+
+  // Ties break on the ONT id, so the sentence never depends on the order the plant was built in.
+  const worst = failing.reduce(function (a, b) {
+    const diff = shortfallDb(b) - shortfallDb(a);
+    if (diff > 0) return b;
+    if (diff < 0) return a;
+    return String(b.ont) < String(a.ont) ? b : a;
+  });
+  const pad = worst.result.attenuator;
+  const others = failing.length - 1;
+  const reason = worst.result.reasons[0] || 'the budget fails with no reason recorded';
+
+  const text = failing.length + ' of ' + budgeted.length + ' ONT' + (budgeted.length === 1 ? '' : 's') +
+    ' ' + (failing.length === 1 ? 'fails' : 'fail') + ' upstream over the same ODN - ' +
+    (worst.name || worst.ont) + ': ' + reason +
+    // A second parenthetical reads as a footnote to the fix; a semicolon keeps the counts in one
+    // breath, which is what a report of 'how much of the estate is failing' is.
+    (others > 0 ? '; ' + others + ' more ONT' + (others === 1 ? '' : 's') + ' fail upstream' : '') +
+    // The reason above is a clause, not a sentence: it has no full stop of its own, and the parenthetical
+    // is where one used to go missing when a plant had more than one failing ONT.
+    '.' +
+    // One pad is ODN loss in both directions, and the upstream overload is the loud side: the band
+    // note offers the pad that clears the ONT receiver, which is the smaller of the two numbers.
+    (pad ? ' A pad is ODN loss and serves both directions, so ' + pad.padDb +
+      ' dB is the size to buy - a pad sized for the launch band alone leaves the other receiver over its limit.' : '') +
+    ' The design is still ranked and offered on its downstream verdict: an upstream failure is ' +
+    'reported here rather than treated as infeasibility, because the plant is only ever judged ' +
+    'against a ceiling on ODN loss.';
+
+  return {
+    text: text,
+    onts: failing.length,
+    total: budgeted.length,
+    worstOnt: worst.ont,
+    // Named the way the technology names it: an active plant has no OLT to blame.
+    receiver: worst.result.technology === 'p2p'
+      ? 'head-end optic ' + worst.result.headEnd
+      : 'OLT ' + worst.result.olt,
+    rxPowerDbm: isNum(worst.result.rxPowerDbm) ? worst.result.rxPowerDbm : null,
+    overloadDbm: isNum(worst.result.overloadDbm) ? worst.result.overloadDbm : null,
+    shortfallDb: round(shortfallDb(worst), 2),
+    padDb: pad ? pad.padDb : null,
+    fits: pad ? pad.fits : null
+  };
+}
+
 /** The clause an overload reason carries, so the refusal says what to do about it. */
 function attenuatorClause(pad, marginDb) {
   if (!pad) return '';
@@ -881,6 +970,7 @@ module.exports = {
   cableAttenuation: cableAttenuation,
   splitterLoss: splitterLoss,
   launchWindowNote: launchWindowNote,
+  upstreamNote: upstreamNote,
   opticalBudget: opticalBudget,
   pointToPoint: pointToPoint,
   computeOdn: computeOdn

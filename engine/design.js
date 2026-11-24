@@ -913,6 +913,15 @@ function bomOf(plant, registry, opts) {
 function evaluate(plant, opts, registry, meta) {
   const structural = network.validate(plant, registry);
   const budgets = network.allOntBudgets(plant, registry, { marginDb: opts.marginDb, direction: 'down' });
+  // The other half of every link over this ODN. A PON is two links over one loss - the ONT launches
+  // into the OLT receiver at 1310 nm, 0.35 dB/km, the more lossy wavelength - and the upstream
+  // verdict was never asked for here, so a candidate whose every ONT was `ok` downstream and `fail`
+  // upstream was ranked, costed and offered as the best design (#185). It is reported, not gated:
+  // no PON class floor is modelled (only the ceiling), so making it part of `feasible` would empty
+  // auto-design for an ordinary short-feed estate - a decision #111/#185 still owes, not one a report
+  // makes in passing.
+  const upstream = network.allOntBudgets(plant, registry, { marginDb: opts.marginDb, direction: 'up' });
+  const upstreamFailures = upstream.filter(function (b) { return b.result && b.result.verdict === 'fail'; });
 
   const failures = budgets.filter(function (b) { return b.error || (b.result && b.result.verdict === 'fail'); });
   const headrooms = budgets.filter(function (b) { return b.result && isNum(b.result.headroomDb); })
@@ -966,6 +975,7 @@ function evaluate(plant, opts, registry, meta) {
     worstHeadroomDb: headrooms.length ? Math.min.apply(null, headrooms) : null,
     launchWindowOnts: hotLaunch.length,
     marginalOnts: marginalOnts.length,
+    upstreamFailOnts: upstreamFailures.length,
     bestHeadroomDb: headrooms.length ? Math.max.apply(null, headrooms) : null,
     longestRunM: plant.spans.reduce(function (n, s) { return Math.max(n, s.lengthM); }, 0),
     drums: bom.lines.reduce(function (n, l) { return n + l.drums; }, 0)
@@ -1012,6 +1022,13 @@ function evaluate(plant, opts, registry, meta) {
   metrics.cost = cost;
   metrics.costBreakdown = costBreakdown;
 
+  // One sentence for the upstream direction, built from the rows rather than per ONT - a design of 300
+  // drops that repeated the same failure 300 times would be unreadable. The sentence lives in
+  // `budget.upstreamNote` beside the band note, because the printed plan needs the same one and two
+  // copies of a paragraph this specific drift apart.
+  const upstreamReport = budgetModule.upstreamNote(upstream, {
+    marginDb: isNum(opts.marginDb) ? opts.marginDb : DEFAULTS.marginDb
+  });
   // Said once for the plant rather than once per ONT: each budget row carries its own pad
   // (`launchWindowPad`), and a design of 300 drops that repeated the same sentence 300 times would be
   // unreadable. What the report needs is how much of the estate is in the band and what the worst of it
@@ -1052,6 +1069,11 @@ function evaluate(plant, opts, registry, meta) {
       'design margin or 1 dB of the class budget, so it is a decision to make, not a clean plan';
   }
 
+  // Keyed by node id: the two passes walk the same plant in the same order, but joining on order
+  // would hide a plant whose ONT list changed between them.
+  const upstreamByOnt = new Map();
+  upstream.forEach(function (b) { if (b && b.result) upstreamByOnt.set(String(b.ont), b.result); });
+
   return {
     technology: meta.technology,
     label: meta.label,
@@ -1062,11 +1084,17 @@ function evaluate(plant, opts, registry, meta) {
     unpricedCable: Array.from(new Set(unpricedCable)).sort(),
     reasons: reasons,
     warnings: structural.warnings
+      // An upstream failure is the strongest thing this report can say, so it reads first.
+      .concat(upstreamReport ? [upstreamReport.text] : [])
       .concat(launchWindowNote ? [launchWindowNote] : [])
       .concat(marginalNote ? [marginalNote] : []),
     metrics: metrics,
     bom: bom,
     budgets: budgets.map(function (b) {
+      // Both directions on one row. A row that carried only its downstream verdict is what made this
+      // report read as a clean design; `upstreamVerdict` is null when that pass could not budget the
+      // row at all, and the downstream row's `error` already says why.
+      const up = upstreamByOnt.get(String(b.ont));
       return {
         ont: b.ont,
         name: b.name,
@@ -1075,6 +1103,8 @@ function evaluate(plant, opts, registry, meta) {
         headroomDb: b.result ? b.result.headroomDb : null,
         rxPowerDbm: b.result ? b.result.rxPowerDbm : null,
         launchWindowPad: b.result ? b.result.launchWindowPad : null,
+        upstreamVerdict: up ? up.verdict : null,
+        upstreamRxPowerDbm: up ? up.rxPowerDbm : null,
         error: b.error || null
       };
     }),
@@ -1137,7 +1167,10 @@ function describe(candidate) {
   const m = candidate.metrics;
   return candidate.label + ': ' + m.onts + ' ONT(s), ' + m.cableM + ' m of cable (' +
     m.fibreMetres + ' fibre-metres), ' + m.splitters + ' splitter(s), ' + m.closures + ' closure(s)' +
-    (m.worstHeadroomDb === null ? '' : ', worst headroom ' + m.worstHeadroomDb + ' dB');
+    (m.worstHeadroomDb === null ? '' : ', worst headroom ' + m.worstHeadroomDb + ' dB') +
+    // Said in the line that picks the design, not only in a warning under it: a candidate chosen for
+    // its cost is still a candidate whose upstream direction fails.
+    (m.upstreamFailOnts ? ', ' + m.upstreamFailOnts + ' of ' + m.onts + ' failing upstream' : '');
 }
 
 /**

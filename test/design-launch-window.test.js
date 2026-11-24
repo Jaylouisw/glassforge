@@ -38,7 +38,12 @@ const near = engine.design.synthesise(estate(12), { headEnd: NEAR }, registry);
 const far = engine.design.synthesise(estate(12), { headEnd: FAR }, registry);
 
 function bandWarnings(result) {
-  return (result.warnings || []).filter(function (w) { return w.indexOf('launch window') !== -1; });
+  // The sentence's own opening, not the words 'launch window': the upstream sentence (#185) quotes the
+  // budget's overload reason, which names the launch window too, so the looser filter counted two
+  // sentences about two different faults and could never say 'exactly one band' again.
+  return (result.warnings || []).filter(function (w) {
+    return w.indexOf('inside the overload point only at the bottom of the OLT') !== -1;
+  });
 }
 
 test('a synthesised design whose ONTs all sit in the blind zone reports it', function () {
