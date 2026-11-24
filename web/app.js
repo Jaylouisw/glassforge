@@ -398,6 +398,16 @@
       for (const note of result.notes) notes.appendChild(el('li', { text: note }));
       card.appendChild(notes);
     }
+    // The winning design's warnings, because a budget warning is only worth computing if somebody
+    // reads it (#111). The one that matters here is the launch-window band: a PON estate inside it
+    // passes at the floor launch and overdrives its ONTs with a hot line card, and this tab is where
+    // the plan is proposed and applied.
+    if (result.best && result.best.warnings && result.best.warnings.length) {
+      card.appendChild(el('h3', { text: result.best.warnings.length + ' warning(s)' }));
+      const warnings = el('ul', { class: 'muted' });
+      for (const warning of result.best.warnings) warnings.appendChild(el('li', { text: warning }));
+      card.appendChild(warnings);
+    }
     if (result.ok) {
       const apply = el('button', { text: 'Apply to this project' });
       apply.addEventListener('click', applyAutoDesign);

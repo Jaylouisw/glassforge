@@ -247,7 +247,7 @@ function attenuatorFor(rxPowerDbm, rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, 
 }
 
 /**
- * The launch blind zone, said out loud.
+ * The pad a hot module needs: the other half of the launch-window story.
  *
  * Overload is judged at the floor of the transmitter's window, because that is the worst-case loss
  * budget the class verdict is built on - but a design can be inside its overload point there and over
@@ -258,15 +258,31 @@ function attenuatorFor(rxPowerDbm, rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, 
  * a small estate, so the verdict stays where `docs/SPEC.md` §4 puts it. What must not happen is the
  * band passing in silence - a plan signed off on a link that only works with a cold optic.
  *
+ * This is the structured form, so a caller can count the band or size its pad without reading prose:
+ * the same `{ overDb, padDb, maxPadDb, atTxDbm, fits }` object `attenuator` carries, sized for the top
+ * of the launch window. It and `attenuator` are mutually exclusive - one says the receiver is too loud
+ * at the floor launch, the other says it is only too loud once the module runs hot. `design.js` counts
+ * these to report a synthesised plan whose ONTs all sit in the band.
+ *
  * Returns null when the floor launch is already too loud (`attenuatorFor` owns that, and its reason
  * already names the pad) or when the ceiling launch is still inside the overload point.
  */
-function launchWindowWarning(rxPowerDbm, rxPowerMaxDbm, txDbmMax, txSpec, rxSpec, headroomDb, marginDb, classHeadroomDb) {
+function launchWindowPad(rxPowerDbm, rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb) {
   if (rxPowerDbm > rxSpec.overload) return null;
   if (!(rxPowerMaxDbm > rxSpec.overload)) return null;
-  const pad = padSizing(rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  return padSizing(rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb);
+}
+
+/**
+ * The launch blind zone, said out loud: one sentence built from the pad `launchWindowPad` returned.
+ *
+ * `txDbm` is the launch the receiver is clean at and `txSpec` names the transmitter it belongs to, so
+ * the sentence reads as a band of the window rather than a second fault.
+ */
+function launchWindowWarning(pad, rxPowerDbm, txDbm, txSpec, rxSpec, marginDb) {
+  if (!pad) return null;
   return 'the ' + rxSpec.who + ' is inside its overload point only at the bottom of the ' + txSpec.who +
-    ' launch window: ' + rxPowerDbm + ' dBm at ' + round(txSpec.min, 2) + ' dBm, but ' + pad.overDb +
+    ' launch window: ' + rxPowerDbm + ' dBm at ' + round(txDbm, 2) + ' dBm, but ' + pad.overDb +
     ' dB above ' + rxSpec.overload + ' dBm at the ' + pad.atTxDbm + ' dBm top of the window - ' +
     (pad.fits
       ? 'fit a ' + pad.padDb + ' dB inline pad (up to ' + pad.maxPadDb + ' dB still passes the ' + marginDb +
@@ -363,7 +379,8 @@ function opticalBudget(design, registry) {
   if (attenuator) {
     reasons.push(rxPowerDbm + ' dBm at the ' + rxSpec.who + ' is above its overload point ' + rxSpec.overload + ' dBm - too much power' + attenuatorClause(attenuator, marginDb));
   }
-  const launchWarning = launchWindowWarning(rxPowerDbm, rxPowerMaxDbm, txDbmMax, txSpec, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  const launchPad = launchWindowPad(rxPowerDbm, rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  const launchWarning = launchWindowWarning(launchPad, rxPowerDbm, txDbm, txSpec, rxSpec, marginDb);
   if (launchWarning) warnings.push(launchWarning);
   if (headroomDb < marginDb) {
     reasons.push('headroom ' + headroomDb + ' dB is below the ' + marginDb + ' dB design margin (sensitivity ' + rxSpec.sensitivity + ' dBm)');
@@ -398,6 +415,7 @@ function opticalBudget(design, registry) {
     totalLossDb: totalLossDb,
     classHeadroomDb: classHeadroomDb,
     attenuator: attenuator,
+    launchWindowPad: launchPad,
     cascadeRatio: odn.cascadeRatio,
     fibreLengthM: round(odn.fibreLengthM, 1),
     leasedLengthM: round(odn.thirdPartyLengthM, 1),
@@ -492,7 +510,8 @@ function pointToPoint(design, registry) {
   if (attenuator) {
     reasons.push(rxPowerDbm + ' dBm at the ' + rxSpec.who + ' is above its overload point ' + rxSpec.overload + ' dBm - too much power' + attenuatorClause(attenuator, marginDb));
   }
-  const launchWarning = launchWindowWarning(rxPowerDbm, rxPowerMaxDbm, txDbmMax, txSpec, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  const launchPad = launchWindowPad(rxPowerDbm, rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  const launchWarning = launchWindowWarning(launchPad, rxPowerDbm, txDbm, txSpec, rxSpec, marginDb);
   if (launchWarning) warnings.push(launchWarning);
   if (headroomDb < marginDb) {
     reasons.push('headroom ' + headroomDb + ' dB is below the ' + marginDb + ' dB design margin (sensitivity ' + rxSpec.sensitivity + ' dBm)');
@@ -527,6 +546,7 @@ function pointToPoint(design, registry) {
     totalLossDb: totalLossDb,
     classHeadroomDb: classHeadroomDb,
     attenuator: attenuator,
+    launchWindowPad: launchPad,
     cascadeRatio: 1,
     fibreLengthM: round(odn.fibreLengthM, 1),
     leasedLengthM: round(odn.thirdPartyLengthM, 1),

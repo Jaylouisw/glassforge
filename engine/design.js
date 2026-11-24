@@ -868,6 +868,12 @@ function evaluate(plant, opts, registry, meta) {
   const headrooms = budgets.filter(function (b) { return b.result && isNum(b.result.headroomDb); })
     .map(function (b) { return b.result.headroomDb; });
 
+  // The launch-window band (#111). Overload is judged at the floor of the OLT's window, so these ONTs
+  // pass - and they pass only while every line card that lands in the chassis is a cold one. The
+  // verdict stays where SPEC §4 puts it; the report must not stay silent about the band, and a
+  // synthesised plan is the last place it is cheap to say so.
+  const hotLaunch = budgets.filter(function (b) { return b.result && b.result.launchWindowPad; });
+
   const bom = bomOf(plant, registry, opts);
   const closures = plant.nodes.filter(function (n) { return n.type === 'closure'; }).length;
   const splitters = plant.nodes.filter(function (n) { return n.type === 'splitter'; }).length;
@@ -900,6 +906,7 @@ function evaluate(plant, opts, registry, meta) {
     fibreMetres: bom.fibreMetres,
     designM: bom.designM,
     worstHeadroomDb: headrooms.length ? Math.min.apply(null, headrooms) : null,
+    launchWindowOnts: hotLaunch.length,
     bestHeadroomDb: headrooms.length ? Math.max.apply(null, headrooms) : null,
     longestRunM: plant.spans.reduce(function (n, s) { return Math.max(n, s.lengthM); }, 0),
     drums: bom.lines.reduce(function (n, l) { return n + l.drums; }, 0)
@@ -946,6 +953,35 @@ function evaluate(plant, opts, registry, meta) {
   metrics.cost = cost;
   metrics.costBreakdown = costBreakdown;
 
+  // Said once for the plant rather than once per ONT: each budget row carries its own pad
+  // (`launchWindowPad`), and a design of 300 drops that repeated the same sentence 300 times would be
+  // unreadable. What the report needs is how much of the estate is in the band and what the worst of it
+  // costs - the pad a hot module needs, and whether the margin and the class budget can fund it.
+  //
+  // The `fits: false` clause is not reachable with the optics in the catalogue today - every receiver's
+  // overload-to-sensitivity span is wider than its transmitter's window, so a pad the band needs is
+  // always affordable - but `padSizing` owns that arithmetic and a catalogue that grows must not find
+  // this report claiming a pad nobody can buy.
+  let launchWindowNote = null;
+  if (hotLaunch.length) {
+    const worst = hotLaunch.reduce(function (a, b) {
+      return b.result.launchWindowPad.overDb > a.result.launchWindowPad.overDb ? b : a;
+    });
+    const pad = worst.result.launchWindowPad;
+    const noPad = hotLaunch.filter(function (b) { return !b.result.launchWindowPad.fits; }).length;
+    const marginDb = isNum(opts.marginDb) ? opts.marginDb : DEFAULTS.marginDb;
+    launchWindowNote = hotLaunch.length + ' of ' + budgets.length + ' ONT' + (budgets.length === 1 ? '' : 's') +
+      ' ' + (hotLaunch.length === 1 ? 'is' : 'are') + ' inside the overload point only at the bottom of the OLT ' +
+      worst.result.olt + ' launch window: worst ' + pad.overDb + ' dB over at the ' + pad.atTxDbm + ' dBm top, ' +
+      (pad.fits
+        ? 'so ' + pad.padDb + ' dB of inline pad at the OLT carries the design to full launch'
+        : 'and the worst of them needs ' + pad.padDb + ' dB of pad against the ' + pad.maxPadDb +
+          ' dB the margin and the class budget can fund') +
+      ' - as it stands it holds only while every line card lands at ' + worst.result.txDbm + ' dBm' +
+      (noPad ? '; ' + noPad + ' of them cannot be padded inside the ' + marginDb +
+        ' dB margin and the class budget, so those need a different split or optic' : '');
+  }
+
   return {
     technology: meta.technology,
     label: meta.label,
@@ -955,7 +991,7 @@ function evaluate(plant, opts, registry, meta) {
     // candidates it is about to compare, and the candidate table never carries this field.
     unpricedCable: Array.from(new Set(unpricedCable)).sort(),
     reasons: reasons,
-    warnings: structural.warnings,
+    warnings: structural.warnings.concat(launchWindowNote ? [launchWindowNote] : []),
     metrics: metrics,
     bom: bom,
     budgets: budgets.map(function (b) {
@@ -965,6 +1001,7 @@ function evaluate(plant, opts, registry, meta) {
         verdict: b.result ? b.result.verdict : 'fail',
         headroomDb: b.result ? b.result.headroomDb : null,
         rxPowerDbm: b.result ? b.result.rxPowerDbm : null,
+        launchWindowPad: b.result ? b.result.launchWindowPad : null,
         error: b.error || null
       };
     }),
