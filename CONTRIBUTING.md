@@ -78,7 +78,9 @@ Never merge red, and never silence a check.
 ## Adding a part to the catalogue
 
 1. Drop `parts/<kind>/<model>.json` — the model slug must match the filename.
-2. Fill in `sourceUrl`. For a cable, splitter, OLT or ONT the validator refuses the spec without it.
+2. Fill in `sourceUrl`. For a cable, splitter, OLT, ONT or transceiver the validator refuses the spec
+   without it — an optic's launch power and sensitivity are datasheet figures exactly as a cable's
+   attenuation is.
 3. `node scripts/audit-parts.js` to see what the validator thinks.
 4. `node scripts/count-parts.js` to update the README counts.
 5. One PR per vendor or per part family, with the datasheet figures quoted in `notes`.

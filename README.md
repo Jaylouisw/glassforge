@@ -135,9 +135,10 @@ tool:
 
 1. **A missing figure stays missing.** A cable with no attenuation published at 1490 nm cannot be
    budgeted at 1490 nm — the engine refuses rather than assuming free glass.
-2. **A number from a datasheet says where it came from.** Cables, splitters, OLTs and ONTs carry
-   `sourceUrl`. The figures shipped here are the standards' limits and typical insertion losses, and
-   every one of them says so; replace them with the datasheet of the part you actually buy.
+2. **A number from a datasheet says where it came from.** Cables, splitters, OLTs, ONTs and
+   transceivers carry `sourceUrl`. The figures shipped here are the standards' limits and typical
+   insertion losses, and every one of them says so; replace them with the datasheet of the part you
+   actually buy.
 
 Adding a part is dropping a file in `parts/<kind>/` and running `node scripts/count-parts.js`. See
 [docs/PARTS.md](docs/PARTS.md) for the field list per kind.
