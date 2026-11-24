@@ -199,9 +199,15 @@ function apply(project, operation, opts) {
     }
 
     case 'rename': {
-      if (!operation.name || !String(operation.name).trim()) return fail('rename needs a name');
+      // A name is a string or it is absent - the rule `createProject` and `PUT` keep (#129) - and this
+      // op was the way around it: `String(name).trim()` turned `{ name: {} }` into "[object Object]"
+      // and the printed plan titled itself with it. The trim stays for a real name.
+      if (operation.name === undefined || operation.name === null) return fail('rename needs a name');
+      const nameFault = network.nameProblem(operation.name);
+      if (nameFault) return fail(nameFault);
+      if (!operation.name.trim()) return fail('rename needs a name');
       next.history = snapshot(project, operation.op, o.now);
-      next.name = String(operation.name).trim();
+      next.name = operation.name.trim();
       next.updatedAt = nowIso(o.now);
       return { project: next };
     }

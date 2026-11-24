@@ -26,9 +26,9 @@ test('a well-formed plant validates', function () {
 });
 
 test('a project name that is not a string is refused, because it is printed', function () {
-  // The rename op has always stringified; `createProject` and `PUT` copied `name` through unchanged,
-  // so an object or an array saved. It is JSON-safe, so nothing complained until `/print/project/:id`
-  // rendered "[object Object] - plan". A name is a string, or absent - a design candidate has none.
+  // `createProject` and `PUT` copied `name` through unchanged, so an object or an array saved. It is
+  // JSON-safe, so nothing complained until `/print/project/:id` rendered "[object Object] - plan".
+  // A name is a string, or absent - a design candidate has none.
   const p = base();
   p.name = { a: 1 };
   assert.deepStrictEqual(engine.network.validate(p, registry).errors,
@@ -41,6 +41,25 @@ test('a project name that is not a string is refused, because it is printed', fu
   delete p.name;
   assert.deepStrictEqual(engine.network.validate(p, registry).errors, [],
     'a plant with no name at all is what a design candidate looks like');
+});
+
+test('a node name that is not a string is refused too, naming the node', function () {
+  // The same rule one level down. A node's name is printed as well - the canvas label
+  // (`web/scene.js`), the splice page title, the closure-capacity warning - and `/ops` copied it
+  // out of the body raw, so `{ name: {} }` was stored as an object and drawn as "[object Object]".
+  // Refused at the write gate because a hand-edited file never passes through `apply()` either.
+  const p = base();
+  p.nodes[2].name = { a: 1 };
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors,
+    ['node "n3" name must be a string, got an object']);
+  p.nodes[2].name = 5;
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors,
+    ['node "n3" name must be a string, got a number']);
+  p.nodes[2].name = 'Casa 30';
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors, []);
+  p.nodes[2].name = null;
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors, [],
+    'a node with no name yet is a legitimate state, like its missing coordinates');
 });
 
 test('exactly one OLT: a second root is refused at plant level, with or without an ONT', function () {

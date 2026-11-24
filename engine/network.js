@@ -519,7 +519,10 @@ function capacity(plant, registry) {
 }
 
 /**
- * The project name is a string or it is absent - the one rule every write that carries it keeps.
+ * A name is a string or it is absent - the one rule every write that carries one keeps.
+ *
+ * `what` names the field in the refusal; it defaults to the project's own name, and a node passes
+ * `node "<id>" name`.
  *
  * `rename` has always stringified (`String(name).trim()`), but `createProject` and `PUT` copied the
  * field through unchanged: `{ name: { a: 1 } }` saved a project whose name is an object, because an
@@ -529,11 +532,12 @@ function capacity(plant, registry) {
  * refused at the write gate, by name, before it lands.
  *
  * Returns the refusal, or null when the field is fine. A missing name is fine: `createProject` defaults
- * it, and a design candidate being validated has no name at all.
+ * it, a design candidate being validated has no name at all, and a node added from the palette is
+ * unnamed until somebody names it.
  */
-function nameProblem(name) {
+function nameProblem(name, what) {
   if (name === undefined || name === null || typeof name === 'string') return null;
-  return 'the project name must be a string, got ' + jsonTypeName(name);
+  return (what || 'the project name') + ' must be a string, got ' + jsonTypeName(name);
 }
 
 function jsonTypeName(value) {
@@ -586,6 +590,12 @@ function validate(plant, registry) {
     if (node.lon !== undefined && node.lon !== null && (typeof node.lon !== 'number' || !isFinite(node.lon) || Math.abs(node.lon) > 180)) {
       errors.push('node "' + node.id + '" has an invalid longitude');
     }
+    // A node's name is printed too: the canvas label, the splice page title, the closure-capacity
+    // warning. `apply()` copied it out of the request body raw, so `{ name: {} }` was stored as an
+    // object and drawn as "[object Object]". The project's own name has been refused since #129 for
+    // exactly this reason; a node name is a string or it is absent (`null` = not named yet).
+    const nodeNameFault = nameProblem(node.name, 'node "' + node.id + '" name');
+    if (nodeNameFault) errors.push(nodeNameFault);
   }
 
   const roots = nodes.filter(function (n) { return n && ROOT_TYPES.indexOf(n.type) !== -1; });

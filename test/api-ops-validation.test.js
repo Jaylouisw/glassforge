@@ -384,6 +384,33 @@ async function main() {
     assert.ok(bundleBom.body.error.indexOf('span "s1" has an invalid bundles count "1.5"') !== -1, bundleBom.body.error);
   });
 
+  // ------------------------------------------------------------------ a name that is not a string
+  // `rename` ran `String(name).trim()`, so `{ name: {} }` renamed the project to "[object Object]"
+  // - the exact sentence `#129` added the create/PUT refusal for, reached through the one write that
+  // skipped it. `add-node` copied `name` through raw, so an object landed on disk and the canvas
+  // label read "[object Object]". A name is a string, or absent, on both.
+  const nameId = (await request('POST', '/api/projects', { name: 'Names' })).body.id;
+  await build(nameId, validPlant);
+  const badRenameOp = await op(nameId, { op: 'rename', name: { a: 1 } });
+  test('renaming a project to an object is a 400 naming the field, not "[object Object]"', function () {
+    assert.strictEqual(badRenameOp.status, 400, brief(badRenameOp));
+    assert.strictEqual(badRenameOp.body.error, 'the project name must be a string, got an object');
+  });
+  const afterBadRename = await request('GET', '/api/projects/' + nameId);
+  test('the refused rename left the stored name alone', function () {
+    assert.strictEqual(afterBadRename.body.name, 'Names');
+  });
+
+  const badNodeName = await op(nameId, { op: 'add-node', node: { type: 'ont', model: 'gpon-ont-4ge', name: 5 } });
+  test('an added node whose name is not a string is refused, naming the node', function () {
+    assert.strictEqual(badNodeName.status, 400, brief(badNodeName));
+    assert.deepStrictEqual(badNodeName.body.errors, ['node "n4" name must be a string, got a number']);
+  });
+  const afterBadNode = await request('GET', '/api/projects/' + nameId);
+  test('the refused node was not saved', function () {
+    assert.deepStrictEqual(afterBadNode.body.nodes.map(function (n) { return n.id; }), ['n1', 'n2', 'n3']);
+  });
+
   await new Promise(function (resolve) { server.close(resolve); });
   fs.rmSync(dataRoot, { recursive: true, force: true });
   done();

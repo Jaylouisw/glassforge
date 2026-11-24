@@ -57,6 +57,18 @@ test('an array of rows is accepted, with string numbers converted', function () 
   assert.strictEqual(parsed.points[0].lat, 51.5);
 });
 
+test('a label that arrives as a number is a string, because it is printed as a node name', function () {
+  // `row.label` was copied through as-is, so `{ label: 5 }` named the ONT node `5` - a number where
+  // every reader (the canvas label, the splice page, the plan) expects text. The label is a string or
+  // it is absent; `null` still means the design names the point itself.
+  const parsed = demand.prepare([
+    { label: 5, lat: 51.5, lon: -0.1 },
+    { name: 7, lat: 51.5001, lon: -0.1 },
+    { lat: 51.5002, lon: -0.1 }
+  ]);
+  assert.deepStrictEqual(parsed.points.map(function (p) { return p.label; }), ['5', '7', 'point 3']);
+});
+
 test('an empty coordinate in an array is rejected, not placed at 0,0', function () {
   // `Number('')` is 0, as is Number(null) and Number(' '), and 0,0 is a coordinate the range check
   // accepts. The CSV path tests the raw cell first; the array path converted first, so a blank cell

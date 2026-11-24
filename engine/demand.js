@@ -186,7 +186,11 @@ function parseArray(rows) {
       rejected.push({ row: i + 1, reason: 'lat/lon out of range', text: row.address || row.label || '' });
       return;
     }
-    points.push({ label: row.label || row.name || null, address: row.address || null, lat: lat, lon: lon });
+    // A label becomes the node's name in the design and is printed there (`web/scene.js` draws it,
+    // the splice page titles itself with it), so it is text. `{ label: 5 }` used to name the ONT
+    // node `5`, and the plant then carried a number where every reader expects a string.
+    const label = row.label || row.name || null;
+    points.push({ label: label === null ? null : String(label), address: row.address || null, lat: lat, lon: lon });
   });
   return { points: points, rejected: rejected };
 }
