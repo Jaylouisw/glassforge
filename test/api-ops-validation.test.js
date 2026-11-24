@@ -197,6 +197,51 @@ async function main() {
     assert.strictEqual(afterOverSplitAgain.body.updatedAt, afterOverSplit.body.updatedAt);
   });
 
+  // --------------------------------------------------- ports are fibres, not cables
+  // The shape auto-design emits: eight customers sharing one distribution cable, one strand each. The
+  // site is full (8 of 8 ports), and a ninth customer on that same cable has no port to land on. While
+  // ports were counted as cabled outputs this plant read "1 of 8" and the ninth drop was saved with a
+  // 200 - a fibre somebody would have to buy, dress and then discover was not lit.
+  const sharedId = (await request('POST', '/api/projects', { name: 'Shared cable' })).body.id;
+  const sharedSteps = [
+    { op: 'add-node', node: { type: 'olt', model: 'gpon-c-plus-8', name: 'OLT' } },
+    { op: 'add-node', node: { type: 'splitter', model: 'plc-1x8-sca', name: 'S1' } },
+    { op: 'add-node', node: { type: 'closure', model: 'nap-16', name: 'NAP' } },
+    { op: 'add-span', span: { from: 'n1', to: 'n2', cable: 'g652d-loose-24', lengthM: 800 } },
+    { op: 'add-span', span: { from: 'n2', to: 'n3', cable: 'g652d-loose-12', lengthM: 60, strands: [1, 2, 3, 4, 5, 6, 7, 8] } }
+  ];
+  for (let i = 1; i <= 8; i++) {
+    sharedSteps.push({ op: 'add-node', node: { type: 'ont', model: 'gpon-ont-4ge', name: 'Casa ' + i } });
+    sharedSteps.push({ op: 'add-span', span: { from: 'n3', to: 'n' + (3 + i), cable: 'g657a2-drop-1', lengthM: 40, strands: [i] } });
+  }
+  const eightOnOneCable = await build(sharedId, sharedSteps);
+  test('eight customers down one cable fill a 1:8, and the plant reports eight ports used', function () {
+    assert.strictEqual(eightOnOneCable.status, 200, brief(eightOnOneCable));
+    assert.deepStrictEqual(eightOnOneCable.body.derived.errors, []);
+    const site = eightOnOneCable.body.derived.summary.capacity.splitterPorts[0];
+    assert.strictEqual(site.portsUsed, 8, 'one cable, eight customer fibres, eight ports');
+    assert.strictEqual(site.overbooked, false);
+  });
+
+  const ninthOnCable = await build(sharedId, [
+    { op: 'add-node', node: { type: 'ont', model: 'gpon-ont-4ge', name: 'Casa 9' } },
+    { op: 'add-span', span: { from: 'n3', to: 'n12', cable: 'g657a2-drop-1', lengthM: 40, strands: [9] } }
+  ]);
+  test('a ninth customer on that cable is a 400 naming the site, not a saved fibre', function () {
+    assert.strictEqual(ninthOnCable.status, 400, brief(ninthOnCable));
+    assert.strictEqual(ninthOnCable.body.errors.length, 1, ninthOnCable.body.errors.join(' | '));
+    assert.strictEqual(ninthOnCable.body.errors[0],
+      'splitter "S1" (n2) has 9 fibres leaving it on 8 output ports (plc-1x8-sca) - 1 fibre has no port');
+  });
+
+  const afterNinth = await request('GET', '/api/projects/' + sharedId);
+  test('the refused ninth drop is not on disk, and the eight are untouched', function () {
+    assert.strictEqual(afterNinth.body.spans.length, 10, 'the ninth drop was persisted');
+    assert.strictEqual(afterNinth.body.nodes.filter(function (n) { return n.type === 'ont'; }).length, 9,
+      'the node op itself was valid and stays');
+    assert.deepStrictEqual(afterNinth.body.derived.errors, [], 'the stored plant is still the buildable one');
+  });
+
   // ------------------------------------------------------------------ warnings are not errors
   const warnId = (await request('POST', '/api/projects', { name: 'Warnings' })).body.id;
   await build(warnId, [

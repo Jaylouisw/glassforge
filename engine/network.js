@@ -400,14 +400,23 @@ function capacity(plant, registry) {
 
   // A splitter's own output ports, counted per site.
   //
-  // A 1:8 cassette has eight outputs; a ninth drop behind it is a fibre with nowhere to go, and the
-  // OLT-level checks above cannot see it: nine ONTs on one 1:8 site is a cascade of 8, inside any
-  // maxSplitRatio, and 9 is inside ports x ratio too. Ports are counted by the branches that leave the
-  // splitter toward the customers, so a downstream splitter costs its site one port however many ONTs
-  // sit behind it - the mistake the cascade rule already exists to avoid, one level down. A branch is
-  // one cabled output, whether it ends at an ONT or at another splitter; a node that is drawn but
-  // never connected to the root is not behind the splitter at all, keeps its own "not connected"
-  // warning from `validate`, and is not charged to a port here.
+  // A 1:8 cassette has eight outputs; a ninth customer behind it is a fibre with nowhere to go, and
+  // the OLT-level checks above cannot see it: nine ONTs on one 1:8 site is a cascade of 8, inside any
+  // maxSplitRatio, and 9 is inside ports x ratio too.
+  //
+  // Ports are counted in FIBRES, because that is what a port is: one cassette output feeds exactly one
+  // fibre. Counting cabled outputs instead reported a splitter whose eight customers share one
+  // distribution cable - the shape `emitTerminalTree` produces, one strand per ONT - as "1 of 8 ports
+  // used", so a ninth customer added to that cable passed `validate`, budgeted `ok`, and went on the
+  // bill of materials as a fibre nobody could light. The splice schedule had always numbered those
+  // ports per strand (P1..P8 on that cable); the capacity view disagreed with it.
+  //
+  // So a walk from the splitter counts one output per ONT below it and one per downstream splitter,
+  // where it stops: a downstream splitter spends one fibre and its own ports are counted at its site -
+  // the mistake the cascade rule already exists to avoid, one level down. A strand merely listed on a
+  // cable with no ONT behind it is spare, not an output in use, and costs nothing. A node that is
+  // drawn but never connected to the root is not behind the splitter at all, keeps its own "not
+  // connected" warning from `validate`, and is not charged to a port here.
   const splitterPorts = [];
   {
     const parentOf = new Map();
@@ -423,14 +432,32 @@ function capacity(plant, registry) {
         stack.push(edge.to);
       }
     }
-    const branches = new Map();
-    for (const parent of parentOf.values()) {
-      branches.set(parent, (branches.get(parent) || 0) + 1);
+    const children = new Map();
+    for (const [child, parent] of parentOf) {
+      const list = children.get(parent) || [];
+      list.push(child);
+      children.set(parent, list);
     }
+    const typeOf = new Map((plant.nodes || []).map(function (n) { return [n.id, n.type]; }));
+    // Outputs in use, in fibres: an ONT is one, a downstream splitter is one and ends the walk.
+    const outputsInUse = function (splitterId) {
+      const walked = new Set([splitterId]);
+      const pending = (children.get(splitterId) || []).slice();
+      let used = 0;
+      while (pending.length) {
+        const id = pending.pop();
+        if (walked.has(id)) continue;
+        walked.add(id);
+        const type = typeOf.get(id) || null;
+        if (type === 'ont' || type === 'splitter') { used += 1; continue; }
+        for (const child of children.get(id) || []) pending.push(child);
+      }
+      return used;
+    };
     for (const node of plant.nodes || []) {
       if (node.type !== 'splitter' || !node.model || !registry.has('splitter', node.model)) continue;
       const part = registry.get('splitter', node.model);
-      const used = branches.get(node.id) || 0;
+      const used = outputsInUse(node.id);
       splitterPorts.push({
         node: node.id,
         name: node.name || node.id,
@@ -456,8 +483,8 @@ function capacity(plant, registry) {
     // is what an API caller greps for, and an unnamed node has only the id.
     const who = row.name === row.node ? '"' + row.node + '"' : '"' + row.name + '" (' + row.node + ')';
     const extra = row.portsUsed - row.ratio;
-    problems.push('splitter ' + who + ' has ' + row.portsUsed + ' branches on ' + row.ratio + ' output ports (' +
-      row.model + ') - ' + extra + (extra === 1 ? ' branch has' : ' branches have') + ' no port');
+    problems.push('splitter ' + who + ' has ' + row.portsUsed + ' fibres leaving it on ' + row.ratio +
+      ' output ports (' + row.model + ') - ' + extra + (extra === 1 ? ' fibre has' : ' fibres have') + ' no port');
   });
   if (theoreticalMax !== null && onts.length > theoreticalMax) {
     problems.push(onts.length + ' ONTs exceed ' + ports + ' ports x 1:' + limitRatio + ' = ' + theoreticalMax);

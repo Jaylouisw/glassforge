@@ -74,9 +74,11 @@ A refused operation returns `400` with the reason and leaves the saved project u
 
 `summary.capacity` carries the OLT's limits (`ports`, `maxSplitRatio`, `splitterCascade`,
 `theoreticalMaxOnts`) and, per splitter site, `splitterPorts: [{ node, name, model, ratio,
-portsUsed, overbooked }]` — the ratio is the cassette's output count and `portsUsed` is the branches
-leaving that site, so a downstream splitter costs its parent one port. An overbooked site also
-appears in `capacity.problems`, which is what turns a `PUT` into a `400`.
+portsUsed, overbooked }]` — the ratio is the cassette's output count and `portsUsed` is the fibres
+leaving that site: one per ONT below the splitter, one per downstream splitter (whose own ports are
+counted at its own site). Counting cables instead of fibres read eight customers sharing one
+distribution cable as one port used. An overbooked site also appears in `capacity.problems`, which is
+what turns a `PUT` into a `400`.
 
 ## Auto-design
 

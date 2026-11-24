@@ -34,6 +34,18 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A splitter's ports are counted in fibres, not cables.** `network.capacity` counted one port per
+  cabled output leaving a splitter site, so a site whose customers share one distribution cable — the
+  shape `emitTerminalTree` emits, one strand per ONT — reported `portsUsed: 1` on a 1:8 that was full.
+  `capacity()` on an auto-designed eight-house 1:8 read "1 of 8"; a ninth customer added to the same
+  cable then passed `validate`, budgeted `ok` and went into the bill of materials as a fibre nobody
+  could light, because the OLT-level checks (cascade 8, 9 ONTs inside 8 × 64) cannot see it. The
+  splice schedule had always numbered those ports per strand, so the two views disagreed. The count is
+  now a walk from the splitter: one port per ONT below it, one per downstream splitter (where it
+  stops — the cascade rule one level down), and a listed strand with no ONT behind it spends nothing.
+  The refusal now reads `has 9 fibres leaving it on 8 output ports … 1 fibre has no port`.
+  Tests: `splitter-ports` adds 4 (shared cable full at eight, a ninth refused by name, spare strands
+  cost nothing, two downstream splitters cost two).
 - **A demand row with an empty coordinate is rejected, not placed at 0,0.** `engine.demand.prepare`
   takes a CSV or an array of rows, and only the CSV path tested the raw cell before `Number()`.
   `Number('')` is 0 — and so are `Number(null)` and `Number(' ')` — and 0,0 passes the range check, so
