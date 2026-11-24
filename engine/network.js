@@ -227,7 +227,12 @@ function designForOnt(plant, ontId, registry, opts) {
     connectorModel: o.connectorModel,
     spliceModel: o.spliceModel,
     allowanceDb: o.allowanceDb,
-    marginDb: o.marginDb
+    marginDb: o.marginDb,
+    // The launch power is a design field, and this is the third place that has to pass it through:
+    // without it `/budget {"txDbm":7}` budgeted at the OLT's minimum and echoed `txDbm: 3`, a 200
+    // whose answer contradicted the request - the #161 defect one endpoint over. Absent stays absent;
+    // the budget's own floor applies and is echoed.
+    txDbm: o.txDbm
   };
 
   let result;

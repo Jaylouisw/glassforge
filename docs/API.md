@@ -155,7 +155,7 @@ with no `lossDb`, is a 400. See [AUTO-DESIGN.md](AUTO-DESIGN.md#site-to-site-lin
 
 ```
 POST /api/projects/:id/budget
-  { ontId?, direction?, wavelength?, connectorModel?, spliceModel?, allowanceDb?, marginDb? }
+  { ontId?, direction?, wavelength?, connectorModel?, spliceModel?, allowanceDb?, marginDb?, txDbm? }
   → { budgets: [ { ont, name, result } | { ont, name, error } ] }
 
 GET  /api/projects/:id/bom       → { lines: [...per span], byCable: [...per model], spanCount }
@@ -175,22 +175,29 @@ the measured route and `designM` is what is bought for **every** cable in the bu
 with `bundles: 2` prices 2.4 km of that cable. The strand page counts the same capacity: 18 strands on
 a 2 × 12 span is three-quarters full, not overbooked.
 
-`/api/projects/:id/budget` hands the body to `designForOnt` as its options, and **seven** keys are what
+`/api/projects/:id/budget` hands the body to `designForOnt` as its options, and **eight** keys are what
 it reads: `ontId` narrows the answer to a single ONT, `direction` (default `down`) and `wavelength`
 (1490 down, 1310 up) choose the receiver, `spliceModel` (default `fusion`) and `connectorModel`
 (default `sc-apc`) set the loss each splice and each connector is charged at, `marginDb` (default 3) is
-the reserve the verdict requires, and `allowanceDb` (default 0) is extra design reserve **added to the
-ODN loss**. `allowanceDb` is the one a planner reaches for on a project: it changes no plant, it makes the
+the reserve the verdict requires, `allowanceDb` (default 0) is extra design reserve **added to the
+ODN loss**, and `txDbm` is the launch power to budget at (default: the transmitter's minimum).
+`allowanceDb` is the one a planner reaches for on a project: it changes no plant, it makes the
 verdict account for slack the route has not spent — the result echoes `marginDb`, and `totalLossDb`
 carries the allowance (`odnLossDb` 11.86 + 2 for `{"allowanceDb":2}`). Measured on a project of one 1:8
 splitter and 3 km of `g652d-loose-12`: `{}` answers `totalLossDb` 11.86 with `headroomDb` 18.14,
 `{"allowanceDb":2}` answers 13.86 and 16.14, `{"spliceModel":"mechanical"}` adds 0.2 dB at the splitter's
 splice, and `{"connectorModel":"lc-apc"}` takes 0.05 dB off each of the two connectors.
+`txDbm` is the same launch the design budget reads, and it moves the verdict because the overload point is judged at it:
+the same project's `{}` is -8.86 dBm at +3 dBm, inside the ONT's -8 dBm overload point, while
+`{"txDbm":7}` answers `rxPowerDbm` -4.86 and `fail` - 3.14 dB over that point, so `attenuator.padDb` is
+4. A launch the budget cannot read is not a launch: it is refused rather than dropped.
 
-`direction`, `marginDb` and `allowanceDb` are checked once, before any ONT is budgeted: a value that is
-present and unusable is a `400` naming the field (`{"allowanceDb":-1}`, `{"marginDb":"3"}`,
-`{"direction":"sideways"}`), never a `200` whose every row repeats the same complaint. `spliceModel` and
-`connectorModel` are looked up per ONT instead, so an unknown model answers a row `{ ont, name, error }`
+`direction`, `marginDb`, `allowanceDb` and `txDbm` are checked once, before any ONT is budgeted: a value
+that is present and unusable is a `400` naming the field (`{"allowanceDb":-1}`, `{"marginDb":"3"}`,
+`{"direction":"sideways"}`, `{"txDbm":"7"}`), never a `200` whose every row repeats the same complaint.
+A launch outside the module's own window is not a mistake - it is budgeted and answered with a warning
+naming the range - so only a value that is not a number is refused.
+`spliceModel` and `connectorModel` are looked up per ONT instead, so an unknown model answers a row `{ ont, name, error }`
 naming the models that exist — `unknown splice model "nope" - known models: fusion, mechanical` — because
 a missing figure stays missing, and the rest of the plant is still budgeted.
 

@@ -464,17 +464,30 @@ function attenuatorClause(pad, marginDb) {
  * The knobs every budget entry point reads, checked once - by the PON budget, by the active budget,
  * and by `/api/projects/:id/budget` before it budgets a single ONT.
  *
- * They are the same three on every path, and they all move the verdict: a negative `marginDb` or
- * `allowanceDb` is read straight into the headroom test, and a `direction` that is not `up` or `down`
- * is answered as `down` - a different receiver at a different wavelength. A value that is present and
+ * They are the same four on every path, and they all move the verdict: a negative `marginDb` or
+ * `allowanceDb` is read straight into the headroom test, a `direction` that is not `up` or `down`
+ * is answered as `down` - a different receiver at a different wavelength - and `txDbm` is the launch
+ * the headroom, the overload check and the pad are all sized for. A value that is present and
  * unusable is refused here rather than dropped, because a dropped reserve is a verdict computed
  * without the loss the caller asked for. Absent is absent: the defaults are documented and echoed in
  * the result.
+ *
+ * `txDbm` is checked here for the reason #161 added the nested-launch refusal: a launch the caller
+ * asked for and the budget cannot read used to fall back to the transmitter's minimum, which is the
+ * one case that cannot hurt the receiver, so the answer was optimistic and silent. A launch outside
+ * the module's window is *not* refused - it is a real case to budget (a weak laser) and the budget
+ * already answers it with a warning naming the range. Only a value that is not a number is a mistake.
  */
 function assertDesignKnobs(design, what) {
   designFields.assertChoiceField(design, 'direction', ['up', 'down'], what);
   designFields.assertNumberField(design, 'marginDb', 0, what);
   designFields.assertNumberField(design, 'allowanceDb', 0, what);
+  designFields.assertNumberField(design, 'txDbm', Number.NEGATIVE_INFINITY, what, {
+    measure: 'a launch power in dBm',
+    unusable: "A launch the budget cannot read is refused rather than dropped: falling back to the " +
+      "transmitter's minimum answers the one case that cannot hurt the receiver, which is not the " +
+      "case the caller asked about."
+  });
 }
 
 /**
@@ -528,7 +541,8 @@ function opticalBudget(design, registry) {
     : { min: ont.txPowerDbmMin, max: ont.txPowerDbmMax, who: 'ONT ' + ont.model };
   let txDbm = txSpec.min;
   if (design.txDbm !== undefined) {
-    if (!isNum(design.txDbm)) throw new TypeError('design.txDbm must be a number when given');
+    // A value that is not a number was refused by `assertDesignKnobs` above; an out-of-window one is
+    // a real design and is answered with a warning, not a refusal.
     if (design.txDbm < txSpec.min || design.txDbm > txSpec.max) {
       warnings.push('requested transmit power ' + design.txDbm + ' dBm is outside the ' + txSpec.who +
         ' range ' + txSpec.min + '..' + txSpec.max + ' dBm');
@@ -670,7 +684,8 @@ function pointToPoint(design, registry) {
     : { min: cpe.txPowerDbmMin, max: cpe.txPowerDbmMax, who: 'customer optic ' + cpe.model };
   let txDbm = txSpec.min;
   if (design.txDbm !== undefined) {
-    if (!isNum(design.txDbm)) throw new TypeError('design.txDbm must be a number when given');
+    // A value that is not a number was refused by `assertDesignKnobs` above; an out-of-window one is
+    // a real design and is answered with a warning, not a refusal.
     if (design.txDbm < txSpec.min || design.txDbm > txSpec.max) {
       warnings.push('requested transmit power ' + design.txDbm + ' dBm is outside the ' + txSpec.who +
         ' range ' + txSpec.min + '..' + txSpec.max + ' dBm');
