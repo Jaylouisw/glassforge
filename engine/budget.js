@@ -80,6 +80,75 @@ function lossPart(registry, kind, model, fallbackModel) {
 }
 
 /**
+ * A value as it arrived, for a refusal sentence: JSON where JSON can say it, `String` otherwise.
+ *
+ * `JSON.stringify(NaN)` is `"null"` and the value is only ever shown after a number check has failed,
+ * so the text is the caller's own body rather than a re-description of it.
+ */
+function showValue(value) {
+  // `JSON.stringify(NaN)` is `"null"`, and NaN reaches `wholeCount` as "not a number" - the sentence
+  // must say NaN rather than null, so a non-finite number is printed as itself.
+  if (typeof value === 'number' && !isFinite(value)) return String(value);
+  const text = JSON.stringify(value);
+  return text === undefined ? String(value) : text;
+}
+
+/**
+ * A count of lossy plant, read strictly instead of as zero.
+ *
+ * `splices: -3`, `connectors: "6"` and `connectors: { count: -6 }` all used to reach
+ * `isNum(x) && x > 0`, fail it, and be read as *no* splices or connectors: a key the engine reads,
+ * with a value it silently deleted from the ODN loss. Measured on this engine with a GPON B+ design of
+ * 22.7 km of G.652.D at 1:64, 10 splices and 6 connectors (ODN 28.294 dB, 0.29 dB over the 28 dB
+ * class, verdict `fail`): `connectors: -6`, `connectors: "6"` and `connectors: { count: -6 }` each
+ * answered `ok` at ODN 26.494 dB, because 1.80 dB of plant disappeared from a plan the caller asked
+ * for it in.
+ *
+ * Refused rather than defaulted, the same call `assertNumberField` makes for a negative `marginDb`
+ * (#146): the request is what is wrong, and every one of these readings moves the answer in the
+ * optimistic direction. An *absent* field is still zero plant - that is a documented default, and the
+ * result's own totals say so - a present value the budget cannot read is not.
+ */
+function wholeCount(value, field) {
+  if (value === undefined) return 0;
+  if (!isNum(value) || !Number.isInteger(value) || value < 0) {
+    throw new TypeError(field + ' must be a whole number at or above 0 and got ' + showValue(value) +
+      ' - a count the budget cannot read is refused rather than read as zero, which would delete the ' +
+      'loss it names from the ODN');
+  }
+  return value;
+}
+
+/** The connector count, in either documented form: a number, or `{ model, count }`. */
+function connectorCountOf(input) {
+  if (input === undefined) return 0;
+  if (input !== null && typeof input === 'object' && !Array.isArray(input)) {
+    if (input.count === undefined) {
+      throw new TypeError('design.connectors names a model without a count and got ' + showValue(input) +
+        ' - a connector model on its own is no connectors, so give { model, count }');
+    }
+    return wholeCount(input.count, 'design.connectors.count');
+  }
+  return wholeCount(input, 'design.connectors');
+}
+
+/**
+ * A splice entry's own `lossDb`, when it states one instead of taking the model's rated loss.
+ *
+ * `lossDb: -5` used to be used as-is, so a splice list could *gain* 5 dB, and `lossDb: "0.1"` fell back
+ * to the model default without a word - two ways for the number the caller wrote not to be the number
+ * in the plan.
+ */
+function spliceEntryLossDb(value, where) {
+  if (!isNum(value) || value < 0) {
+    throw new TypeError(where + ' must be a non-negative number of dB and got ' + showValue(value) +
+      ' - a splice entry states its loss where it is not the model default, and a value the budget ' +
+      'cannot read would silently become that default');
+  }
+  return value;
+}
+
+/**
  * The passive side of any link: fibre, splices, connectors, splitters.
  *
  * Shared so the PON path and the active path charge exactly the same losses for the same plant.
@@ -110,28 +179,39 @@ function computeOdn(design, wavelength, registry) {
   });
 
   // --- splices -------------------------------------------------------------------
+  // Both forms are read strictly: a count the budget cannot use is refused by name (`wholeCount`),
+  // never rounded, floored or dropped to zero.
   let spliceLossDb = 0;
   const spliceInput = design.splices === undefined ? 0 : design.splices;
   if (Array.isArray(spliceInput)) {
     spliceInput.forEach(function (s, i) {
-      const model = (s && s.model) || DEFAULT_SPLICE_MODEL;
-      const part = s && isNum(s.lossDb) ? null : lossPart(registry, 'splice', model, DEFAULT_SPLICE_MODEL);
-      const db = s && isNum(s.lossDb) ? s.lossDb : part.lossDb;
+      const where = 'design.splices[' + i + ']';
+      if (!s || typeof s !== 'object' || Array.isArray(s)) {
+        throw new TypeError(where + ' must be an object naming a splice model or its loss, and got ' + showValue(s));
+      }
+      const model = s.model || DEFAULT_SPLICE_MODEL;
+      const part = s.lossDb === undefined ? lossPart(registry, 'splice', model, DEFAULT_SPLICE_MODEL) : null;
+      const db = part ? part.lossDb : spliceEntryLossDb(s.lossDb, where + '.lossDb');
       spliceLossDb += db;
-      breakdown.push({ kind: 'splice', label: 'splice ' + (i + 1) + ' (' + ((s && s.model) || model) + ')', db: round(db, 3) });
+      breakdown.push({ kind: 'splice', label: 'splice ' + (i + 1) + ' (' + model + ')', db: round(db, 3) });
     });
-  } else if (isNum(spliceInput) && spliceInput > 0) {
-    if (!Number.isInteger(spliceInput)) throw new TypeError('design.splices must be an integer count or an array');
-    const part = lossPart(registry, 'splice', design.spliceModel, DEFAULT_SPLICE_MODEL);
-    spliceLossDb = part.lossDb * spliceInput;
-    breakdown.push({ kind: 'splice', label: spliceInput + ' x ' + part.model + ' splice', db: round(spliceLossDb, 3) });
+  } else {
+    const spliceCount = wholeCount(spliceInput, 'design.splices');
+    if (spliceCount > 0) {
+      const part = lossPart(registry, 'splice', design.spliceModel, DEFAULT_SPLICE_MODEL);
+      spliceLossDb = part.lossDb * spliceCount;
+      breakdown.push({ kind: 'splice', label: spliceCount + ' x ' + part.model + ' splice', db: round(spliceLossDb, 3) });
+    }
   }
 
   // --- connectors ----------------------------------------------------------------
   let connectorLossDb = 0;
   const connectorInput = design.connectors === undefined ? 0 : design.connectors;
-  const connectorModel = (connectorInput && !isNum(connectorInput) && connectorInput.model) || design.connectorModel || DEFAULT_CONNECTOR_MODEL;
-  const connectorCount = isNum(connectorInput) ? connectorInput : (connectorInput && isNum(connectorInput.count) ? connectorInput.count : 0);
+  const connectorSpec = connectorInput !== null && typeof connectorInput === 'object' && !Array.isArray(connectorInput)
+    ? connectorInput
+    : null;
+  const connectorModel = (connectorSpec && connectorSpec.model) || design.connectorModel || DEFAULT_CONNECTOR_MODEL;
+  const connectorCount = connectorCountOf(connectorInput);
   if (connectorCount > 0) {
     const part = lossPart(registry, 'connector', connectorModel, DEFAULT_CONNECTOR_MODEL);
     connectorLossDb = part.lossDb * connectorCount;
