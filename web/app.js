@@ -333,6 +333,15 @@
     if (!state.selected) { body.appendChild(el('p', { class: 'muted', text: 'Select a closure on the canvas to open its splice diagram.' })); return; }
     const splice = spliceFor(state.selected);
     if (!splice) { body.appendChild(el('p', { class: 'muted', text: 'Selected node is not a closure.' })); return; }
+    // The strand address is a property of the cable it is in: a 24-per-tube ribbon's strand 25 is
+    // T02-F01, not T03-F01. The catalogue is already in `state.registry`, so read the geometry from
+    // there rather than assuming the standard's default of twelve (the same value the engine uses).
+    const perTubeOf = {};
+    const cables = (state.registry.parts && state.registry.parts.cable) || [];
+    for (const span of splice.spans) {
+      const cable = cables.find(function (c) { return c.model === span.cable; });
+      if (cable && typeof cable.fibersPerTube === 'number') perTubeOf[span.id] = cable.fibersPerTube;
+    }
     const card = el('div', { class: 'card' });
     card.appendChild(el('h3', { text: (splice.node.name || splice.node.id) + ' — thread diagram' }));
     card.appendChild(el('p', { class: 'muted', text: splice.spans.length + ' cables, ' + splice.rows.length + ' strands in use' }));
@@ -341,7 +350,8 @@
     ['Span', 'Strand', 'Address', 'Colour'].forEach(function (h) { head.appendChild(el('th', { text: h })); });
     table.appendChild(head);
     for (const row of splice.rows) {
-      const addr = GFFiber.addressFor(row.index, {});
+      const perTube = perTubeOf[row.span];
+      const addr = GFFiber.addressFor(row.index, perTube ? { fibersPerTube: perTube } : {});
       const tr = el('tr', {});
       tr.appendChild(el('td', { text: row.span }));
       tr.appendChild(el('td', { class: 'num', text: String(row.index) }));

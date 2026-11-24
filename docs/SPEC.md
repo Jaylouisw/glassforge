@@ -132,6 +132,13 @@ above stated as a shape.
 because that is what is written on the tray in a closure. `fiber.parseAddress` accepts `T03-F07`,
 `t3f7`, `3-7`, `3/7` and a bare strand index.
 
+How many fibres a tube holds is a property of the **cable** (`fibersPerTube`, validated 1..24), not a
+fixed twelve, and the address follows the cable the strand is in: `network.spliceTable` addresses every
+row from the span's own cable part, so strand 25 is `T02-F01` in a 24-per-tube ribbon and `T03-F01` in
+a 12-per-tube loose tube - two cables of different tube sizes spliced at one closure get one address
+each, which is what the crew reads off the two trays. A span naming a cable the catalogue does not hold
+falls back to the standard twelve rather than hiding the strand from the sheet.
+
 `spans[].strands` lists the strand indices **in use** on that span. The ledger reports used, spare and
 utilisation per span, and flags overbooking: 14 strands assigned to a 12-fibre cable is a real drum
 somebody cannot splice, not a cosmetic warning.

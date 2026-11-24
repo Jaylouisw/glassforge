@@ -34,6 +34,17 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A strand is addressed in its own cable's tube size, not always twelve.** Every cable part publishes
+  `fibersPerTube` and `parts.validate` holds it to 1..24, but nothing read it: `network.spliceTable`
+  called `fiber.addressFor(index)` with no options, so a 24-per-tube ribbon's strand 25 was printed
+  `T03-F01` when the tray says `T02-F01` — a wrong tube on the one sheet a crew splices from. Each row's
+  address now comes from the span's own cable, so two cables of different tube sizes spliced at one
+  closure get one address each (the pairing the crew reads off the two trays), a splitter's input and
+  port rows follow their own cables, and a span naming a cable the catalogue does not hold still renders
+  the standard default instead of dropping the strand. The UI's thread diagram reads the same
+  `fibersPerTube` from the catalogue it already loads. New suite `strand-address` adds 6 assertions (the
+  geometry itself, a closure on a ribbon, two tube sizes at one closure, a splitter tail, a 1-fibre drop,
+  an unknown model).
 - **A splitter has its own port count, and the plant check now reads it.** `engine.network.capacity`
   measured the plant only against the OLT's limits (deepest cascade, total ONTs against
   `maxSplitRatio`), so a 1:8 cassette with nine or twelve drops hanging off it validated clean: nine

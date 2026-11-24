@@ -602,6 +602,24 @@ function stats(plant, registry) {
 
 
 /**
+ * The tube geometry of the cable a strand is in, as `fiber.addressFor`'s options.
+ *
+ * TIA-598 numbers a strand by its tube and its position inside it, and how many fibres a tube holds is a
+ * property of the cable - a 12-per-tube loose tube and a 24-per-tube ribbon are different trays. Every
+ * cable part publishes `fibersPerTube` and `parts.validate` holds it to 1..24, but the addresses here
+ * used to be computed with no options at all, i.e. always twelve: a 24-fibre ribbon's strand 25 printed
+ * as `T03-F01` when the tray it is in says `T02-F01`. A splice sheet that names the wrong tube is the
+ * one error a crew cannot work around, so the address follows the cable. An unknown model keeps the
+ * standard default rather than hiding the strand: the sheet still has to list it.
+ */
+function tubeOptions(span, registry) {
+  if (!span || !span.cable || !registry.has('cable', span.cable)) return undefined;
+  const cable = registry.get('cable', span.cable);
+  if (!isNum(cable.fibersPerTube)) return undefined;
+  return { fibersPerTube: cable.fibersPerTube };
+}
+
+/**
  * The splice schedule: for every splice point (a closure or a splitter), the strands arriving on each
  * cable and how each one is terminated.
  *
@@ -628,7 +646,12 @@ function spliceTable(plant, registry) {
   const nodes = (plant && plant.nodes) || [];
   const spans = (plant && plant.spans) || [];
   const idOf = new Map();
-  spans.forEach(function (span, i) { idOf.set(span, span.id || '#' + i); });
+  const spanById = new Map();
+  spans.forEach(function (span, i) {
+    const id = span.id || '#' + i;
+    idOf.set(span, id);
+    spanById.set(id, span);
+  });
 
   const depth = nodeDepths(plant);
   const points = [];
@@ -665,9 +688,11 @@ function spliceTable(plant, registry) {
     const rows = [];
     Array.from(byStrand.keys()).sort(function (a, b) { return a - b; }).forEach(function (index) {
       const carriers = byStrand.get(index).slice().sort();
-      const address = fiber.addressFor(index);
       carriers.forEach(function (spanId) {
         const others = carriers.filter(function (id) { return id !== spanId; });
+        // Each row is the strand *in its own cable*: two cables of different tube sizes splice the same
+        // strand index under two different addresses, which is exactly what the crew reads off the trays.
+        const address = fiber.addressFor(index, tubeOptions(spanById.get(spanId), registry));
         rows.push({
           span: spanId,
           strand: index,
@@ -756,7 +781,7 @@ function splitterPoint(node, local, idOf, depth, registry) {
       if (!Number.isInteger(index) || index < 1) continue;
       if (seen.has(index)) continue;
       seen.add(index);
-      const address = fiber.addressFor(index);
+      const address = fiber.addressFor(index, tubeOptions(span, registry));
       rows.push({
         span: idOf.get(span),
         strand: index,

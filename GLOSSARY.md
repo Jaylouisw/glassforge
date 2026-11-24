@@ -59,6 +59,12 @@ splice). The crew's count at the same joint is one splice per strand — `splice
 `legs[].splices` (the crew's count, which `bom.splices` sums). Charging the crew's count as loss put
 24 splices on one joint of a 24-fibre leg.
 
+**Strand address** — a strand named the way the tray is: `T03-F07` is tube 3, fibre 7 (`fiber.addressFor`,
+`fiber.parseAddress`). The tube size is the **cable's** `fibersPerTube` (1..24, validated), so the same
+strand index has a different address in a 24-per-tube ribbon than in a 12-per-tube loose tube, and
+`network.spliceTable` derives each row's address from the span's own cable. A span naming an unknown
+cable model is addressed at the standard twelve rather than dropped from the sheet.
+
 **Drop cable** — the small 1–2 fibre cable used on the last leg, only at or below `DROP_CABLE_MAX_M`
 (300 m). Anything longer goes to the 12-fibre ladder whatever the fibre count.
 
