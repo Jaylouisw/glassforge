@@ -339,3 +339,37 @@ test('a refused link still lists its declared leases, unattached and uncosted', 
   assert.strictEqual(r.thirdParty.totalM, 0);
   assert.strictEqual(r.thirdParty.unattachedCost, 1200);
 });
+
+test('a leg route reaches both sites, so the drawing covers the cable the BOM buys', function () {
+  // One duct running west-east at 51.5000. Both sites sit 0.0004 deg north of it - 44.5 m - so the snap
+  // puts them on the duct and that gap is the drop. `ownM` (and the BOM built on it) already pays for
+  // the drop; the route handed to a map stopped at the manhole and drew two legs ending in mid-duct,
+  // 88.96 m shorter than the cable the same result quoted. A route is the thing somebody pulls.
+  const corridor = { edges: [{ id: 'duct', coords: [p(51.5000, -0.1020), p(51.5000, -0.0960)] }] };
+  const A2 = { name: 'DC-West', lat: 51.5004, lon: -0.1018 };
+  const B2 = { name: 'DC-East', lat: 51.5004, lon: -0.0962 };
+  const r = link.design({ sites: { a: A2, b: B2 }, network: corridor, optics: ER }, registry);
+  const leg = r.legs[0];
+  // 0.0004 deg of latitude is 44.5 m, so both drops together are 88.96 m on a 387.64 m duct run.
+  close(leg.spurM, 88.96, 0.2, 'the two site drops');
+  close(leg.ownM, 476.6, 0.5, 'routed 387.64 + drops 88.96');
+  assert.strictEqual(leg.route[0].lat, A2.lat, 'the route starts at site A');
+  assert.strictEqual(leg.route[0].lon, A2.lon);
+  const last = leg.route[leg.route.length - 1];
+  assert.strictEqual(last.lat, B2.lat, 'the route ends at site B');
+  assert.strictEqual(last.lon, B2.lon);
+  // The geometry now measures what the cable line buys: 387.64 m of duct + 88.96 m of drop.
+  close(engine.geo.pathLengthM(leg.route), leg.ownM, 0.5, 'route metres against ownM');
+  // Every surface that draws a leg gets the same geometry.
+  assert.strictEqual(r.paths[0].route[0].lat, A2.lat, 'paths[].route starts at the site');
+  const run = r.runs.filter(function (x) { return x.id === 'link-a'; })[0];
+  assert.strictEqual(run.route[run.route.length - 1].lat, B2.lat, 'runs[].route ends at the site');
+
+  // A site already on the duct must not be pinned twice: gridLink's A and B sit on the graph, so the
+  // route is the duct's own geometry and the first two points are different places.
+  const on = gridLink();
+  assert.strictEqual(on.legs[0].spurM, 0, 'no drop to draw');
+  const route = on.legs[0].route;
+  assert.ok(route[0].lat !== route[1].lat || route[0].lon !== route[1].lon,
+    'the first duct point is not repeated as a site drop');
+});

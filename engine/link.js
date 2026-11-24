@@ -456,6 +456,14 @@ function design(input, registry) {
     const leased = opts.thirdParty.filter(function (seg) { return seg.leg === 'both' || seg.leg === id; });
     const leasedM = round(sum(leased, function (seg) { return seg.lengthM; }), 2);
     const joints = graph ? jointNodes(graph, routed.nodes) : [];
+    // The drawn leg covers the cable the leg buys. `routed.route` is the duct geometry between the two
+    // snap points; the site drops (`spurA`, `spurB`) are measured into `ownM` and paid for by the BOM,
+    // so leaving them out of the route drew a circuit that ended at a manhole 44.5 m from the building
+    // while the cable line billed the last metres. Auto-design attaches the terminal to a run for the
+    // same reason. Only a non-zero drop is added, so a site already on the duct is not pinned twice.
+    const route = routed.route.slice();
+    if (spurA > 0) route.unshift({ lat: opts.sites.a.lat, lon: opts.sites.a.lon });
+    if (spurB > 0) route.push({ lat: opts.sites.b.lat, lon: opts.sites.b.lon });
     // One splice event per joint on the path, not one per strand. A joint splices every strand the
     // cable carries - that is the crew's count (`splices`, below, times `splicesPerJoint`) - but the
     // light on any one strand crosses the joint once, which is what the budget charges (SPEC §3: "a
@@ -499,7 +507,7 @@ function design(input, registry) {
       cable: cable.model,
       fiberCount: cable.fiberCount,
       edges: routed.edges.map(function (edge) { return edge.edgeId; }),
-      route: routed.route,
+      route: route,
       budget: budgetResult,
       verdict: budgetResult.verdict
     });
