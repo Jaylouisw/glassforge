@@ -211,8 +211,10 @@ difference is almost exactly the detour to the junction, which is the whole poin
 `metrics.marginalOnts` counts the ONTs whose verdict is `marginal` — a design that passes, but with under
 2 dB above the design margin or under 1 dB of its class budget left (SPEC §4) — and `warnings` names the
 tightest one once for the whole plant. Each candidate's `budgets` carries one row per ONT,
-`{ ont, name, verdict, marginalReason, headroomDb, rxPowerDbm, launchWindowPad, error }`, so a marginal
-verdict can be read per address instead of only as a plant-level sentence.
+`{ ont, name, verdict, marginalReason, headroomDb, rxPowerDbm, launchWindowPad, upstreamVerdict,
+upstreamRxPowerDbm, error }`, so a marginal verdict can be read per address instead of only as a
+plant-level sentence. `verdict` is the downstream half; the upstream columns are the other link over the
+same ODN (see below).
 
 `metrics.launchWindowOnts` counts the ONTs that are inside the receiver's overload point only at the
 bottom of the OLT's launch window — the band [OPTICAL.md](OPTICAL.md#the-band-between-the-two-launches)
@@ -222,6 +224,23 @@ same function the printed plan calls, so the report and the page a crew signs of
 The band does not make a design infeasible — the candidate stays `ok` and `feasible`, and whether that
 is right is still open in issue #111 — and `launchWindowPad` on each budget row is the per-ONT figure
 behind the plant-level count.
+
+`metrics.upstreamFailOnts` counts the ONTs that fail the **other** half of the same link — the ONT
+launching into the OLT at 1310 nm, the lossier wavelength, budgeted with `direction: 'up'` and the OLT's
+receiver ([OPTICAL.md](OPTICAL.md#the-formula)). A PON is two links over one ODN, and ranking on one of
+them offered a 12-house C+ estate whose every ONT was `ok` downstream and `fail` upstream as the best
+feasible design with nothing said (#185). Each row's `upstreamVerdict` and `upstreamRxPowerDbm` carry that
+pass per address, and it is `null` when the upstream pass could not budget the row at all; the row's
+`error` then carries the downstream pass's own failure. The winner's `warnings` carries one plant-level
+sentence from `budget.upstreamNote`: how many ONTs fail, the worst one, its reason, the pad that clears it
+and how many more fail behind it.
+
+That sentence is **reported, not gated**: `feasible` and the ranking still rest on the downstream verdict,
+because only a ceiling on ODN loss is modelled and no class floor, so gating on it would empty auto-design
+for an ordinary short-feed estate. Whether an upstream failure should refuse a candidate is the open
+decision in #185/#111, and the design report does not make it in passing. One pad is ODN loss in both
+directions, so the sentence sizes the pad for the louder receiver and says so when the launch-band pad
+would leave the other end over its limit.
 
 `rationale` is written to be checkable: every line quotes the numbers the comparison used. When
 `ok` is false there is no `plant`, and every candidate carries the reasons it was refused — a design

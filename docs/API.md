@@ -108,9 +108,12 @@ so the caller can preview it (and send it as `network` unchanged). `applyToProje
 one operation (one undo step) *after* validating it; without it, the design is returned and nothing is
 written. Candidates that fail are returned with `feasible: false` and their reasons, never dropped. Every
 candidate carries `budgets`, one row per ONT (`{ ont, name, verdict, marginalReason, headroomDb,
-rxPowerDbm, launchWindowPad, error }`), and `metrics.marginalOnts` counts the ONTs that pass only
-marginally; the chosen design's `warnings` names the tightest one once for the whole plant — see
-[AUTO-DESIGN.md](AUTO-DESIGN.md#reading-a-result).
+rxPowerDbm, launchWindowPad, upstreamVerdict, upstreamRxPowerDbm, error }`), and `metrics.marginalOnts`
+counts the ONTs that pass only marginally; the chosen design's `warnings` names the tightest one once for
+the whole plant. Both directions are budgeted: `verdict` is downstream (OLT → ONT, 1490 nm), the
+`upstream*` columns are the ONT into the OLT at 1310 nm, and `metrics.upstreamFailOnts` counts the rows
+that fail there — reported in the winner's `warnings`, but it does not move `feasible`, which is still
+the downstream verdict — see [AUTO-DESIGN.md](AUTO-DESIGN.md#reading-a-result).
 With `costs`, `objective` is `cost` and every candidate's `metrics.cost` prices the drums the BOM buys
 (`purchaseM`) plus the priced splices, closures and splitters, with the terms in
 `metrics.costBreakdown: { cable, splices, closures, splitters, total }`; without `costs`, both are
