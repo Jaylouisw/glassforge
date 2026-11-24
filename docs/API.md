@@ -12,13 +12,15 @@ The server binds `127.0.0.1:8000` by default (`HOST`, `PORT`), and stores projec
 ```
 GET /api/health
 → { ok: true, name: "glassforge", version: "0.4.0",
-    parts: { total: 37, byKind: { cable: 8, splitter: 6, olt: 5, ont: 3, transceiver: 5,
+    parts: { total: 44, byKind: { cable: 8, splitter: 7, olt: 5, ont: 3, transceiver: 11,
                                  closure: 5, connector: 3, splice: 2 } },
     projects: 0, uptimeS: 4 }
 ```
 
-`version` is `package.json`'s, and `parts.total` is the catalogue on disk, so both move with a release;
-the numbers above are what this build answers (`node scripts/count-parts.js` prints the catalogue line).
+`version` is `package.json`'s. `parts.total` and `parts.byKind` are the catalogue on disk, so they
+change whenever a part is added: the block above is one build's answer, not a constant. The authorities
+are the endpoint itself and `node scripts/count-parts.js`, whose `--check` mode keeps README's copy of
+that line honest.
 
 ## Parts
 

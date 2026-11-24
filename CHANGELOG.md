@@ -4,8 +4,9 @@ All notable changes to Glassforge. The format follows [Keep a Changelog](https:/
 and the project uses [Semantic Versioning](https://semver.org/).
 
 Each suite count below is what `node scripts/run-tests.js` printed at that release's commit — the
-chain is 13 / 107 (0.1.0) → 16 / 141 (0.2.0) → 17 / 156 (0.3.0) → 18 / 174 (0.4.0), and `main`
-today reports **23 suites / 228 assertions**. A count in a section is a snapshot, never a promise.
+chain is 13 / 107 (0.1.0) → 16 / 141 (0.2.0) → 17 / 156 (0.3.0) → 18 / 174 (0.4.0), and the runner's
+own total on `main` is **23 suites / 239 assertions** at this writing. A count in a section is a snapshot,
+never a promise.
 
 ## [Unreleased]
 
