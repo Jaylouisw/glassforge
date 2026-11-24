@@ -130,7 +130,8 @@ segment, and `protection.legs` is how many legs the graph actually allowed (1 me
 
 **Attenuator (pad)** — an inline loss fitted because the receiver is *too loud*: `attenuator` on a
 budget result, `null` when the receiver is at or below its overload point. `overDb` is how far above
-overload the link lands, `padDb` the smallest whole-dB pad that clears it, and `maxPadDb` the most the
+overload the receiver lands with the transmitter at `atTxDbm`, the top of its launch window unless the
+request pinned `txDbm`; `padDb` the smallest whole-dB pad that clears it; and `maxPadDb` the most the
 design margin and the class budget can absorb, because a pad is ODN loss like any other.
 
 **`routedM` / `ownM` / `lengthM`** — the same leg measured three ways, because they answer three

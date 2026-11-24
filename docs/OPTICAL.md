@@ -130,21 +130,38 @@ OLT patched into a nearby ONT, delivers more than the receiver tolerates, and th
 attenuator — not a shorter budget, not more reach. Every budget therefore reports the pad:
 
 ```
-overDb   = P(rx) − overload                      how far above the receiver's limit it lands
-padDb    = ceil(overDb)                          the pad to buy (pads come in whole dB)
+overDb   = P(rx at the strongest launch) − overload    how far above the receiver's limit a hot
+                                                       module lands
+padDb    = ceil(overDb)                                the pad to buy (pads come in whole dB)
 maxPadDb = floor(min(class headroom, headroom − marginDb))
+atTxDbm                                                the launch `padDb` was sized for
 ```
+
+**The pad is sized for the strongest launch, not the weakest.** A pad is fitted once, but the module
+that lands in the chassis can sit anywhere in its own `txPowerDbmMin..txPowerDbmMax` window — a C+
+line card may paint +3 or +7 dBm. A pad computed from the minimum launch is sized for the one case that
+cannot hurt the receiver, and leaves the receiver above its overload point whenever the module runs hot.
+So `overDb` and `padDb` are measured at the receiver power the transmitter's `txPowerDbmMax` produces
+(or the `txDbm` the caller asked for), and `atTxDbm` records the launch that was used.
+
+Whether a link is too loud at all is still decided at the **minimum** launch: that is the worst-case
+loss the class verdict is built on. A span that is inside its overload point there reports
+`attenuator: null` — a healthy link needs no pad — and the reason a too-loud link carries names the
+launch the pad covers (`even at the 7 dBm top of its launch window`).
 
 `maxPadDb` exists because **a pad is ODN loss**: it spends the same budget the route spends. A 5 dB pad
 on a link with 4 dB of class headroom does not pass. When `maxPadDb < padDb` the design is
 contradictory — too loud *and* too tight — so no pad satisfies both and the reason says so instead of
-naming a number that would fail on site. `attenuator` is `null` when the receiver is at or below its
-overload point; "0 dB" would be a plate somebody orders.
+naming a number that would fail on site. Pads are bought in whole dB, so a 14.6 dB allowance funds
+14 dB, and none at all is a plate somebody orders.
 
-The EX example in `test/parts-long-reach-optics.test.js`: +2.05 dBm at a receiver whose overload is
-+1 dBm is 1.05 dB too loud, so 2 dB is the smallest pad that clears it, and 20 dB is the most the
-21 dB link budget (less 0.95 dB of loss) and the 3 dB margin allow. Cisco's own 5 dB pad sits inside
-that window.
+The EX example in `test/parts-long-reach-optics.test.js`: 1 km of G.652.D and two connectors is 0.95 dB
+of loss, so a 1000BASE-EX pinned at the 3 dBm top of its −1..+3 dBm window (`txDbm: 3`) receives
++2.05 dBm at a receiver whose overload is +1 dBm — 1.05 dB too loud, so 2 dB is the smallest pad that
+clears it, and 20 dB is the most the 21 dB link budget (less 0.95 dB of loss, 20.05 dB, floored) and the
+3 dB margin allow. Cisco's own 5 dB pad sits inside that window. The same span with no `txDbm` lands at
+−1.95 dBm at the minimum launch, inside the overload point: the link is `ok` with no pad, and a hot
+module in that chassis is what the pad arithmetic is for.
 
 ## What this model does not include
 

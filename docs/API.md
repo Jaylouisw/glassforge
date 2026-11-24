@@ -182,9 +182,12 @@ A budget `result` carries: `verdict` (`ok`/`marginal`/`fail`), `reasons`, `rxPow
 and `breakdown` (one line per loss element). See [SPEC.md](SPEC.md) §2–3.
 
 `attenuator` is `null` when the receiver is at or below its overload point, and otherwise
-`{ overDb, padDb, maxPadDb, fits }` — how far above overload the link lands, the smallest whole-dB
+`{ overDb, padDb, maxPadDb, atTxDbm, fits }` — how far above overload the receiver lands with the
+transmitter at `atTxDbm` (its `txPowerDbmMax` unless the request pinned `txDbm`), the smallest whole-dB
 inline pad that clears it, the most pad the margin and class budget can absorb, and whether `padDb`
-is achievable. The overload reason quotes the pad, so `reasons` alone is enough to act on.
+is achievable. A pad is fitted once, so it is sized for the strongest launch the transmitter can
+present, not the weakest. The overload reason quotes the pad and its launch, so `reasons` alone is
+enough to act on.
 
 ## Printed plan and PNG
 

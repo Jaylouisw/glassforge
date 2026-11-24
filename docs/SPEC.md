@@ -90,9 +90,10 @@ A design passes only if **both** hold:
 
 1. **Receiver headroom.** `rxPower − sensitivity ≥ marginDb` (default 3 dB), and `rxPower` is not above
    the receiver's overload point. Overload is the failure more power cannot fix, so the result also
-   reports the inline pad that clears it (`attenuator: { overDb, padDb, maxPadDb, fits }`, or `null`
-   when the receiver is at or below its overload point) — and because a pad is ODN loss, `maxPadDb` is
-   the point where the margin and the class budget run out.
+   reports the inline pad that clears it (`attenuator: { overDb, padDb, maxPadDb, atTxDbm, fits }`, or
+   `null` when the receiver is at or below its overload point) — sized at the transmitter's strongest
+   launch (`atTxDbm`), because one pad has to hold a module that may run hot — and because a pad is
+   ODN loss, `maxPadDb` is the point where the margin and the class budget run out.
 2. **The plant's own budget.** For a PON, `ODN loss ≤ class budget` (GPON B+ 28 dB, C+ 32, C++ 35;
    XG-PON N1 29, N2 31; XGS-PON N1 29, N2 31, E1 33, E2 35). For an active link,
    `ODN loss ≤ launch(min) − sensitivity` for the optic pair, and the route must be inside the optic's
