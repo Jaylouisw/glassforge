@@ -166,3 +166,12 @@ the budgets and the bill of materials for a demand.
 
 **Refusal** — an explicit rejection that names the address or the row responsible. The alternative — a
 straight line drawn to a property that has no route — is never acceptable.
+
+**Near-miss field** — a key on a budget design that the engine does not read but that names one it does:
+`splitter` for `splitters`, `margin` for `marginDb`, `headend` for `headEnd`, or one letter out.
+`designFields.assertKnownFields` (`engine/design-fields.ts`) refuses it before any loss is computed
+and names the field that was meant, because a silently ignored key removes the loss it names: a 1:8
+splitter sent as `splitter` budgeted a 15 km GPON B+ ODN at 4.3 dB instead of 14.8 dB, and the
+verdict was computed on fibre that will not light. A key that is not a near miss — `name`, `notes`, a
+caller's own bookkeeping — is still ignored, because refusing it would refuse a caller who is not
+wrong. Over HTTP it is a `400` from `POST /api/design/budget`.

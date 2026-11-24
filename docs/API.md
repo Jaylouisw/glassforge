@@ -177,6 +177,30 @@ not a `500` and not a link budget. Point-to-point is `POST /api/design/link` (§
 which calls `budget.pointToPoint` per leg; there is no endpoint that budgets `headEnd`/`cpe` from a
 hand-written body.
 
+The design object is read through a fixed list of fields, and a **near miss is refused**. A key the
+engine does not read is a typo, and it is the worst kind: it removes the loss it names without removing
+a number from the plan. A 1:8 splitter sent as `splitter` (singular) budgeted a 15 km GPON B+ ODN at
+4.3 dB instead of 14.8 dB and answered `200`.
+
+```
+$ curl -s -X POST http://127.0.0.1:8000/api/design/budget -H 'Content-Type: application/json' \
+    -d '{"design":{"olt":{"model":"gpon-b-plus-8"},"ont":{"model":"gpon-ont-1ge"},
+         "spans":[{"lengthM":1200,"cable":"g652d-loose-12"}],"splices":2,
+         "splitter":{"model":"plc-1x8-sca"}}}'
+HTTP 400
+{"error":"the PON budget does not read the design field \"splitter\" - did you mean \"splitters\"? A field the engine ignores loses the loss it names without saying so, so a near miss is refused rather than skipped. Fields it reads: direction, wavelength, olt, ont, spans, splices, spliceModel, connectors, connectorModel, splitters, thirdParty, allowanceDb, marginDb, txDbm"}
+```
+
+The refusal is deliberately narrow: it fires on a case difference, a singular/plural, a prefix of a
+real field (`margin` for `marginDb`) or one letter wrong, and names the field that was meant. Every
+other key is still ignored — `name`, `notes` or a caller's own bookkeeping passes through untouched,
+because a guard that refused every unknown key would refuse a caller who is not wrong.
+`budget.pointToPoint`, the **active** budget, refuses the same way against its own list (`headEnd`,
+`cpe`, `spans`, `splices`, `spliceModel`, `connectors`, `connectorModel`, `thirdParty`, `allowanceDb`,
+`marginDb`, `wavelength`, `direction`, `txDbm`); no endpoint hands a caller's body to it, since
+`/api/design/link` builds that design from its own named options, so over the HTTP surface the refusal
+is the PON budget's.
+
 A budget `result` carries: `verdict` (`ok`/`marginal`/`fail`), `reasons`, `warnings` (sentences that
 do not move the verdict; the launch-window band
 [OPTICAL.md](OPTICAL.md#the-band-between-the-two-launches) describes is the one an ordinary estate

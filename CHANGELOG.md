@@ -5,7 +5,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 Each suite count below is what `node scripts/run-tests.js` printed at that release's commit — the
 chain is 13 / 107 (0.1.0) → 16 / 141 (0.2.0) → 17 / 156 (0.3.0) → 18 / 174 (0.4.0). `main` printed
-**32 suites / 352 assertions** on 2026-11-24; `node scripts/run-tests.js` prints the figure for
+**35 suites / 381 assertions** on 2026-11-24; `node scripts/run-tests.js` prints the figure for
 today. A count in a section is a snapshot, never a promise.
 
 ## [Unreleased]
@@ -34,6 +34,19 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A design field the budget does not read is refused, not skipped.** `opticalBudget` and
+  `pointToPoint` read a fixed list of fields, so a key that is a near miss of one of them — a singular
+  `splitter` for `splitters`, `margin` for `marginDb`, `headend` for `headEnd`, one letter out — was
+  ignored while the plan lost the loss it named. A 1:8 splitter sent as `splitter` budgeted a 15 km
+  GPON B+ ODN at **4.3 dB instead of 14.8 dB**, a received power 10.5 dB optimistic, and a verdict
+  computed on fibre that will not light, answered `200`. `engine/design-fields.ts` now refuses the
+  near miss before any loss is computed, naming the field that was meant and listing the ones the
+  budget reads; `/api/design/budget` turns that into a `400`. Unrelated keys (`name`, `notes`, a
+  caller's own bookkeeping) are still ignored, because a guard that refused every unknown key would
+  refuse a caller who is not wrong.
+  Tests: `budget-design-fields` adds 7 (the plural budgets the splitter, the singular refused by name,
+  the reason in the sentence, a case slip on the active budget, a prefix, an unrelated key unchanged),
+  and `api-http` asserts the same refusal as a `400` naming the field.
 - **A blank KML coordinate cell is not the zero meridian.** `kml.parseCoordinates` converted each
   `lon,lat[,alt]` field with `Number()` before testing it, and `Number('')` is 0 - a legal longitude -
   so a tuple with an empty cell imported as a point on the Greenwich meridian. One blank cell in a
