@@ -87,6 +87,21 @@ async function main() {
     assert.ok(missingPart.body.error.indexOf('no cable part') !== -1);
   });
 
+  // A create names an OLT model, so it can name one that does not exist. This used to answer 201 and
+  // save the plant: the very next edit was then refused for "node n1 uses unknown olt model ...",
+  // which blames the caller's new op for a typo made in the first one. Every project write is
+  // validated before it lands, and the refusal names the models that do exist.
+  const badCreate = await request('POST', '/api/projects', { name: 'Typo OLT', olt: 'gpon-c-pluss-8' });
+  const afterBadCreate = await request('GET', '/api/projects');
+  test('creating a project with an unknown OLT model is a 400 naming the models that exist', function () {
+    assert.strictEqual(badCreate.status, 400, JSON.stringify(badCreate.body));
+    assert.ok(badCreate.body.error.indexOf('gpon-c-pluss-8') !== -1, badCreate.body.error);
+    assert.ok(badCreate.body.error.indexOf('gpon-c-plus-8') !== -1,
+      'the refusal must name a model that exists, not only reject the one that does not: ' + badCreate.body.error);
+    assert.ok(!afterBadCreate.body.projects.some(function (p) { return p.name === 'Typo OLT'; }),
+      'a refused create wrote a project anyway');
+  });
+
   const created = await request('POST', '/api/projects', { name: 'API test build' });
   test('a project can be created', function () {
     assert.strictEqual(created.status, 201);
@@ -118,6 +133,20 @@ async function main() {
     const result = budget.body.budgets[0].result;
     assert.ok(['ok', 'marginal', 'fail'].indexOf(result.verdict) !== -1);
     assert.ok(result.breakdown.length >= 4);
+  });
+
+  // POST /budget takes a node id. An id that names nothing, or names the OLT, is the caller's mistake:
+  // letting designForOnt throw sent it through the generic handler as a 500 - "the server broke" -
+  // when the answer is 400 naming the id and the ONT ids that do exist.
+  const unknownOnt = await request('POST', '/api/projects/' + id + '/budget', { ontId: 'nope' });
+  const notAnOnt = await request('POST', '/api/projects/' + id + '/budget', { ontId: 'n1' });
+  test('a budget for an id that is not an ONT is a 400 naming the id, not a 500', function () {
+    assert.strictEqual(unknownOnt.status, 400, JSON.stringify(unknownOnt.body));
+    assert.ok(unknownOnt.body.error.indexOf('nope') !== -1, unknownOnt.body.error);
+    assert.ok(unknownOnt.body.error.indexOf('n3') !== -1,
+      'the refusal should name the ONT ids the project does have: ' + unknownOnt.body.error);
+    assert.strictEqual(notAnOnt.status, 400, JSON.stringify(notAnOnt.body));
+    assert.ok(notAnOnt.body.error.indexOf('n1') !== -1 && /not "ont"/.test(notAnOnt.body.error), notAnOnt.body.error);
   });
 
   const bom = await request('GET', '/api/projects/' + id + '/bom');

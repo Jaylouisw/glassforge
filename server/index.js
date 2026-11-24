@@ -234,6 +234,15 @@ async function handle(req, res, ctx) {
     if (method === 'POST') {
       const body = await readJsonBody(req);
       const project = engine.project.createProject(body.name || 'Untitled project', { id: store.newId() });
+      // The OLT model is the one field a create can get wrong that the caller then cannot see. An
+      // unknown model used to be saved with a 201 (apply() refuses op-level faults only), and every
+      // later edit was then refused for 'node "n1" uses unknown olt model ...' - the *next* op
+      // blamed for a typo made in the first one. A write is validated before it lands, and the
+      // refusal names the models that exist.
+      if (body.olt && !registry.has('olt', body.olt)) {
+        return fail(req, res, 400, 'no olt part with model "' + body.olt + '" - known: ' +
+          registry.all('olt').map(function (part) { return part.model; }).join(', '));
+      }
       if (body.olt) {
         const applied = engine.project.apply(project, { op: 'add-node', node: { type: 'olt', model: body.olt } });
         if (applied.error) return fail(req, res, 400, applied.error);
@@ -305,6 +314,23 @@ async function handle(req, res, ctx) {
 
     if (action === '/budget' && method === 'POST') {
       const body = await readJsonBody(req);
+      // ontId is a node id: an id that names nothing, or names the OLT, is the caller's
+      // mistake. designForOnt throws for both, and uncaught that becomes a 500 - "the server
+      // broke" - when the answer is a 400 naming the id and the ONTs this plant actually has.
+      if (body.ontId) {
+        const nodes = project.nodes || [];
+        const onts = nodes.filter(function (n) { return n && n.type === 'ont'; });
+        const target = nodes.find(function (n) { return n && n.id === body.ontId; });
+        if (!target) {
+          return fail(req, res, 400, 'no node with id "' + body.ontId + '"' + (onts.length
+            ? ' - this project has ONTs: ' + onts.map(function (n) { return n.id; }).join(', ')
+            : ' - this project has no ONTs'));
+        }
+        if (target.type !== 'ont') {
+          return fail(req, res, 400, 'node "' + body.ontId + '" has type "' + target.type +
+            '", not "ont" - /budget takes an ONT id');
+        }
+      }
       const budgets = body.ontId
         ? [engine.network.designForOnt(project, body.ontId, registry, body)]
         : engine.network.allOntBudgets(project, registry, body);
