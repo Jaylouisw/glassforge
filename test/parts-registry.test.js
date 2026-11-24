@@ -56,7 +56,7 @@ test('specs that would silently mislead are rejected', function () {
 test('an OLT whose budget does not match its class warns', function () {
   const result = parts.validateSpec({
     kind: 'olt', model: 'odd-olt', label: 'Odd', pon: 'gpon', class: 'C+',
-    txPowerDbmMin: 3, txPowerDbmMax: 7, rxSensitivityDbm: -30, rxOverloadDbm: -8,
+    txPowerDbmMin: 3, txPowerDbmMax: 7, rxSensitivityDbm: -32, rxOverloadDbm: -12,
     budgetDb: 35, ports: 8, maxSplitRatio: 128, sourceUrl: 'https://x.invalid'
   });
   assert.strictEqual(result.ok, true);
@@ -133,6 +133,23 @@ test('an active link can be budgeted with an LC/UPC mating, not the SC/APC defau
   close(defaulted.odnLossDb, 0.95, 0.001, 'ODN loss with the 0.30 dB default pair');
   close(defaulted.odnLossDb - upc.odnLossDb, 0.1, 0.001, 'the polish worth 0.05 dB per mating');
   assert.strictEqual(registry.get('connector', 'lc-upc').polish, 'upc');
+});
+
+test('an OLT receiver reaches the class budget its own ONTs launch into', function () {
+  // Upstream is a class-level pair, not a per-design one: every ONT of a PON in this catalogue launches
+  // the same floor (GPON +0.5, XG-PON +2, XGS-PON +4 dBm), so the OLT receiver has to be sensitive
+  // enough that the class the row declares is reachable at all. Two rows were not: gpon-c-plus-8
+  // carried -30 dBm and gpon-c-plus-plus-16 -33 dBm - the class B+ pair copied down the ladder - which
+  // left 30.5 and 33.5 dB against 32 and 35 dB classes. The class verdict passed while the headroom
+  // verdict failed on the same row, and a designer reads that as "the tool is broken", not "buy a pad".
+  for (const olt of registry.all('olt')) {
+    const onts = registry.all('ont').filter(function (o) { return o.pon === olt.pon; });
+    assert.ok(onts.length > 0, olt.model + ' has no ONT of the same PON');
+    const launchFloor = Math.min.apply(null, onts.map(function (o) { return o.txPowerDbmMin; }));
+    const reach = launchFloor - olt.rxSensitivityDbm;
+    assert.ok(reach >= olt.budgetDb, olt.model + ': an ONT launching ' + launchFloor + ' dBm into a ' +
+      olt.rxSensitivityDbm + ' dBm receiver reaches ' + reach + ' dB, short of its own ' + olt.budgetDb + ' dB class');
+  }
 });
 
 done();

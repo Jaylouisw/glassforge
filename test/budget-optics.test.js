@@ -39,7 +39,10 @@ test('upstream is a different wavelength through the same glass', function () {
   // 3.0 km x 0.35 = 1.05 instead of 0.66 -> ODN 12.55 dB, and the OLT transmitter is the receiver now
   assert.ok(up.odnLossDb > down.odnLossDb, '1310 nm attenuates more than 1490 nm in G.652.D');
   close(up.odnLossDb, 12.55, 0.001, 'upstream ODN loss');
-  assert.strictEqual(up.sensitivityDbm, -30, 'in the upstream direction the C+ OLT line card is the receiver');
+  // The C+ OLT receiver is -32 dBm (G.984.2 Amd 2, Table V.1), not the -30 this line asserted while
+  // the row carried the class B+ receiver pair: at -30 an ONU launching +0.5 dBm reaches 30.5 dB, so
+  // a legal 32 dB C+ ODN read as a headroom failure on a row that declared the 32 dB class.
+  assert.strictEqual(up.sensitivityDbm, -32, 'in the upstream direction the C+ OLT line card is the receiver');
 });
 
 test('a design with too little margin fails and says which margin', function () {
@@ -133,7 +136,7 @@ test('a transmit power outside the part\'s range is a warning, not a silent clam
 });
 
 test('a link that is too loud says which pad fixes it, and how much pad fits', function () {
-  // A C++ OLT at its +9 dBm ceiling patched into an ONT through 5 m of drop cable: 5 m x 0.22 dB/km =
+  // A C++ OLT at +9 dBm - inside its +6..+10 dBm range - patched into an ONT through 5 m of drop cable: 5 m x 0.22 dB/km =
   // 0.0011 dB, so the ONT sees 9.00 dBm against an overload point of -8 dBm - 17.00 dB too loud.
   // Pads are sold in whole dB, so 17.00 dB of overload needs a 17 dB pad.
   const loud = budget.opticalBudget({

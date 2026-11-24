@@ -12,7 +12,7 @@
   "budgetDb": 28,
   "ports": 8,
   "maxSplitRatio": 64,
-  "notes": "Class B+ per ITU-T G.984.2: a published 28 dB ODN budget and a practical 1:64 limit. The OLT downstream launch of 1.5-5 dBm is typical of a class B+ line card, not a named card's datasheet. Replace with the line card actually purchased - the budget moves with its optics.",
+  "notes": "Class B+ per ITU-T G.984.2 (03/2003), Table III.1 added by Amendment 1 (02/2006) - Appendix III industry best practice for the 2.488 Gbit/s downstream, 1.244 Gbit/s upstream system - reprinted as Table A.1 in the 2019 edition: OLT mean launched power +1.5..+5 dBm, OLT receiver minimum sensitivity -28 dBm, minimum overload -8 dBm; ONU launch +0.5..+5 dBm, ONU sensitivity -27 dBm, ONU overload -8 dBm; 28 dB ODN. These are the standard's own class limits, not one vendor's typicals, which is what this row used to call them before 2026-11-24: the +1.5..+5 dBm launch is the class floor and ceiling, so a bought card outside it is not class B+ and a budget's outside-range warning is telling the truth. Neither direction is left with slack: 1.5 - (-27) = 28.5 dB downstream and 0.5 - (-28) = 28.5 dB upstream against a 28 dB class, so the class verdict is the tighter one and it is meant to be. A 28 dB ODN is about 1:64, and the 1:64 in maxSplitRatio is the practical ratio G.984.2's loss classes support rather than a standards figure - confirm the card's own limit. Replace with the line card actually purchased - the budget moves with its optics.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
   "tags": [
     "gpon",
