@@ -818,15 +818,35 @@ function printPage(req, res, project, registry) {
   out.push('<div class="drawing">' + plan.svg + '</div>');
   out.push('<p class="muted">' + escapeHtml(plan.scaleText) + '</p>');
 
+  // The budget's warnings are the plan's warnings, not a separate page. `project.check` is
+  // structural - it never runs an optical budget - so a link that is clean only at the bottom of
+  // its launch window (#111) printed as "No errors and no warnings" while the Signal tab said
+  // nothing either. A plan is signed off from this page, so the band has to be on it.
+  const signalWarnings = [];
+  let budgetRows = [];
+  try {
+    budgetRows = engine.network.allOntBudgets(project, registry, {});
+  } catch (err) {
+    signalWarnings.push('the optical budget could not be run: ' + err.message);
+  }
+  for (const row of budgetRows) {
+    if (!row.result) continue;
+    const label = row.name || row.ont;
+    (row.result.warnings || []).forEach(function (w) {
+      signalWarnings.push(label + ': ' + w);
+    });
+  }
+
   out.push('<h2>Checks</h2>');
-  if (!check.errors.length && !check.warnings.length) {
+  const planWarnings = check.warnings.concat(signalWarnings);
+  if (!check.errors.length && !planWarnings.length) {
     out.push('<p class="muted">No errors and no warnings.</p>');
   } else {
     if (check.errors.length) {
       out.push('<ul class="err">' + check.errors.map(function (e) { return '<li>' + escapeHtml(e) + '</li>'; }).join('') + '</ul>');
     }
-    if (check.warnings.length) {
-      out.push('<ul class="warn">' + check.warnings.map(function (w) { return '<li>' + escapeHtml(w) + '</li>'; }).join('') + '</ul>');
+    if (planWarnings.length) {
+      out.push('<ul class="warn">' + planWarnings.map(function (w) { return '<li>' + escapeHtml(w) + '</li>'; }).join('') + '</ul>');
     }
   }
 

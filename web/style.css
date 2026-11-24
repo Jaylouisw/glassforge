@@ -90,4 +90,5 @@ th { color: var(--muted); font-weight: 500; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .muted { color: var(--muted); }
 .err { color: #ff8a8a; }
+.warn { color: var(--warn); }
 .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 3px; }

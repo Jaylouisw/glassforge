@@ -32,7 +32,7 @@ test('canvas tags are SVG, panel tags are HTML', function () {
   for (const tag of ['g', 'circle', 'text', 'line', 'rect', 'path']) {
     assert.strictEqual(dom.namespaceFor(tag), dom.SVG_NS, tag + ' must be created in the SVG namespace');
   }
-  for (const tag of ['div', 'td', 'tr', 'span', 'button', 'table']) {
+  for (const tag of ['div', 'td', 'tr', 'span', 'button', 'table', 'ul', 'li']) {
     assert.strictEqual(dom.namespaceFor(tag), dom.HTML_NS, tag + ' must be created in the HTML namespace');
   }
 });

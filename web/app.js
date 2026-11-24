@@ -244,6 +244,15 @@
         for (const reason of r.reasons) list.appendChild(el('li', { text: reason }));
         card.appendChild(list);
       }
+      // A warning is not a reason: the verdict can be `ok` and the design still depend on a cold
+      // optic, because overload is judged at the bottom of the launch window (#111). The engine
+      // computed that sentence and this card dropped it, so the one place the verdict is read
+      // said nothing about it.
+      if (r.warnings && r.warnings.length) {
+        const list = el('ul', { class: 'warn' });
+        for (const warning of r.warnings) list.appendChild(el('li', { text: warning }));
+        card.appendChild(list);
+      }
       const details = el('details', {});
       details.appendChild(el('summary', { class: 'muted', text: 'Loss breakdown' }));
       const inner = el('table', {});
