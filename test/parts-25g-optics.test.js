@@ -43,12 +43,20 @@ test('a 40 km 25GBASE-ER link spends 14.6 dB of an 18 dB class and stays audible
 });
 
 test('a bare 25GBASE-ER patch is over the receiver overload point and the pad fits', function () {
-  // Two optics patched together lose 0.6 dB: -3.0 - 0.6 = -3.6 dBm at a -4.0 dBm receiver.
-  // Overload is the one fault more reach cannot fix, so the budget has to name the pad.
+  // Two optics patched together lose 0.6 dB: -3.0 - 0.6 = -3.6 dBm at a -4.0 dBm receiver,
+  // 0.4 dB over its overload point at the launch floor. A pad is bought once and fitted once,
+  // so it is sized at the TOP of the window (802.3cc Table 114-6: -3.0 .. +6.0 dBm):
+  // +6.0 - 0.6 = +5.4 dBm at the receiver is 9.4 dB over -4.0, and ceil(9.4) = 10 dB.
+  // This used to assert a 1 dB pad, which was sized at the launch floor and left the receiver
+  // at +4.4 dBm on a card painting +6; #110 moved the size to the strongest launch.
+  // maxPadDb is the class budget less the margin and the ODN: 18 - 3 - 0.6 = 14.4, so 14 dB.
   const r = budget.pointToPoint(link(0), registry);
-  assert.strictEqual(r.rxPowerDbm, -3.6, 'two SC/APC matings only');
+  assert.strictEqual(r.rxPowerDbm, -3.6, 'two SC/APC matings only, at the launch floor');
   assert.ok(r.attenuator, 'a pad is required');
-  assert.strictEqual(r.attenuator.padDb, 1, '0.4 dB over overload rounds up to a 1 dB pad');
+  assert.strictEqual(r.attenuator.atTxDbm, 6, 'the pad is sized at the +6.0 dBm top of the window');
+  assert.strictEqual(r.attenuator.overDb, 9.4, '+6.0 - 0.6 = +5.4 dBm, 9.4 dB over the -4.0 dBm overload');
+  assert.strictEqual(r.attenuator.padDb, 10, '9.4 dB over rounds up to a 10 dB pad, not the old 1 dB');
+  assert.strictEqual(r.attenuator.maxPadDb, 14, '18 dB class - 3 dB margin - 0.6 dB ODN = 14.4, so 14 dB');
   assert.strictEqual(r.attenuator.fits, true, 'the 13 dB of spare class still funds it');
   assert.strictEqual(r.verdict, 'fail', 'an overload without a pad is not a pass');
 });
