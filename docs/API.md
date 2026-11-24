@@ -88,8 +88,10 @@ what turns a `PUT` into a `400`.
 ```
 POST /api/design/synthesise
   { demand, headEnd: { lat, lon, name? }, technology?, routeFactor?, marginDb?,
-    network?, maxSnapM?, joinToleranceM?,
-    pon?: { ratios, olt, ont, maxDropM }, active?: { optics }, costs?, applyToProject? }
+    network?, maxSnapM?, joinToleranceM?, ladder?, overlengthPct?,
+    pon?: { ratios, olt, ont, maxDropM },
+    active?: { headEndOptic, cpeOptic, optics: [{ headEndOptic, cpeOptic }] },
+    costs?, applyToProject? }
   → { ok, objective, routeMethod, technology, best, candidates, plant, runs, rationale, notes, applied? }
 
 POST /api/import/network
@@ -118,6 +120,28 @@ With `costs`, `objective` is `cost` and every candidate's `metrics.cost` prices 
 (`purchaseM`) plus the priced splices, closures and splitters, with the terms in
 `metrics.costBreakdown: { cable, splices, closures, splitters, total }`; without `costs`, both are
 `null`.
+
+`ladder` and `overlengthPct` are the two knobs that change what is bought rather than where it goes: the
+ladder is the cable list every span is chosen from, and `overlengthPct` (default 3) is the BOM slack quoted
+on every route. A present-but-unreadable value is a `400`, never a default, because either one silently
+reshapes the whole plan: the same eight-house estate quotes 707.3 m of design length at the default and
+755.4 m at `{"overlengthPct":10}` (707.3 / 1.03 x 1.10 = 755.4), while `{"overlengthPct":"ten"}` is
+`the design reads "overlengthPct" as a percentage of design length and got "ten" (a string)` and
+`{"ladder":["nope"]}` names the cable models the catalogue has.
+
+`pon` and `active` are blocks of named options, and a block of another shape is a `400` rather than a
+substitution. The blocks are merged into the defaults, so a value the design cannot read used to be
+*replaced* and the search then ran on options nobody named: `{"pon":"gpon"}` answers `the design reads
+"pon" as an object of ratios, olt, ont, maxDropM and got "gpon"`, and `{"pon":{"ratios":"16"}}` is refused
+rather than iterated by character - a string is iterated, so `"16"` would try 1:1 and 1:6 and then answer
+"no candidate topology could be built", the estate blamed for a missing pair of brackets. A near-miss key
+inside a block is refused the same way (`{"pon":{"ratio":[8]}}` names `ratios`). `active.optics` is a list
+of `{ headEndOptic, cpeOptic }` pairs, and an end may be named once for the whole block instead:
+`{"technology":"active","active":{"headEndOptic":"sfp-1g-lx-10km","optics":[{"cpeOptic":"sfp-1g-lx-10km"}]}}`
+builds the 1G plant (541.4 m). An entry that names an end nowhere is refused, because that end used to be
+filled from the default and the ONTs then failed as "the optics run at different rates". Only the block
+the chosen `technology` reads is validated: a `pon` block beside `technology: "active"` is not a setting,
+and it is neither read nor refused.
 See [AUTO-DESIGN.md](AUTO-DESIGN.md).
 
 ## Site-to-site links
