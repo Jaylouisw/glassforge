@@ -18,10 +18,12 @@ node server/index.js          # then open http://127.0.0.1:8000
 ```
 
 Node 18 or newer. Nothing has to be installed to run it, because it has no runtime dependencies: the
-server is `http` and `fs`, the UI is one HTML file and three scripts (`app.js`, `scene.js`, `dom.js`)
-served verbatim, and the engine is CommonJS. New engine modules are TypeScript (`engine/geo.ts`),
-compiled in place with the emitted `.js` committed, so a clone still starts with no build — see
-[ADR 0004](docs/adr/0004-typescript-hybrid-and-no-any.md) and [Development](#development).
+server is `http` and `fs`, the UI is one HTML file and four scripts (`app.js`, `scene.js`,
+`signal.js`, `dom.js`) served verbatim — plus `fiber.js`, which comes from the engine so the canvas
+colours a strand from the table the budget addressed it with — and the engine is CommonJS. New engine
+modules are TypeScript (`engine/geo.ts`), compiled in place with the emitted `.js` committed, so a
+clone still starts with no build — see [ADR 0004](docs/adr/0004-typescript-hybrid-and-no-any.md) and
+[Development](#development).
 
 <!-- parts:start -->
 **77 parts across 8 kinds** — 9 cables, 9 splitters, 13 OLTs, 7 ONTs, 23 transceiver, 8 closures, 6 connectors, 2 splices.
@@ -97,7 +99,8 @@ Being explicit, because a planner that quietly lacks a feature is worse than one
 engine/     the planning model — fibre colours, parts registry, budget, lengths, plant, KML, projects
 parts/      the catalogue, one JSON file per part (add a model = drop a file, no code change)
 server/     HTTP surface and project storage: http + fs, nothing else
-web/        the UI: index.html, app.js, scene.js, dom.js, style.css — no framework, no build step
+web/        the UI: index.html, app.js, scene.js, signal.js, dom.js, style.css — no framework, no
+            build step
 test/       one suite per behaviour, discovered by scripts/run-tests.js
 docs/       SPEC.md (the model), AUTO-DESIGN.md (topology synthesis), OPTICAL.md (the numbers),
             PARTS.md, FIBRE-COLOURS.md, API.md
