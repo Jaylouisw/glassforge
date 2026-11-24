@@ -129,10 +129,65 @@ function firstBlock(xml: string, tag: string): string | null {
   return all.length ? all[0] : null;
 }
 
+/** XML's five predefined entities. Anything else needs a DTD this importer does not read. */
+const NAMED_ENTITIES: { [name: string]: string } = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'"
+};
+
+/**
+ * The text an XML entity reference stands for, or the reference itself when this importer cannot
+ * resolve it.
+ *
+ * Google Earth escapes what its author typed, so a placemark called "Main St & 3rd Ave" is stored as
+ * `Main St &amp; 3rd Ave` and `&#233;` is `e-acute`. Reading the raw block gave that markup straight
+ * to the node label: the printed plan escapes its own HTML, so the `&` of `&amp;` became `&amp;amp;`
+ * and the sheet a crew carries read `Main St &amp; 3rd Ave`. An unknown named entity is left exactly
+ * as written - guessing a character for `&nbsp;` would be the same invention as a defaulted loss.
+ */
+function decodeEntities(text: string): string {
+  return text.replace(/&(#x[0-9A-Fa-f]+|#[0-9]+|[A-Za-z][A-Za-z0-9]*);/g,
+    function (whole: string, body: string): string {
+      if (body.charAt(0) === '#') {
+        const hex = body.charAt(1) === 'x' || body.charAt(1) === 'X';
+        const code = parseInt(hex ? body.slice(2) : body.slice(1), hex ? 16 : 10);
+        // A reference outside Unicode, one that lands on a lone surrogate, or NUL - which XML forbids
+        // outright - is not a character this can write; it stays as it was found rather than becoming
+        // a replacement glyph nobody typed.
+        if (!isFinite(code) || code < 1 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) return whole;
+        return String.fromCodePoint(code);
+      }
+      const named = NAMED_ENTITIES[body];
+      return named === undefined ? whole : named;
+    });
+}
+
+/** The markup the surrounding sentence should not carry: tags go, their text stays. */
+function stripTags(text: string): string {
+  return text.replace(/<[^>]*>/g, '');
+}
+
+/**
+ * The text of the first `<tag>` in `xml`, decoded - except for CDATA, which is literal by definition.
+ *
+ * Order matters twice. Tags are stripped *before* entities are decoded, so a KML description holding
+ * `&lt;b&gt;` keeps the literal "<b>" the author escaped instead of it becoming markup. CDATA is
+ * split out *before* either, because an entity inside it is not markup at all: `a &amp; b` inside
+ * CDATA is the six characters `&amp;` and must survive untouched.
+ */
 function firstText(xml: string, tag: string): string | null {
   const inner = firstBlock(xml, tag);
   if (inner === null) return null;
-  return inner.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]*>/g, '').trim();
+  const parts: string[] = [];
+  const cdata = /<!\[CDATA\[([\s\S]*?)\]\]>/g;
+  let at = 0;
+  let m: RegExpExecArray | null;
+  while ((m = cdata.exec(inner)) !== null) {
+    parts.push(decodeEntities(stripTags(inner.slice(at, m.index))));
+    parts.push(m[1]);
+    at = m.index + m[0].length;
+  }
+  parts.push(decodeEntities(stripTags(inner.slice(at))));
+  return parts.join('').trim();
 }
 
 /**

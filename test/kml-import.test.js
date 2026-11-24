@@ -208,3 +208,53 @@ test('a blank coordinate field is not the zero meridian', function () {
   assert.strictEqual(classified.droppedCoordinates, 2);
   assert.strictEqual(classified.routes[0].dropped, 1);
 });
+
+
+// A name is text, and XML writes text with entities. Google Earth escapes what its author typed, so
+// "Main St & 3rd Ave" is stored as "Main St &amp; 3rd Ave" - and the importer handed that string
+// straight to the node label. The printed plan escapes its HTML, so the "&" of "&amp;" became
+// "&amp;amp;" and the sheet a crew carries read "Main St &amp; 3rd Ave". A numeric reference
+// (`&#233;`) is `e-acute` on the same terms.
+const ENTITIES = '<?xml version="1.0"?><kml><Document><name>Campus &amp; depot</name>' +
+  '<Placemark><name>Main St &amp; 3rd Ave</name>' +
+  '<description>Joint &lt;A&gt; &#233;tage &#x00E9;t&eacute;</description>' +
+  '<Point><coordinates>-1.5,52.5,0</coordinates></Point></Placemark>' +
+  '<Placemark><name>Route &quot;north&quot; &apos;old&apos;</name>' +
+  '<description><![CDATA[a &amp; b]]></description>' +
+  '<LineString><coordinates>-1.5,52.5 -1.4,52.6</coordinates></LineString></Placemark>' +
+  '<Placemark><name>Café &nbsp;stop &#1114112;</name>' +
+  '<Point><coordinates>-1.6,52.6,0</coordinates></Point></Placemark>' +
+  '</Document></kml>';
+
+function byName(parsed, name) {
+  return parsed.placemarks.find(function (p) { return p.name === name; });
+}
+
+test('entity text is decoded into the name the file means', function () {
+  const parsed = kml.parseKml(ENTITIES);
+  assert.strictEqual(parsed.name, 'Campus & depot', 'the document name is the text, not its markup');
+  const main = byName(parsed, 'Main St & 3rd Ave');
+  assert.ok(main, 'the ampersand in a name is one character, got ' +
+    JSON.stringify(parsed.placemarks.map(function (p) { return p.name; })));
+  // `&lt;A&gt;` is a literal "<A>" in the text - stripped as markup it would vanish - and `&#233;` and
+  // `&#x00E9;` are character references, each one character.
+  assert.strictEqual(main.description, 'Joint <A> étage ét&eacute;');
+  const route = byName(parsed, 'Route "north" \'old\'');
+  assert.ok(route, 'quot and apos are quotes, got ' +
+    JSON.stringify(parsed.placemarks.map(function (p) { return p.name; })));
+  // The classified route carries the decoded name too: this is the string a design turns into a node.
+  assert.strictEqual(kml.classify(parsed).routes[0].name, 'Route "north" \'old\'');
+});
+
+// The other half of the rule: a reference this importer cannot resolve is left exactly as written.
+// CDATA is literal by definition, so its content is never decoded; `&eacute;` and `&nbsp;` are not two
+// of XML's five predefined entities and there is no DTD here to resolve them, so guessing a character
+// would be the same invention as a defaulted loss. `&#1114112;` is past the last code point.
+test('an entity this importer cannot resolve is left as written, and CDATA is literal', function () {
+  const parsed = kml.parseKml(ENTITIES);
+  const route = byName(parsed, 'Route "north" \'old\'');
+  assert.strictEqual(route.description, 'a &amp; b', 'CDATA is literal: its ampersand is not markup');
+  const cafe = byName(parsed, 'Café &nbsp;stop &#1114112;');
+  assert.ok(cafe, 'the sentence keeps what the file wrote, got ' +
+    JSON.stringify(parsed.placemarks.map(function (p) { return p.name; })));
+});
