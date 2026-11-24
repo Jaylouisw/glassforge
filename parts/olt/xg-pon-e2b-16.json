@@ -1,0 +1,22 @@
+{
+  "kind": "olt",
+  "model": "xg-pon-e2b-16",
+  "vendor": "generic",
+  "label": "XG-PON1 OLT E2b boosted port (ODN class E2), 16 ports",
+  "pon": "xg-pon",
+  "class": "E2",
+  "txPowerDbmMin": 14.5,
+  "txPowerDbmMax": 16.5,
+  "rxSensitivityDbm": -33.5,
+  "rxOverloadDbm": -13,
+  "budgetDb": 35,
+  "ports": 16,
+  "maxSplitRatio": 64,
+  "notes": "The 35 dB XG-PON class with the boosted transmitter, per ITU-T G.987.2 (02/2023) Amd. 1 (06/2023). Table 9-3 prints its ODN Class header as two rows - N1 | N2 | N2 | E1 | E2 | E2 over N2a | N2b | E2a | E2b - so E2b is a column inside ODN class E2 (20-35 dB, clause 6.1 / Table 6-1), and this row's class is E2 with the E2 35 dB budget, not a class of its own. Table 9-3 gives mean launched power +14.5..+16.5 dBm for E2b; Table 9-4 has no E2b column, so the receiver is E2's -33.5 dBm sensitivity / -13.0 dBm overload and the ONU launch is the common +2.0..+7.0 dBm. The pairing is xg-pon-ont-n2b-1xge (-21.5 dBm): 14.5 - (-21.5) = 36.0 dB downstream against 35, the 1 dB of slack every row here has (measured: a 25.70 dB ODN reads 10.30 dB of headroom and 9.30 dB of class headroom, identical to E2a plus the -28 dBm ONT). With the -28 dBm ONT the arithmetic is 16.5 - (-28) = 44.5 dB but the class stops at 35 - the hotter launch exists to pay for the cheaper receiver, and a green budget on that pairing is not a longer PON. Overload is the sharp end: 16.5 - (-3.5) = 20.0 dB, exactly E2's published minimum ODN loss, so an ODN shorter than 20 dB blinds the ONU and needs the pad the budget names, sized at the launch ceiling rather than the floor. A 1:64 split is 20.5 dB on its own, so this port is realistically a two-stage or 1:32 design - 1:128 is 23.8 dB and leaves 11 dB of fibre at 0.35 dB/km, before margin. Caveats: downstream figures are at the 10^-3 BER reference level (Table 9-3, Note 4) and upstream at 10^-4 (Table 9-4, Note 6), both pre-FEC; Note 5 requires the ONU figure with G-PON and video overlay present. Ports 16 and the 1:64 cap are card sizes, not standards figures. The palette subtitle reads 'xg-pon E2' for both E2 columns; the label carries the b. Class figures from the recommendation, not one measured card: replace with the card actually purchased before construction.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.987.2/en",
+  "tags": [
+    "xg-pon",
+    "e2b",
+    "boosted"
+  ]
+}

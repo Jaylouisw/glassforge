@@ -221,4 +221,116 @@ test('a 1:64 XG-PON at class E2 over 20 km budgets green, and E1 is the tighter 
   assert.strictEqual(e1.verdict, 'ok', e1.reasons.join(' | '));
 });
 
+test('the N2b and E2b boosted ports carry Table 9-3, inside the ODN class they belong to', function () {
+  // G.987.2 (2023) Amd. 1, Table 9-3 prints two header rows over the same columns:
+  //   ODN Class: N1 | N2 | N2 | E1 | E2 | E2
+  //                       N2a  N2b      E2a  E2b
+  // so N2b is a power-budget column *inside* ODN class N2 (16-31 dB), not a fifth class, and the
+  // part's `class` field is the ODN class the class verdict spends: 31 dB, not a new table key.
+  // Mean launched power MIN/MAX +10.5/+12.5 dBm (N2b) and +14.5/+16.5 (E2b); Table 9-4 has only
+  // four columns, so the OLT receiver is N2's -29.5/-9.0 and E2's -33.5/-13.0 and the ONU's
+  // upstream launch stays +2.0..+7.0.
+  const n2b = registry.get('olt', 'xg-pon-n2b-16');
+  assert.strictEqual(n2b.pon, 'xg-pon');
+  assert.strictEqual(n2b.class, 'N2', 'N2b is a column inside ODN class N2');
+  assert.strictEqual(n2b.txPowerDbmMin, 10.5, 'N2b launch MIN is +10.5 dBm');
+  assert.strictEqual(n2b.txPowerDbmMax, 12.5, 'N2b launch MAX is +12.5 dBm');
+  assert.strictEqual(n2b.rxSensitivityDbm, -29.5, 'the N2 OLT receiver is the one in Table 9-4');
+  assert.strictEqual(n2b.rxOverloadDbm, -9, 'the N2 OLT overload is the one in Table 9-4');
+  assert.strictEqual(n2b.budgetDb, 31, 'N2 is 31 dB of ODN loss');
+
+  const e2b = registry.get('olt', 'xg-pon-e2b-16');
+  assert.strictEqual(e2b.class, 'E2', 'E2b is a column inside ODN class E2');
+  assert.strictEqual(e2b.txPowerDbmMin, 14.5, 'E2b launch MIN is +14.5 dBm');
+  assert.strictEqual(e2b.txPowerDbmMax, 16.5, 'E2b launch MAX is +16.5 dBm');
+  assert.strictEqual(e2b.rxSensitivityDbm, -33.5, 'the E2 OLT receiver is the one in Table 9-4');
+  assert.strictEqual(e2b.rxOverloadDbm, -13, 'the E2 OLT overload is the one in Table 9-4');
+  assert.strictEqual(e2b.budgetDb, 35, 'E2 is 35 dB of ODN loss');
+
+  // Upstream, the same half-dB of slack every row here carries: 2.0 - (-29.5) = 31.5 against 31,
+  // 2.0 - (-33.5) = 35.5 against 35.
+  assert.ok(2 - n2b.rxSensitivityDbm > n2b.budgetDb, 'N2b upstream headroom exceeds its class');
+  assert.ok(2 - e2b.rxSensitivityDbm > e2b.budgetDb, 'E2b upstream headroom exceeds its class');
+});
+
+test('the boosted port buys back exactly the 6.5 dB its cheaper ONU gives away', function () {
+  // Same ODN as the N2a case above: 1.0 km at 0.22 = 0.22; 2 splices 0.20; 2 connectors 0.60;
+  // 1:64 = 18.06 + 2.44 = 20.50 -> 21.52 dB.
+  // N2b launches 10.5: 10.5 - 21.52 = -11.02 dBm into the -21.5 dBm ONT = 10.48 dB of headroom,
+  // and 31 - 21.52 = 9.48 dB inside the class - identical to what N2a + the -28 dBm ONT reads,
+  // which is the whole point of the port.
+  const boosted = budget.opticalBudget({
+    olt: { model: 'xg-pon-n2b-16' },
+    ont: { model: 'xg-pon-ont-n2b-1xge' },
+    wavelength: '1490',
+    spans: [{ cable: 'g652d-loose-12', lengthM: 1000 }],
+    splitters: [{ model: 'plc-1x64-sca' }],
+    splices: 2,
+    connectors: 2
+  }, registry);
+  close(boosted.odnLossDb, 21.52, 0.001, 'ODN loss');
+  close(boosted.rxPowerDbm, -11.02, 0.01, 'receive power');
+  close(boosted.headroomDb, 10.48, 0.01, 'headroom into the reduced-sensitivity ONT');
+  close(boosted.classHeadroomDb, 9.48, 0.01, 'class headroom');
+  assert.strictEqual(boosted.oltClass, 'N2');
+  assert.strictEqual(boosted.verdict, 'ok', boosted.reasons.join(' | '));
+
+  // The reduced-sensitivity ONU on the ordinary N2a card over the same span: 4.0 - 21.52 = -17.52
+  // into -21.5 = 3.98 dB, under the 5 dB the engine needs for "ok" - the 6.5 dB the port restores.
+  const naive = budget.opticalBudget({
+    olt: { model: 'xg-pon-n2-16' },
+    ont: { model: 'xg-pon-ont-n2b-1xge' },
+    wavelength: '1490',
+    spans: [{ cable: 'g652d-loose-12', lengthM: 1000 }],
+    splitters: [{ model: 'plc-1x64-sca' }],
+    splices: 2,
+    connectors: 2
+  }, registry);
+  close(naive.headroomDb, 3.98, 0.01, 'headroom on the ordinary card');
+  assert.strictEqual(naive.verdict, 'marginal', naive.reasons.join(' | '));
+  close(boosted.headroomDb - naive.headroomDb, 6.5, 0.001, 'the port gives back exactly 6.5 dB');
+});
+
+test('a boosted port overdrives any ODN shorter than its class floor', function () {
+  // Table 9-3's ceiling against the type-2 ONU's overload point lands exactly on Table 6-1's
+  // minimum ODN loss: 12.5 + 3.5 = 16.0 dB for N2, 16.5 + 3.5 = 20.0 dB for E2. A 100 m patch is
+  // 0.022 dB, so the pad is sized at the top of the launch window:
+  // 12.5 - 0.022 - (-3.5) = 15.978 -> a 16 dB pad, and the verdict stays fail until it is fitted.
+  const r = budget.opticalBudget({
+    olt: { model: 'xg-pon-n2b-16' },
+    ont: { model: 'xg-pon-ont-n2b-1xge' },
+    wavelength: '1490',
+    spans: [{ cable: 'g652d-loose-12', lengthM: 100 }],
+    splices: 0,
+    connectors: 0
+  }, registry);
+  assert.ok(r.attenuator, 'a +12.5 dBm launch into a -3.5 dBm receiver must report an attenuator');
+  assert.strictEqual(r.attenuator.overDb, 15.98);
+  assert.strictEqual(r.attenuator.padDb, 16);
+  assert.strictEqual(r.attenuator.atTxDbm, 12.5, 'the pad is sized for the top of the launch window');
+  assert.strictEqual(r.verdict, 'fail', 'a pad is still a fail until it is in the BOM');
+  assert.strictEqual(12.5 - -3.5, 16, 'N2b ceiling meets the N2 floor');
+  assert.strictEqual(16.5 - -3.5, 20, 'E2b ceiling meets the E2 floor');
+});
+
+test('a 1:64 E2b over 20 km budgets green at E2a headroom, not more', function () {
+  // 1:64 = 20.50; 20 km at 0.22 = 4.40; 2 splices 0.20; 2 connectors 0.60 -> 25.70 dB.
+  // E2b launches 14.5: 14.5 - 25.70 = -11.20 into -21.5 = 10.30 dB of headroom, 35 - 25.70 = 9.30
+  // inside the class - the same as E2a + the -28 dBm ONT. The hotter launch is not extra reach.
+  const e2b = budget.opticalBudget({
+    olt: { model: 'xg-pon-e2b-16' },
+    ont: { model: 'xg-pon-ont-n2b-1xge' },
+    wavelength: '1490',
+    spans: [{ cable: 'g652d-loose-12', lengthM: 20000 }],
+    splitters: [{ model: 'plc-1x64-sca' }],
+    splices: 2,
+    connectors: 2
+  }, registry);
+  close(e2b.odnLossDb, 25.70, 0.001, 'ODN loss');
+  close(e2b.headroomDb, 10.30, 0.01, 'headroom into the reduced-sensitivity ONT');
+  close(e2b.classHeadroomDb, 9.30, 0.01, 'class headroom');
+  assert.strictEqual(e2b.oltClass, 'E2');
+  assert.strictEqual(e2b.verdict, 'ok', e2b.reasons.join(' | '));
+});
+
 done();
