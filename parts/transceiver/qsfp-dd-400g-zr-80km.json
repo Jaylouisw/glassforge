@@ -1,0 +1,24 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp-dd-400g-zr-80km",
+  "vendor": "generic",
+  "label": "QSFP-DD 400G-ZR coherent (OIF 400ZR), 80 km amplified",
+  "speedMbps": 400000,
+  "wavelengthNm": 1550,
+  "reachM": 80000,
+  "txPowerDbmMin": -10,
+  "txPowerDbmMax": -6,
+  "rxSensitivityDbm": -20,
+  "rxOverloadDbm": 0,
+  "polish": "upc",
+  "sourceUrl": "https://resource.fs.com/mall/doc/202307101638353veuqy.pdf",
+  "notes": "The first coherent row in the catalogue, and the only 400G optic here that is not a lane-bonded client: OIF 400ZR, dual-polarisation 16-QAM on one C-band carrier at 59.84 GBd with C-FEC, tunable 1528.77-1567.13 nm on a 75/100 GHz grid. Figures are the FS QSFPDD-ZR-400G sheet: average output power -10..-6 dBm at the connector, unamplified-link input sensitivity -20 dBm (specified at receiver OSNR tolerance >= 34 dB), input power range -12..0 dBm for the amplified application, 80 km over SMF with an EDFA. Cisco's QDD-400G-ZR-S sheet corroborates the same class and splits the receive figure the way this row has to be read: -12 dBm optimal, -15 dBm at 1 dB of OSNR penalty, -20 dBm only with no ASE noise, maximum receive +13 dBm (a damage threshold, not an operating point - the row keeps the 0 dBm operating maximum the FS range and the 400G mode give). The row takes the -20 dBm end because that is the unamplified span this engine can budget: launch(min) -10 minus -20 = 10.0 dB, which is 47.6 km of G.652 at 0.21 dB/km and, with the default 3 dB margin, 20.9 km with two SC/UPC matings and 23.8 km bare (measured). At the declared 80 km the loss is 17.4 dB, reception -27.4 dBm and headroom -7.4 dB: the row FAILS, and that is the honest answer, because the 80 km is the amplified declaration and an amplifier is exactly what this tool does not model. Do not read the 80 km reach as usable: treat it as a 21-24 km optic here, and budget the amplifier, the mux/demux pair and the 26 dB OSNR by hand - a span with a mid-stage amp turns the question from launch-minus-sensitivity into OSNR, which no part row can answer. Near end needs no pad: the 0 dBm receive maximum is 10 dB above the -10 dBm launch floor, so a 0 m patch reads -10.6 dBm and proposes no attenuator (measured); an EDFA in front of the receiver can still overload it, and the engine cannot see one. Single-wavelength caveat, as for the LAN-WDM rows: the engine budgets one wavelength and the cables publish attenuation at 1310/1490/1550, so the row says 1550 nm - the C-band window, not one grid channel - and both ends of a pair must be the same row, which is what a tunable coherent pair tuned to one channel is. ZR+ modes (300G/200G/100G at longer reach) are deliberately absent: the catalogue holds one rate per row and a mode-dependent row would quote a rate the module is not committed to. Class figures for one module family, not a purchase-tested part: replace the row with the QSFP-DD actually purchased before pricing a build.",
+  "tags": [
+    "400000",
+    "1550nm",
+    "400g",
+    "coherent",
+    "oif-400zr",
+    "dc-to-dc"
+  ]
+}
