@@ -129,3 +129,55 @@ test('coordinates that are not coordinates are dropped, not projected to null is
   assert.strictEqual(parsed.placemarks.length, 0);
   assert.strictEqual(parsed.unsupported, 1);
 });
+
+// A Placemark in a real drawing is often a MultiGeometry: Google Earth splits a road at every
+// junction, so one Placemark holds two or three LineStrings. The importer used to read the FIRST
+// <Point>/<LineString>/<LinearRing> in a Placemark and nothing else, and still reported
+// `unsupported: 0` - so half a road vanished and the caller was told the import was clean. A
+// property 10 m from the missing half was then snapped to the far end of the half that was read,
+// given a 100 m spur, and reported as needing a drop it does not need. One entry per geometry, in
+// document order, is what makes the import's own count true.
+const MULTI = '<kml><Document><Placemark><name>Calle 3</name><MultiGeometry>' +
+  '<LineString><coordinates>-0.1000,51.5000 -0.1010,51.5000</coordinates></LineString>' +
+  '<LineString><coordinates>-0.1010,51.5000 -0.1010,51.5010</coordinates></LineString>' +
+  '</MultiGeometry></Placemark></Document></kml>';
+
+test('a MultiGeometry contributes every part, not just the first', function () {
+  const parsed = kml.parseKml(MULTI);
+  assert.strictEqual(parsed.unsupported, 0, 'nothing in this drawing is unsupported');
+  assert.strictEqual(parsed.placemarks.length, 2, 'two LineStrings in one Placemark are two entries');
+  assert.deepStrictEqual(parsed.placemarks.map(function (p) { return p.name; }), ['Calle 3', 'Calle 3']);
+  const result = kml.classify(parsed);
+  assert.strictEqual(result.routes.length, 2, 'both halves are routes');
+  // 0.001 deg of longitude at 51.5 N is 0.001 x 111320 x cos(51.5) = 69.2 m, 0.001 deg of latitude is
+  // 111.2 m, so the pair measures 180.4 m. The old importer quoted 69.2 - the first leg only.
+  close(result.routeM, 180.4, 1.0, 'both legs are measured, got ' + result.routeM + ' m');
+});
+
+test('a MultiGeometry that mixes a point with a line yields both', function () {
+  const mixed = '<kml><Document><Placemark><name>NAP 12</name><MultiGeometry>' +
+    '<Point><coordinates>-0.1010,51.5010</coordinates></Point>' +
+    '<LineString><coordinates>-0.1000,51.5000 -0.1010,51.5000</coordinates></LineString>' +
+    '</MultiGeometry></Placemark></Document></kml>';
+  const result = kml.classify(kml.parseKml(mixed));
+  assert.strictEqual(result.routes.length, 1, 'the line is a route');
+  assert.strictEqual(result.points.length, 1, 'the point is a candidate node');
+});
+
+test('a property on the second half of a split road is snapped to that half, not to the first', function () {
+  const street = require('../engine/street');
+  const graph = street.buildGraph(MULTI, {});
+  assert.strictEqual(graph.stats().edges, 2, 'both halves are edges of the graph');
+  // 0.0009 deg of latitude = 100.1 m up the second leg, and the property is on the centreline.
+  // Against the truncated graph this same point snapped to the junction with a 100.08 m spur.
+  const snapped = street.snap(graph, { lat: 51.5009, lon: -0.1010 });
+  close(snapped.spurM, 0, 1, 'a property on the centreline has no spur, got ' + snapped.spurM + ' m');
+});
+
+test('a geometry too short to be a route is unsupported, not an empty route', function () {
+  const stub = '<kml><Document><Placemark><name>stub</name><LineString>' +
+    '<coordinates>-0.1,51.5</coordinates></LineString></Placemark></Document></kml>';
+  const parsed = kml.parseKml(stub);
+  assert.strictEqual(parsed.placemarks.length, 0);
+  assert.strictEqual(parsed.unsupported, 1);
+});
