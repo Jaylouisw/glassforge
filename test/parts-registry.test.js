@@ -114,4 +114,25 @@ test('a 1:128 PON budgets on the 1x128 cassette', function () {
   assert.strictEqual(r.verdict, 'ok');
 });
 
+test('an active link can be budgeted with an LC/UPC mating, not the SC/APC default', function () {
+  // Every transceiver in this catalogue is UPC, and the catalogue's connector family only carried an
+  // LC/APC row: a UPC patch cord cannot be mated to it. lc-upc is therefore a part the budget must be
+  // able to reach by name - a row that loads but is never chargeable is a table entry, not a part.
+  // 1.0 km x 0.35 dB/km (1310 nm) = 0.35 dB of fibre; 2 x 0.25 (lc-upc) = 0.50 dB of connector
+  // -> ODN 0.85 dB, against 0.95 dB with the 0.30 dB default pair.
+  const design = {
+    headEnd: { model: 'sfp-plus-10g-lr-10km' },
+    cpe: { model: 'sfp-plus-10g-lr-10km' },
+    spans: [{ cable: 'g652d-loose-12', lengthM: 1000 }],
+    splices: 0,
+    connectors: { model: 'lc-upc', count: 2 }
+  };
+  const upc = engine.budget.pointToPoint(design, registry);
+  close(upc.odnLossDb, 0.85, 0.001, 'ODN loss with an LC/UPC pair');
+  const defaulted = engine.budget.pointToPoint(Object.assign({}, design, { connectors: 2 }), registry);
+  close(defaulted.odnLossDb, 0.95, 0.001, 'ODN loss with the 0.30 dB default pair');
+  close(defaulted.odnLossDb - upc.odnLossDb, 0.1, 0.001, 'the polish worth 0.05 dB per mating');
+  assert.strictEqual(registry.get('connector', 'lc-upc').polish, 'upc');
+});
+
 done();
