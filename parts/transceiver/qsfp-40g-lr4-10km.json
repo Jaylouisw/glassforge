@@ -1,0 +1,21 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp-40g-lr4-10km",
+  "vendor": "generic",
+  "label": "QSFP+ 40GBASE-LR4 10 km",
+  "speedMbps": 40000,
+  "wavelengthNm": 1310,
+  "reachM": 10000,
+  "txPowerDbmMin": -7,
+  "txPowerDbmMax": 2.3,
+  "rxSensitivityDbm": -13.7,
+  "rxOverloadDbm": 2.3,
+  "polish": "upc",
+  "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
+  "notes": "Figure provenance: IEEE 802.3ba Clause 87, Table 87-7 (transmit) and Table 87-8 (receive), per-lane averages - average launch power -7.0..+2.3 dBm, average receive power -13.7..+2.3 dBm, receiver sensitivity (OMA) -11.5 dBm. Cisco's 40GBASE QSFP data sheet (QSFP-40G-LR4-S) and the Finisar and FS 40GBASE-LR4 sheets print the same rows. This row takes the AVERAGE receive minimum (-13.7), not the -11.5 dBm OMA sensitivity, because the engine compares average launch with average receive: the pair's budget is -7.0 - (-13.7) = 6.7 dB, which is IEEE's own 40GBASE-LR4 power budget. Four CWDM lanes (1271, 1291, 1311, 1331 nm centres, 1264.5-1337.5 nm ranges); the engine budgets one wavelength, so the row says 1310 nm, the cable's published window, and the 1331 nm top lane's slightly lower attenuation is not claimed - the single-wavelength figure errs conservative. Reach and loss are separate verdicts: 10 km x 0.35 dB/km = 3.5 dB leaves 3.2 dB, which clears the default 3 dB margin by 0.2 dB on a bare span and FAILS once two connector pairs (0.6 dB) are counted (2.6 dB, measured). The last length that clears the margin with connectors is 8.8 km (measured: 3.02 dB at 8.8 km, 2.99 dB at 8.9 km). Overload runs the other way: the launch ceiling +2.3 dBm equals the receiver's +2.3 dBm maximum, so a module at its ceiling into a 0 dB patch is exactly at its overload point and a 1 dB pad is the safe build. This engine computes receive power from the launch FLOOR (-7.0), which sits 9.3 dB below that ceiling, so it will not flag overload on this row - pad a short run by hand rather than trusting a green verdict. Class figures from the standard and vendor sheets, not one measured module: replace the row with the QSFP+ actually purchased before pricing a build.",
+  "tags": [
+    "40000",
+    "1310nm",
+    "40g"
+  ]
+}

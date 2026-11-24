@@ -1,0 +1,21 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp-40g-er4-40km",
+  "vendor": "generic",
+  "label": "QSFP+ 40GBASE-ER4 40 km",
+  "speedMbps": 40000,
+  "wavelengthNm": 1310,
+  "reachM": 40000,
+  "txPowerDbmMin": -2.7,
+  "txPowerDbmMax": 4.5,
+  "rxSensitivityDbm": -21.2,
+  "rxOverloadDbm": -4.5,
+  "polish": "upc",
+  "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
+  "notes": "Figure provenance: 40GBASE-ER4 as standardised in IEEE 802.3bm and printed by Cisco (QSFP-40G-ER4: +4.5/-2.7 dBm average launch per lane, -4.5/-21.2 dBm average receive per lane, 40 km on G.652), the Finisar FTL4E1QE1C, the Eoptolink EOLQ-1640G-40 and the SNR QSFP+ER4-40 sheets, all of which print average receive power -21.2..-4.5 dBm and an OMA receiver sensitivity of -19 dBm. The row takes the AVERAGE receive minimum (-21.2), not the OMA -19, because the engine compares average launch with average receive: the budget is -2.7 - (-21.2) = 18.5 dB against the class's 18 dB link budget. Four CWDM lanes (1271, 1291, 1311, 1331 nm centres, 1264.5-1337.5 nm ranges); the row says 1310 nm because the engine budgets one wavelength and that is the window the cables publish attenuation for. Reach and loss: 40 km x 0.35 dB/km = 14.0 dB leaves 4.5 dB, which covers two connector pairs and ten fusion splices (0.6 + 1.0 = 1.6 dB) and still reads 2.9 dB - below the default 3 dB margin, so a spliced 40 km run is marginal (measured); 39.7 km is the last length that clears it (measured: 3.01 dB). The 40G ER4 trap is the near end: the launch floor -2.7 dBm is 1.8 dB ABOVE the receiver's -4.5 dBm maximum, so the engine refuses any run with less than 1.8 dB of loss on overload - a 0 dB patch gets a 2 dB pad, a 1-4 km duct run (0.95-1.4 dB) a 1 dB pad (measured). A module sitting at its +4.5 dBm ceiling is 9 dB above that maximum, so the pad that clears overload without spending the budget lies between roughly 1 and 9 dB: size it against the bought module's own transmit figure, never a formula. Overload is not a reach problem. Class figures from the standard and vendor sheets, not one measured module: replace the row with the QSFP+ actually purchased before pricing a build.",
+  "tags": [
+    "40000",
+    "1310nm",
+    "40g"
+  ]
+}

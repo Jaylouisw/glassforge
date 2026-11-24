@@ -162,7 +162,7 @@ test('a missing optic is refused by name', function () {
   throws(function () { budget.pointToPoint({ headEnd: { model: 'nope' }, cpe: { model: 'sfp-1g-lx-10km' } }, registry); }, 'unknown transceiver model');
 });
 
-test('the catalogue carries optics for 1G, 10G, 25G and 100G with published figures', function () {
+test('the catalogue carries optics for 1G, 10G, 25G, 40G and 100G with published figures', function () {
   const optics = registry.all('transceiver');
   assert.ok(optics.length >= 4);
   for (const optic of optics) {
@@ -176,4 +176,7 @@ test('the catalogue carries optics for 1G, 10G, 25G and 100G with published figu
   assert.ok(speeds.indexOf(1000) !== -1 && speeds.indexOf(10000) !== -1 && speeds.indexOf(25000) !== -1,
     'the catalogue has 1G, 10G and 25G optics');
   assert.ok(speeds.indexOf(100000) !== -1, 'the catalogue has a 100G optic');
+  // 40G is not a subset of 100G: a QSFP+ port cannot take a QSFP28, so a switch with 40G ports
+  // had no optic to design a link with until 40GBASE-LR4/ER4 landed in the catalogue.
+  assert.ok(speeds.indexOf(40000) !== -1, 'the catalogue has a 40G optic');
 });
