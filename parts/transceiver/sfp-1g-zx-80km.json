@@ -1,20 +1,23 @@
 {
   "kind": "transceiver",
   "model": "sfp-1g-zx-80km",
-  "vendor": "generic",
-  "label": "SFP 1000BASE-ZX 80 km",
+  "vendor": "cisco",
+  "label": "Cisco GLC-ZX-SMD 1000BASE-ZX 80 km",
   "speedMbps": 1000,
   "wavelengthNm": 1550,
   "reachM": 80000,
   "txPowerDbmMin": 0,
   "txPowerDbmMax": 5,
-  "rxSensitivityDbm": -24,
+  "rxSensitivityDbm": -23,
   "rxOverloadDbm": -3,
   "polish": "upc",
-  "sourceUrl": "https://www.cisco.com/c/en/us/products/collateral/interfaces-modules/gigabit-ethernet-gbic-sfp-modules/product_data_sheet0900aecd8033f885.html",
-  "notes": "IEEE 802.3 does not define 1000BASE-ZX: \"ZX\" is a vendor convention for a 1550 nm extended-reach 1G optic, so this row cites the convention as a vendor publishes it (Cisco 1000BASE-ZX: 1500-1580 nm, launch 0..+5 dBm, receive -3..-23 dBm, 21 dB channel budget, about 70 km on single-mode fibre). The -24 dBm sensitivity and 80 km here are typical of third-party ZX-compatible modules rather than of that datasheet. Vendor-defined class, not a standard one: replace these figures with the module you buy.",
+  "sourceUrl": "https://www.cisco.com/c/en/us/td/docs/interfaces_modules/transceiver_modules/installation/note/78_15160.html",
+  "notes": "Cisco SFP and SFP+ Transceiver Module Installation Notes, Table 5 (1-Gigabit SFP optical transmit and receive specifications), rows GLC-ZX-SM / GLC-ZX-SM-RGD / SFP-GE-Z / GLC-ZX-SMD: average transmit power 0..+5 dBm, receive power -3 (max) .. -23 (min) dBm, 1500-1580 nm, 43.4-62 miles (70-100 km) on G.652 - so 0 - (-23) = 23 dB between the launch floor and the sensitivity floor. This row carried -24 dBm until 2026-11-24, and no document it cited printed that figure: -24 is a common third-party ZX-compatible claim, and it handed every 1000BASE-ZX link 1 dB that had not been sold. Take -24 from the module actually bought if its test report prints it; the catalogue row keeps the figure its own sourceUrl publishes. 1000BASE-ZX is NOT an IEEE 802.3 class - ZX is a vendor long-reach convention - so this row cites the vendor rather than a standard, and must not be read as a class limit. The two verdicts sit 1 dB apart in opposite directions. Loss: 80 km of G.652.D at 0.21 dB/km is 16.8 dB, which leaves 6.2 dB of the 23 for every splice, connector and the default 3 dB margin - a measured 80 km run with five splices and two connector pairs reads 5.1 dB of headroom. Overload: at the +5 dBm launch ceiling the receiver's -3 dBm maximum is 8 dB below it, and Cisco states that same 8 dB as the minimum attenuation between the transmit and receive bores, so any span shorter than about 38 km (8 / 0.21) needs a pad - the budget's attenuator verdict names it, and more reach is never the answer. The 80 km in the model name is the middle of Cisco's 70-100 km declaration, not a published reach: the loss budget refuses a long run before the distance does. Replace these figures with the test report for the module actually purchased before pricing a build.",
   "tags": [
     "1000",
-    "1550nm"
+    "1550nm",
+    "80km",
+    "long-reach",
+    "cisco"
   ]
 }
