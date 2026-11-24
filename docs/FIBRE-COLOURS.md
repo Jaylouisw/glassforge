@@ -36,9 +36,12 @@ Counting is 1-based at both levels.
 | 31 | `T03-F07` | green | red |
 | 96 | `T08-F12` | black | aqua |
 
-Accepted input forms: `T03-F07`, `t3f7`, `03-07`, `3/7`, and a bare `31` (a strand index). Anything
-else returns `null` — unparseable is distinguishable from out of range, which are different errors to
-a user.
+Accepted input forms: `T03-F07`, `t3f7`, `03-07`, `3/7`, and a bare `31` (a strand index).
+Everything else returns `null`, and an address that is out of range is **not** a different answer:
+`T00-F01` and `T03-F13` (a 12-fibre tube has no fibre 13) are `null` exactly as `garbage` is. The
+`RangeError`s in `engine/fiber.js` belong to the addressing helpers, not to the parser: `addressFor`
+refuses a strand index that is not a positive integer. A caller that needs to tell "not an address"
+from "no such strand" compares the parsed `tube`/`fiber` against the cable's own `fibersPerTube`.
 
 ## Ribbon cable
 
