@@ -188,7 +188,7 @@ function verdictFor(headroomDb, marginDb, classHeadroomDb, reasons) {
 }
 
 /**
- * The pad a link needs when it is too loud.
+ * The three numbers a pad is bought on, from the power the receiver sees at its strongest launch.
  *
  * Overload is the one failure more power cannot fix: a long-reach optic on a short duct run receives
  * more than its own receiver tolerates, and the remedy is an inline attenuator. Naming the fault
@@ -205,9 +205,6 @@ function verdictFor(headroomDb, marginDb, classHeadroomDb, reasons) {
  * `fits` is false when the design is contradictory: too loud *and* too tight, so no pad satisfies both
  * and the answer is a shorter reach optic or a different split, not a number.
  *
- * Returns null when the receiver is at or below its overload point - a healthy link needs no pad, and
- * reporting "0 dB" would be a plate somebody orders.
- *
  * **The pad is sized for the strongest launch, not the weakest.** A pad is fitted once and the optic
  * that lands in the chassis can sit anywhere in its own `txPowerDbmMin..txPowerDbmMax` window - a
  * C+ OLT line card may paint +3 or +7 dBm, and the head-end optic a -4.7 or a +4. A pad computed from
@@ -216,13 +213,8 @@ function verdictFor(headroomDb, marginDb, classHeadroomDb, reasons) {
  * whose launch windows are 3-4 dB wide. The number a crew buys must cover the worst case, so `overDb`
  * and `padDb` are taken at `rxPowerMaxDbm` (the receiver's power at the transmitter's maximum launch,
  * or at a requested `txDbm` when one is given) and `atTxDbm` says which launch the pad is sized for.
- *
- * Which end is *too loud* is still judged at the minimum launch: that is the worst-case loss budget
- * the class verdict is built on, and a link that is inside its overload point there can always be
- * brought to full launch by the pad this function returns.
  */
-function attenuatorFor(rxPowerDbm, rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb) {
-  if (!(rxPowerDbm > rxSpec.overload)) return null;
+function padSizing(rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb) {
   const overDb = round(rxPowerMaxDbm - rxSpec.overload, 2);
   const padDb = Math.ceil(overDb);
   // Floor as well as min: the pad itself is a whole number of dB, so a 14.6 dB allowance funds 14 dB.
@@ -236,6 +228,51 @@ function attenuatorFor(rxPowerDbm, rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, 
     atTxDbm: round(txDbmMax, 2),
     fits: maxPadDb >= padDb
   };
+}
+
+/**
+ * The pad a too-loud link has to carry, or null.
+ *
+ * Returns null when the receiver is at or below its overload point at the minimum launch - a healthy
+ * link needs no pad, and reporting "0 dB" would be a plate somebody orders.
+ *
+ * Which end is *too loud* is still judged at the minimum launch: that is the worst-case loss budget
+ * the class verdict is built on, and a link that is inside its overload point there can always be
+ * brought to full launch by the pad this returns. A link that is inside the point there and over it
+ * at the ceiling gets no pad from here and a warning instead - see `launchWindowWarning`.
+ */
+function attenuatorFor(rxPowerDbm, rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb) {
+  if (!(rxPowerDbm > rxSpec.overload)) return null;
+  return padSizing(rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb);
+}
+
+/**
+ * The launch blind zone, said out loud.
+ *
+ * Overload is judged at the floor of the transmitter's window, because that is the worst-case loss
+ * budget the class verdict is built on - but a design can be inside its overload point there and over
+ * it at the ceiling. Every OLT in the catalogue has a 3-4 dB window, so for a C+ line card (+3..+7 dBm)
+ * an ODN between about 11 and 15 dB is clean with a weak module and overdrives the ONT with a hot one,
+ * and that is an ordinary 1:8 estate with a short feeder. Whether such a design should *fail* is a
+ * product decision (#111): failing every one of them would leave auto-design no feasible candidate for
+ * a small estate, so the verdict stays where `docs/SPEC.md` §4 puts it. What must not happen is the
+ * band passing in silence - a plan signed off on a link that only works with a cold optic.
+ *
+ * Returns null when the floor launch is already too loud (`attenuatorFor` owns that, and its reason
+ * already names the pad) or when the ceiling launch is still inside the overload point.
+ */
+function launchWindowWarning(rxPowerDbm, rxPowerMaxDbm, txDbmMax, txSpec, rxSpec, headroomDb, marginDb, classHeadroomDb) {
+  if (rxPowerDbm > rxSpec.overload) return null;
+  if (!(rxPowerMaxDbm > rxSpec.overload)) return null;
+  const pad = padSizing(rxPowerMaxDbm, txDbmMax, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  return 'the ' + rxSpec.who + ' is inside its overload point only at the bottom of the ' + txSpec.who +
+    ' launch window: ' + rxPowerDbm + ' dBm at ' + round(txSpec.min, 2) + ' dBm, but ' + pad.overDb +
+    ' dB above ' + rxSpec.overload + ' dBm at the ' + pad.atTxDbm + ' dBm top of the window - ' +
+    (pad.fits
+      ? 'fit a ' + pad.padDb + ' dB inline pad (up to ' + pad.maxPadDb + ' dB still passes the ' + marginDb +
+        ' dB margin and the class budget)'
+      : 'and no whole-dB pad clears it without breaking the ' + marginDb +
+        ' dB margin or the class budget, so this needs a different split or optic');
 }
 
 /** The clause an overload reason carries, so the refusal says what to do about it. */
@@ -326,6 +363,8 @@ function opticalBudget(design, registry) {
   if (attenuator) {
     reasons.push(rxPowerDbm + ' dBm at the ' + rxSpec.who + ' is above its overload point ' + rxSpec.overload + ' dBm - too much power' + attenuatorClause(attenuator, marginDb));
   }
+  const launchWarning = launchWindowWarning(rxPowerDbm, rxPowerMaxDbm, txDbmMax, txSpec, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  if (launchWarning) warnings.push(launchWarning);
   if (headroomDb < marginDb) {
     reasons.push('headroom ' + headroomDb + ' dB is below the ' + marginDb + ' dB design margin (sensitivity ' + rxSpec.sensitivity + ' dBm)');
   }
@@ -453,6 +492,8 @@ function pointToPoint(design, registry) {
   if (attenuator) {
     reasons.push(rxPowerDbm + ' dBm at the ' + rxSpec.who + ' is above its overload point ' + rxSpec.overload + ' dBm - too much power' + attenuatorClause(attenuator, marginDb));
   }
+  const launchWarning = launchWindowWarning(rxPowerDbm, rxPowerMaxDbm, txDbmMax, txSpec, rxSpec, headroomDb, marginDb, classHeadroomDb);
+  if (launchWarning) warnings.push(launchWarning);
   if (headroomDb < marginDb) {
     reasons.push('headroom ' + headroomDb + ' dB is below the ' + marginDb + ' dB design margin (sensitivity ' + rxSpec.sensitivity + ' dBm)');
   }

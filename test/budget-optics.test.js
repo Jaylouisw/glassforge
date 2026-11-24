@@ -222,4 +222,56 @@ test('overload is caught: too much power is a failure too', function () {
   assert.strictEqual(r.verdict, 'fail');
 });
 
+test('a design that is only too loud at the top of the launch window is visible, not silent', function () {
+  // The healthy C+ design above is quiet at the 3 dBm floor of the OLT window (-9.16 dBm at the ONT,
+  // 1.16 dB inside its -8 dBm overload point) and too loud at the 7 dBm ceiling: 7 - 12.16 = -5.16,
+  // which is 2.84 dB above overload, so a 3 dB pad (pads are whole dB). Every OLT in the catalogue has
+  // a 3-4 dB window, so this band of ODN loss is real. Whether it is a *failure* is #111's decision;
+  // until that is made the band must at least be visible, and the verdict must not move with it.
+  const r = budget.opticalBudget(design(), registry);
+  assert.strictEqual(r.verdict, 'ok', 'a band that only bites a hot module must not fail an ordinary design');
+  assert.strictEqual(r.reasons.length, 0, r.reasons.join(' | '));
+  assert.strictEqual(r.attenuator, null, 'nothing is too loud at the floor, so there is no pad to fit yet');
+  const loud = r.warnings.filter(function (w) { return w.indexOf('top of the window') !== -1; });
+  assert.strictEqual(loud.length, 1, r.warnings.join(' | '));
+  assert.ok(loud[0].indexOf('2.84 dB above -8 dBm') !== -1, loud[0]);
+  assert.ok(loud[0].indexOf('7 dBm') !== -1, 'names the launch the design is too loud at: ' + loud[0]);
+  assert.ok(loud[0].indexOf('3 dB inline pad') !== -1, 'ceil(2.84) = 3, and the fix must be named: ' + loud[0]);
+
+  // 20 km of G.652.D behind the same 1:8: 4.40 fibre + 10.50 splitter + 4 x 0.10 splices + 2 x 0.30
+  // connectors = 15.90 dB, so the ceiling launch lands -8.90 dBm - 0.90 dB inside the overload point.
+  // Underneath the band there is nothing to warn about.
+  const deep = budget.opticalBudget(design({ spans: [{ cable: 'g652d-loose-24', lengthM: 20000 }] }), registry);
+  close(deep.odnLossDb, 15.9, 0.001, 'ODN loss');
+  assert.strictEqual(deep.warnings.filter(function (w) { return w.indexOf('top of the window') !== -1; }).length, 0,
+    deep.warnings.join(' | '));
+});
+
+test('the launch window warning is on a point-to-point link too', function () {
+  // A ZX pair over 15 km of G.652.D and two connectors at 1550 nm: 15 x 0.21 = 3.15 + 0.60 = 3.75 dB.
+  // The 0..+5 dBm window puts the far optic at -3.75 dBm at the floor (0.75 dB inside its -3 dBm
+  // overload point) and +1.25 dBm at the ceiling - 4.25 dB over, so a 5 dB pad.
+  const r = budget.pointToPoint({
+    headEnd: { model: 'sfp-1g-zx-80km' }, cpe: { model: 'sfp-1g-zx-80km' },
+    spans: [{ cable: 'g652d-loose-12', lengthM: 15000 }], splices: 0, connectors: 2
+  }, registry);
+  close(r.odnLossDb, 3.75, 0.001, 'ODN loss');
+  close(r.rxPowerDbm, -3.75, 0.001, 'receive power at the floor launch');
+  assert.strictEqual(r.verdict, 'ok', r.reasons.join(' | '));
+  const loud = r.warnings.filter(function (w) { return w.indexOf('top of the window') !== -1; });
+  assert.strictEqual(loud.length, 1, r.warnings.join(' | '));
+  assert.ok(loud[0].indexOf('4.25 dB above -3 dBm') !== -1, loud[0]);
+  assert.ok(loud[0].indexOf('5 dB inline pad') !== -1, loud[0]);
+
+  // A link that is already too loud at the floor keeps exactly one statement of the fault - the reason
+  // and its pad - rather than gaining a second copy as a warning.
+  const over = budget.pointToPoint({
+    headEnd: { model: 'sfp-1g-zx-80km' }, cpe: { model: 'sfp-1g-zx-80km' },
+    spans: [{ cable: 'g652d-loose-12', lengthM: 1000 }], splices: 0, connectors: 2
+  }, registry);
+  assert.strictEqual(over.verdict, 'fail');
+  assert.strictEqual(over.warnings.filter(function (w) { return w.indexOf('top of the window') !== -1; }).length, 0,
+    over.warnings.join(' | '));
+});
+
 done();
