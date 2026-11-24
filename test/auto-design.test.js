@@ -140,10 +140,58 @@ test('a long two-fibre span is a cable run, not a drop', function () {
     { label: 'Near', lat: 51.5000, lon: -0.1 },
     { label: 'Far', lat: 51.5108, lon: -0.1 }
   ], { headEnd: { lat: 51.4995, lon: -0.1 }, technology: 'active' }, registry);
+  // No exemption for `purpose: 'drop'` any more. It used to skip drops, which is how a 400 m spur
+  // kept its builder-supplied drop cable while every other long span obeyed the rule.
   for (const span of far.plant.spans) {
-    if (span.purpose === 'drop' || span.lengthM <= engine.design.DROP_CABLE_MAX_M) continue;
+    if (span.lengthM <= engine.design.DROP_CABLE_MAX_M) continue;
     const cable = registry.get('cable', span.cable);
     assert.ok(cable.fiberCount >= 12, span.id + ' is ' + span.lengthM + ' m on ' + cable.model);
+  }
+});
+
+test('a drop longer than the drop-cable limit is a cable run, not drop cable', function () {
+  // The same rule as a long two-fibre span, one span further out: a rural address 400 m from the
+  // nearest mapped street is a real drop length (that is what `maxSnapM` is for), and drop cable over
+  // 300 m is a product nobody pulls. This span used to keep the builder's hard-coded `terminalCable`,
+  // so the BOM bought 457 m of 1-fibre drop - the one product the limit exists to keep out of it.
+  const coords = [];
+  for (let i = 0; i <= 20; i++) coords.push({ lat: 51.5, lon: -0.1010 + i * 0.0002 });
+  const out = engine.design.synthesise([
+    { label: 'Far Farm', lat: 51.5 + 400 / 111320, lon: -0.1 },
+    { label: 'Near House', lat: 51.5002, lon: -0.0995 }
+  ], {
+    headEnd: { lat: 51.5, lon: -0.1010 }, technology: 'pon', pon: { ratios: [8] },
+    network: { edges: [{ id: 'main', coords: coords }] }, maxSnapM: 600
+  }, registry);
+  const drops = out.plant.spans.filter(function (s) { return s.purpose === 'drop'; });
+  const long = drops.filter(function (s) { return s.lengthM > engine.design.DROP_CABLE_MAX_M; });
+  assert.strictEqual(long.length, 1, 'one 400 m drop, got ' + JSON.stringify(drops.map(function (s) { return [s.id, s.lengthM, s.cable]; })));
+  const longCable = registry.get('cable', long[0].cable);
+  assert.ok(longCable.fiberCount >= 12, 'a 400 m drop bought ' + longCable.model + ' (' + longCable.fiberCount + 'F)');
+  // The short drop on the same design is unchanged: drop cable is right when the run is a drop.
+  const short = drops.filter(function (s) { return s.lengthM <= engine.design.DROP_CABLE_MAX_M; })[0];
+  assert.ok(short, 'a short drop to keep');
+  assert.strictEqual(registry.get('cable', short.cable).fiberCount, 1, 'a short PON drop stays 1F drop cable');
+
+  // But the drop is still one route, not a trunk: no bundle is invented for it.
+  assert.strictEqual(long[0].bundles === undefined ? 1 : long[0].bundles, 1);
+});
+
+test('a home-run cable comes from the callers ladder, not a hard-coded model', function () {
+  // `cableForSpan` is the one place the drop/ladder rule lives. The home-run builder used to restate
+  // it as `lengthM > 300 ? 'g652d-loose-12' : ...`, which ignored `ladder`: a caller whose ladder has
+  // no 12-fibre cable got a model it never listed, priced from a catalogue entry it excluded.
+  const ladder = ['g652d-loose-24'];
+  const out = engine.design.synthesise([
+    { label: 'Near', lat: 51.5000, lon: -0.1 },
+    { label: 'Far', lat: 51.5108, lon: -0.1 }
+  ], { headEnd: { lat: 51.4995, lon: -0.1 }, technology: 'active', ladder: ladder, includeAllPlants: true }, registry);
+  const home = out.candidates.filter(function (c) { return c.technology === 'active-home-run'; })[0];
+  assert.ok(home, 'a home-run candidate');
+  const long = home.plant.spans.filter(function (s) { return s.lengthM > engine.design.DROP_CABLE_MAX_M; });
+  assert.ok(long.length > 0, 'a long home-run span to check');
+  for (const span of long) {
+    assert.strictEqual(span.cable, 'g652d-loose-24', span.id + ' is ' + span.lengthM + ' m on ' + span.cable);
   }
 });
 
@@ -181,10 +229,12 @@ test('cable is tapered, and a long span is never a drop cable', function () {
     const cable = registry.get('cable', span.cable);
     const required = span.strands ? span.strands.length : 1;
     assert.ok(cable.fiberCount >= required, span.id + ' uses ' + cable.model + ' for ' + required + ' fibres');
-    if (span.lengthM > engine.design.DROP_CABLE_MAX_M && span.purpose !== 'drop') {
+    if (span.lengthM > engine.design.DROP_CABLE_MAX_M) {
       // A 1.2 km two-fibre run is a cable run, not a drop: drop cable is not what gets pulled there.
+      // A `drop` over the same limit is the same mistake, so it is held to the same floor (this test
+      // used to exempt drops, which let the exception hide a 400 m spur on 1-fibre cable).
       assert.ok(cable.fiberCount >= 12, span.id + ' is ' + span.lengthM + ' m on ' + cable.model);
-    } else if (span.purpose !== 'drop') {
+    } else {
       const smaller = registry.all('cable').filter(function (c) {
         return c.fiberCount >= required && c.fiberCount < cable.fiberCount && c.fiberCount >= 12;
       });

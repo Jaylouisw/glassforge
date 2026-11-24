@@ -568,11 +568,15 @@ function emitTerminalTree(plant, tree, cfg, registry) {
         name: point.label, lat: point.lat, lon: point.lon
       });
       const spur = tree.spurs.get(terminalId) || 0;
+      const dropM = Math.max(1, round(spur, 1));
       plant.spans.push({
         id: cfg.prefix + 'drop-' + terminalId,
         from: idOf.get(node.key), to: ontId,
-        cable: cfg.terminalCable,
-        lengthM: Math.max(1, round(spur, 1)),
+        // The drop is a span like any other, so it obeys the span rule: the builder's `terminalCable`
+        // is right for a spur and wrong for a rural 400 m gap, where it bought 1-fibre drop cable on a
+        // run nobody pulls one. `cableForSpan` is the one place the limit lives.
+        cable: cableForSpan(cfg.terminalFibres, dropM, cfg.ladder, registry).model,
+        lengthM: dropM,
         strands: cfg.terminalFibres === 1 ? [1] : [1, 2],
         purpose: cfg.dropPurpose,
         feedsOnts: 1,
@@ -708,7 +712,9 @@ function buildActiveHomeRun(demand, opts, registry, optic, graph) {
       const lengthM = Math.max(1, round(path.lengthM + snapped.spurM, 1));
       plant.spans.push({
         id: 's-' + (i + 1), from: 'n-headend', to: 'n-ont-' + point.id,
-        cable: lengthM > 300 ? 'g652d-loose-12' : 'g657a2-drop-2',
+        // The drop/ladder rule is `cableForSpan`'s. Restating it here as a magic 300 and a hard-coded
+        // model ignored the caller's ladder, so a design could be billed for a cable it excluded.
+        cable: cableForSpan(2, lengthM, opts.ladder, registry).model,
         lengthM: lengthM, strands: [1, 2], purpose: 'home-run', feedsOnts: 1,
         route: path.route.concat([{ lat: point.lat, lon: point.lon }])
       });
@@ -722,7 +728,7 @@ function buildActiveHomeRun(demand, opts, registry, optic, graph) {
       });
       plant.spans.push({
         id: 's-' + (i + 1), from: 'n-headend', to: 'n-ont-' + point.id,
-        cable: lengthM > 300 ? 'g652d-loose-12' : 'g657a2-drop-2',
+        cable: cableForSpan(2, lengthM, opts.ladder, registry).model,
         lengthM: lengthM, strands: [1, 2], purpose: 'home-run', feedsOnts: 1,
         route: [{ lat: opts.headEnd.lat, lon: opts.headEnd.lon }, { lat: point.lat, lon: point.lon }]
       });
