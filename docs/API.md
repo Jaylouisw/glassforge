@@ -17,8 +17,8 @@ The server binds `127.0.0.1:8000` by default (`HOST`, `PORT`), and stores projec
 ```
 GET /api/health
 → { ok: true, name: "glassforge", version: "0.4.0",
-    parts: { total: 53, byKind: { cable: 8, splitter: 8, olt: 9, ont: 4, transceiver: 13,
-                                 closure: 5, connector: 4, splice: 2 } },
+    parts: { total: 54, byKind: { cable: 8, splitter: 8, olt: 9, ont: 4, transceiver: 13,
+                                 closure: 6, connector: 4, splice: 2 } },
     projects: 0, uptimeS: 4 }
 ```
 
