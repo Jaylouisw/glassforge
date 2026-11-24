@@ -128,8 +128,16 @@ async function main() {
   // The budget follows the topology, not `span.splices`: 20 km x 0.22 = 4.40, drop 0.01, one closure
   // = one splice 0.10, 2 connectors 0.60, 1:64 = 20.50 (18.06 ideal + 2.44 excess) -> ODN 25.61 dB.
   // Tx +1.5 dBm puts -24.11 dBm on a -27 dBm receiver: 2.89 dB of headroom, below the 3 dB margin,
-  // so `fail`. At 16 km the fibre is 3.52 dB instead of 4.40: ODN 24.73 dB, 3.77 dB of headroom -
-  // inside the `marginal` band (< margin + 2) rather than failing.
+  // so `fail`. At 11 km the fibre is 2.42 dB instead of 4.40: ODN 23.63 dB (2.42 + 0.01 drop + 0.10
+  // splice + 0.60 connectors + 20.50 splitter), -22.13 dBm on the -27 dBm receiver = 4.87 dB of
+  // headroom - inside the `marginal` band (< margin + 2) rather than failing.
+  //
+  // This used to seed 16 km. The printed plan now also budgets the upstream direction, and at 16 km
+  // that direction is not marginal at all: 16 x 0.35 = 5.60 dB of 1310 nm fibre + 0.01 + 0.10 + 0.60
+  // + 20.50 = 26.81 dB of ODN puts the ONT's +0.5 dBm at -26.31 dBm on a -28 dBm OLT receiver -
+  // 1.69 dB of headroom against the 3 dB margin, a `fail`. The page printing that as an error is
+  // correct, so this guard keeps both its assertions and only moves to a plant that is a decision in
+  // both directions: at 11 km upstream is 25.06 dB, -24.56 dBm against -28 dBm = 3.44 dB, marginal.
   function longFeeder(metres, ontName) {
     return [
       { op: 'add-node', node: { type: 'olt', model: 'gpon-b-plus-8', name: 'OLT' } },
@@ -166,7 +174,7 @@ async function main() {
       'the plan does not carry the reason the engine gave: ' + failingRing.reasons[0]);
   });
 
-  const marginalId = await seedPlant('Marginal link', longFeeder(16000, 'Casa 8'));
+  const marginalId = await seedPlant('Marginal link', longFeeder(11000, 'Casa 8'));
   const marginalBudget = await request('POST', '/api/projects/' + marginalId + '/budget', {});
   const marginalRing = marginalBudget.body.budgets[0].result;
   const marginalPrinted = await request('GET', '/print/project/' + marginalId);

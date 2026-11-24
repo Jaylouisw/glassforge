@@ -903,6 +903,58 @@ function printPage(req, res, project, registry) {
   const bandNote = engine.budget.launchWindowNote(budgetRows, {});
   if (bandNote) signalWarnings.unshift(bandNote.text);
 
+  // ---- the other direction of the same link -------------------------------------------------------
+  //
+  // A PON is two links over one ODN: the OLT launches into the ONT, and the ONT launches into the
+  // OLT. Every caller above budgets the default direction, so the page a crew signs off carried the
+  // downstream verdict and nothing else - and the two disagree exactly where it costs money. A C+
+  // line card (launch +3..+7 dBm, receiver overload -12 dBm) behind an ODN of 11.7 dB sees
+  // +0.5 dBm - 11.725 = -11.22 dBm at the ONT's launch floor: 0.78 dB over its overload point,
+  // `fail`, and a 6 dB pad sized at the top of the ONT's window. Downstream the same ODN is
+  // -8.53 dBm against an ONT overload of -8 dBm - inside it, `ok`, with only the launch-window band
+  // (#111) saying anything. So a crew reads the band note, fits the 4 dB pad it names, and the OLT
+  // still saturates on the ONT's launch.
+  //
+  // Only the verdicts are lifted, never the upstream `warnings`: the band sentence says which
+  // receiver saturates and which launch window does it, and the downstream band has already named a
+  // pad. Two pad sentences for one ODN read as two pads to buy, and the failure's own reason names
+  // the size that binds (a pad anywhere in the ODN serves both directions).
+  //
+  // A row whose path cannot be budgeted carries `error` and is skipped: the downstream pass above
+  // already printed that fault, and a path fault is not a direction fault.
+  let upstreamRows = [];
+  try {
+    upstreamRows = engine.network.allOntBudgets(project, registry, { direction: 'up' });
+  } catch (err) {
+    signalWarnings.push('the upstream optical budget could not be run: ' + err.message);
+  }
+  const upstreamBudgeted = upstreamRows.filter(function (r) { return r.result; });
+  const upstreamFailures = upstreamBudgeted.filter(function (r) { return r.result.verdict === 'fail'; });
+  const upstreamMarginals = upstreamBudgeted.filter(function (r) { return r.result.verdict === 'marginal'; });
+  // The launch side of the upstream verdict is the head-end optic on an active plant and the OLT's
+  // receiver on a PON; naming the wrong one is the mistake this sentence exists to prevent.
+  const upstreamEnd = root && root.type === 'headend' ? 'head-end optic' : 'OLT receiver';
+  if (upstreamFailures.length) {
+    // The lowest ONT id, so the sentence does not depend on the order the plant was built in.
+    const worst = upstreamFailures.reduce(function (a, b) { return String(b.ont) < String(a.ont) ? b : a; });
+    signalErrors.push(upstreamFailures.length + ' of ' + upstreamBudgeted.length + ' ONT' +
+      (upstreamBudgeted.length === 1 ? '' : 's') + ' ' + (upstreamFailures.length === 1 ? 'fails' : 'fail') +
+      ' upstream at the ' + upstreamEnd + ' - ' + (worst.name || worst.ont) + ': ' +
+      worst.result.reasons.join('; '));
+  }
+  if (upstreamMarginals.length) {
+    const tightest = upstreamMarginals.reduce(function (a, b) {
+      const diff = b.result.headroomDb - a.result.headroomDb;
+      if (diff !== 0) return diff < 0 ? b : a;
+      return String(b.ont) < String(a.ont) ? b : a;
+    });
+    signalWarnings.push(upstreamMarginals.length + ' of ' + upstreamBudgeted.length + ' ONT' +
+      (upstreamBudgeted.length === 1 ? '' : 's') + ' ' + (upstreamMarginals.length === 1 ? 'is' : 'are') +
+      ' marginal upstream - ' + (tightest.name || tightest.ont) + ': headroom ' + tightest.result.headroomDb +
+      ' dB against the ' + tightest.result.marginDb + ' dB margin, ' + tightest.result.classHeadroomDb +
+      ' dB of budget left');
+  }
+
   out.push('<h2>Checks</h2>');
   const planErrors = check.errors.concat(signalErrors);
   const planWarnings = check.warnings.concat(signalWarnings);
