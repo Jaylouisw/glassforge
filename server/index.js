@@ -268,7 +268,16 @@ function cataloguePayload(registry, kind, term) {
 
 async function handle(req, res, ctx) {
   const url = new URL(req.url, 'http://localhost');
-  const pathname = decodeURIComponent(url.pathname);
+  // `decodeURIComponent` throws URIError on a truncated or bogus escape (`%E0%A4%A`, `%zz`). That is
+  // a path the caller mistyped, not a fault in this server, and the generic handler answered it with
+  // `500 URI malformed` plus a stack trace - the one answer docs/API.md reserves for "the server
+  // broke". Refuse it once, here, naming the path, before any route sees a half-decoded string.
+  let pathname;
+  try {
+    pathname = decodeURIComponent(url.pathname);
+  } catch (err) {
+    return fail(req, res, 400, 'the request path is not valid percent-encoding: "' + url.pathname + '"');
+  }
   const method = req.method || 'GET';
   const registry = ctx.registry;
 

@@ -519,6 +519,24 @@ async function main() {
     assert.ok(missingPrint.raw.toString('utf8').indexOf('not found') !== -1);
   });
 
+  // A URL the caller mistyped is caller input, and docs/API.md says bad input is a 400 and a 500
+  // means the server broke. `decodeURIComponent` on a truncated escape throws URIError, which the
+  // generic handler used to dress up as `500 URI malformed` plus a stack trace - sending a script
+  // author to look for a server fault that is not there. The refusal names the path it could not read.
+  const badEscape = await request('GET', '/api/parts/cable/%E0%A4%A');
+  test('a path that is not valid percent-encoding is a 400 naming the path, not a 500', function () {
+    assert.strictEqual(badEscape.status, 400);
+    assert.ok(String(badEscape.body.error).indexOf('percent-encoding') !== -1,
+      'the refusal must say what is wrong with the path, got: ' + JSON.stringify(badEscape.body));
+    assert.ok(String(badEscape.body.error).indexOf('/api/parts/cable/%E0%A4%A') !== -1,
+      'the refusal must name the path it could not read, got: ' + JSON.stringify(badEscape.body));
+  });
+
+  const afterBadEscape = await request('GET', '/api/health');
+  test('one unreadable path does not take the server down for the next request', function () {
+    assert.strictEqual(afterBadEscape.status, 200);
+  });
+
   const unknown = await request('GET', '/api/nope');
   test('an unknown endpoint answers JSON, not an HTML error page', function () {
     assert.strictEqual(unknown.status, 404);
