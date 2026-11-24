@@ -206,3 +206,48 @@ export function assertChoiceField(design: unknown, field: string, allowed: reado
   throw new TypeError(what + ' reads "' + field + '" as one of ' + quoted.join(', ') + ' and got ' +
     showValue(value) + ' (' + kindOf(value) + '). ' + why);
 }
+
+/**
+ * A cable ladder the design cannot use is refused, not read as the default ladder.
+ *
+ * `ladder` is the last knob still normalised with `Array.isArray(o.ladder) && o.ladder.length ? … :
+ * DEFAULTS.ladder`, and it is the one that decides **what is bought**: every span goes through
+ * `cableForSpan(cableFor)`, so the list is the BOM. Measured on this engine, an 8-house PON estate:
+ *
+ *   ladder: 'g652d-loose-48'        read as DEFAULT_LADDER - same 686.7 m of cable, but 5,890.2
+ *                                   fibre-metres on five 12-fibre trunk spans instead of 22,569 on
+ *                                   48-fibre. The objective ranks on fibre-metres, and the order is
+ *                                   placed against the model.
+ *   ladder: ['g652d-nope', …]       threw only when a span asked for it, from a sentence that named no
+ *                                   field: "the cable ladder names no cable this catalogue has: …". An
+ *                                   unused bad entry in a ladder that still fits was never noticed.
+ *
+ * An absent ladder, or an empty one, is not a mistake: it takes the design's default and the design
+ * says which ladder that was in `notes`. Everything else - a bare model name, a list with a number in
+ * it, a model the cable catalogue does not have - is caller input the design would otherwise read as
+ * the default, so it is refused by name at its position, and an unknown model names the catalogue.
+ *
+ * `isCable` and `catalogue` keep this module free of the registry: the caller knows the cables it has.
+ */
+export function assertCableLadder(value: unknown, isCable: (model: string) => boolean,
+                                  catalogue: FieldList, what: string): void {
+  if (value === undefined) return;
+  const known = catalogue.join(', ');
+  if (!Array.isArray(value)) {
+    throw new TypeError(what + ' reads "ladder" as a list of cable model names and got ' + showValue(value) +
+      ' (' + kindOf(value) + '). A ladder of another shape is refused rather than read as the default ' +
+      'ladder, because every span would then be bought from a cable the caller left out. Pass a list, ' +
+      'or omit it (or pass []) for the default. Cable models: ' + known + '.');
+  }
+  for (let i = 0; i < value.length; i++) {
+    const model = value[i];
+    if (typeof model !== 'string' || model === '') {
+      throw new TypeError(what + ' reads "ladder" as cable model names and got ' + showValue(model) +
+        ' (' + kindOf(model) + ') at position ' + i + '. Cable models: ' + known + '.');
+    }
+    if (!isCable(model)) {
+      throw new TypeError(what + ' reads "ladder" as cable model names and "' + model + '" is not in the ' +
+        'cable catalogue (position ' + i + '). Cable models: ' + known + '.');
+    }
+  }
+}

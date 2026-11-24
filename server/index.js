@@ -498,6 +498,10 @@ async function handle(req, res, ctx) {
         network: body.network,
         maxSnapM: body.maxSnapM,
         joinToleranceM: body.joinToleranceM,
+        // The cable ladder decides what every span is bought from, and the handler forwarded nine
+        // named keys without it: a body naming a 48-fibre ladder designed the trunk on 12-fibre cable.
+        // The engine refuses a ladder it cannot use by name, so a typo is a 400, not a default.
+        ladder: body.ladder,
         // Every cable line the design prices is route x (1 + overlengthPct/100). The handler
         // forwarded nine named keys and dropped this one, so `overlengthPct: 10` answered the
         // design measured at 3% and `overlengthPct: "ten"` answered 200 instead of the engine

@@ -83,6 +83,43 @@ test('an absent option is still absent - the documented default applies and is r
   close(plain.best.metrics.designM, 707.3, 0.2, 'default design length');
 });
 
+test('a ladder that arrives as one model name is refused, not read as the default ladder', function () {
+  // #157 took `isNum(x) ? x : default` off the measuring knobs; `ladder` kept it. A single string is
+  // not an array, so it fell back to DEFAULT_LADDER: the estate bought five trunk spans on
+  // g652d-loose-12 where the caller named g652d-loose-48 - the same 686.7 m of cable, but 5,890.2
+  // fibre-metres instead of 22,569, which is the number the objective ranks on. A value that is not
+  // a list of names is caller input, so it is refused by name.
+  const err = throws(function () { design({ ladder: 'g652d-loose-48' }); }, 'ladder', 'a single-model ladder');
+  assert.ok(err.message.indexOf('"g652d-loose-48"') !== -1, 'says the value it got: ' + err.message);
+});
+
+test('a ladder naming a cable the catalogue does not have is refused, naming the ones it has', function () {
+  // Today `cableFor` throws only once a span asks for the missing cable, and its sentence names no
+  // field: "the cable ladder names no cable this catalogue has: g652d-nope". The caller has to guess
+  // that `ladder` is the field, and an unused bad entry in a ladder that still fits is never noticed.
+  const err = throws(function () { design({ ladder: ['g652d-loose-48', 'g652d-nope'] }); }, 'ladder',
+    'a ladder with an unknown cable');
+  assert.ok(err.message.indexOf('"g652d-nope"') !== -1, 'names the model it does not have: ' + err.message);
+  assert.ok(err.message.indexOf('g652d-loose-96') !== -1, 'names a model the catalogue does have: ' + err.message);
+});
+
+test('a ladder entry that is not a model name is refused at its position', function () {
+  const err = throws(function () { design({ ladder: ['g652d-loose-48', 48] }); }, 'ladder', 'a numeric ladder entry');
+  assert.ok(err.message.indexOf('position 1') !== -1, 'says which entry: ' + err.message);
+});
+
+test('an absent or empty ladder takes the default ladder, and the notes say so', function () {
+  // The default is legitimate - every caller that omits `ladder` gets it - but a BOM bought from a
+  // ladder the design picked has to say which ladder that was, or the number cannot be checked.
+  for (const extra of [{}, { ladder: [] }]) {
+    const out = design(extra);
+    const notes = out.notes.filter(function (n) { return n.indexOf('default cable ladder') !== -1; });
+    assert.strictEqual(notes.length, 1, JSON.stringify(out.notes));
+    assert.ok(notes[0].indexOf('g652d-loose-144') !== -1 && notes[0].indexOf('g657a2-drop-2') !== -1,
+      'names the ladder it used: ' + notes[0]);
+  }
+});
+
 // --- the link design's own knobs -------------------------------------------------------------
 
 const A = { lat: 51.5, lon: -0.1, name: 'Site A' };

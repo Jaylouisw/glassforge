@@ -319,6 +319,40 @@ async function main() {
     assert.strictEqual(applied.body.applied.projectId, id);
   });
 
+  // `ladder` is the other option the design reads, and the handler dropped it the way it dropped
+  // `overlengthPct`: the body named a 48-fibre ladder and the plant still carried
+  // g652d-loose-12 on its two trunk spans, so the cable ordered was one the caller excluded.
+  const laddered = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv,
+    headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' },
+    ladder: ['g652d-loose-48']
+  });
+  const stringLadder = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv,
+    headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' },
+    ladder: 'g652d-loose-48'
+  });
+  const unknownLadder = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv,
+    headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' },
+    ladder: ['g652d-nope']
+  });
+  test('a cable ladder reaches the design instead of being dropped at the handler', function () {
+    assert.strictEqual(laddered.status, 200, JSON.stringify(laddered.body).slice(0, 300));
+    const allowed = ['g652d-loose-48', 'g657a2-drop-1', 'g657a2-drop-2'];
+    const models = laddered.body.plant.spans.map(function (s) { return s.cable; });
+    for (const model of models) {
+      assert.ok(allowed.indexOf(model) !== -1, "a span was bought on " + model + ", not the caller's ladder");
+    }
+    assert.ok(models.indexOf('g652d-loose-48') !== -1, 'the ladder named a cable the trunk did not buy: ' + models.join(', '));
+  });
+  test('a ladder of the wrong shape, or naming an unknown cable, is a 400 naming the field', function () {
+    assert.strictEqual(stringLadder.status, 400, 'status ' + stringLadder.status + ': ' + JSON.stringify(stringLadder.body).slice(0, 200));
+    assert.ok(stringLadder.body.error.indexOf('ladder') !== -1, stringLadder.body.error);
+    assert.strictEqual(unknownLadder.status, 400, 'status ' + unknownLadder.status + ': ' + JSON.stringify(unknownLadder.body).slice(0, 200));
+    assert.ok(unknownLadder.body.error.indexOf('g652d-nope') !== -1, unknownLadder.body.error);
+  });
+
   const badDemand = await request('POST', '/api/import/demand', { demand: 'address,postcode\nCalle 3,28001' });
   test('a demand list with no coordinates is a 400 with the reason', function () {
     assert.strictEqual(badDemand.status, 400);

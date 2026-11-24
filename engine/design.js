@@ -114,7 +114,7 @@ function costModel(input) {
   return out;
 }
 
-function options(input) {
+function options(input, registry) {
   const o = input || {};
   // A reserve is read straight into the verdict of every ONT in the design, so a value the budget
   // cannot use is refused here rather than defaulted: `marginDb: '3'` was replaced by 3 (right by
@@ -157,6 +157,12 @@ function options(input) {
     wrong: 'A technology it cannot place is refused rather than searched: "PON" is not "pon", and the ' +
       'answer to it was "no candidate topology could be built", which blames the estate for a typo.'
   });
+  // `ladder` is what every span is bought from, and it was the last knob still falling back to the
+  // default on a shape it could not use - a bare model name read as DEFAULT_LADDER, and a model the
+  // catalogue does not have noticed only if a span happened to ask for it. An absent or empty ladder
+  // is legitimate; anything else present is refused by name, at its position (see design-fields).
+  designFields.assertCableLadder(o.ladder, function (model) { return registry.has('cable', model); },
+    registry.all('cable').map(function (cable) { return cable.model; }), 'the design');
   return {
     technology: o.technology || DEFAULTS.technology,
     routeFactor: isNum(o.routeFactor) && o.routeFactor >= 1 ? o.routeFactor : DEFAULTS.routeFactor,
@@ -168,6 +174,7 @@ function options(input) {
     pon: Object.assign({}, DEFAULTS.pon, o.pon || {}),
     active: Object.assign({}, DEFAULTS.active, o.active || {}),
     ladder: Array.isArray(o.ladder) && o.ladder.length ? o.ladder : DEFAULTS.ladder,
+    ladderSupplied: Array.isArray(o.ladder) && o.ladder.length > 0,
     overlengthPct: isNum(o.overlengthPct) ? o.overlengthPct : DEFAULTS.overlengthPct,
     costs: costModel(o.costs),
     kmeansIterations: DEFAULTS.kmeansIterations,
@@ -1160,7 +1167,7 @@ function describe(candidate) {
  *   marginDb     optical design margin                     (default 3)
  *   pon          { ratios, olt, ont, maxDropM }
  *   active       { headEndOptic, cpeOptic, optics }
- *   ladder       cable models, richest first
+ *   ladder       cable models, richest first (absent or empty takes DEFAULT_LADDER, noted)
  *   costs        { cablePerM: { model: n }, splice, closure, splitter }   optional
  *
  * Returns `{ ok, demand, headEnd, routeMethod, objective, candidates, best, plant, runs, rationale,
@@ -1168,7 +1175,7 @@ function describe(candidate) {
  */
 function synthesise(demandInput, userOptions, registry) {
   if (!registry) throw new TypeError('synthesise needs a parts registry');
-  const opts = options(userOptions);
+  const opts = options(userOptions, registry);
   if (!opts.headEnd || !isNum(opts.headEnd.lat) || !isNum(opts.headEnd.lon)) {
     throw new TypeError('opts.headEnd { lat, lon } is required - a design needs somewhere to start from');
   }
@@ -1191,6 +1198,13 @@ function synthesise(demandInput, userOptions, registry) {
       'addresses farther than ' + opts.maxSnapM + ' m from a street are reported as unresolved.');
   } else {
     notes.push('No street network supplied: runs are straight-line x' + opts.routeFactor + '.');
+  }
+  if (!opts.ladderSupplied) {
+    // A design that picked the cable ladder says which one, or the BOM's models cannot be checked
+    // against what the caller asked for - and an absent ladder is the common case, so the note is
+    // the only place the default is visible.
+    notes.push('No cable ladder supplied: spans are bought from the default cable ladder ' +
+      DEFAULTS.ladder.join(', ') + '.');
   }
 
   const wantsPon = opts.technology === 'auto' || opts.technology === 'pon';
