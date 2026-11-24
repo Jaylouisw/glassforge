@@ -34,6 +34,16 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A demand row with an empty coordinate is rejected, not placed at 0,0.** `engine.demand.prepare`
+  takes a CSV or an array of rows, and only the CSV path tested the raw cell before `Number()`.
+  `Number('')` is 0 — and so are `Number(null)` and `Number(' ')` — and 0,0 passes the range check, so
+  an array row with a blank latitude or longitude became a house in the Gulf of Guinea. Blank rows all
+  landed on that same phantom point, so `dedupe` collapsed them into one and three broken rows left no
+  rejection record at all. Arrays are what `POST /api/import/demand` and `POST /api/design/synthesise`
+  receive, and a CSV converted to JSON is exactly where empty cells survive as `""`. `parseArray` now
+  rejects an empty coordinate with `latitude or longitude is empty` and a non-numeric one with
+  `latitude/longitude are not numbers`, while a numeric `0` remains a legitimate coordinate. Tests:
+  `demand-input` adds 3.
 - **A money objective prices the drums you buy, not the metres you hang.** `design.synthesise` charged
   cable as `cablePerM × designM`, so the cost it ranked by disagreed with the BOM it had just built:
   a 30-house PON buying 8 km on five drums (5.9 km of design length: three 2 km 12-fibre and two 1 km

@@ -57,6 +57,45 @@ test('an array of rows is accepted, with string numbers converted', function () 
   assert.strictEqual(parsed.points[0].lat, 51.5);
 });
 
+test('an empty coordinate in an array is rejected, not placed at 0,0', function () {
+  // `Number('')` is 0, as is Number(null) and Number(' '), and 0,0 is a coordinate the range check
+  // accepts. The CSV path tests the raw cell first; the array path converted first, so a blank cell
+  // became a house in the Gulf of Guinea, several of them collapsed in `dedupe`, and no rejection
+  // row was written. An array is what /api/import/demand and synthesise receive.
+  const parsed = demand.prepare([
+    { label: 'blank', lat: '', lon: '' },
+    { label: 'null', lat: null, lon: null },
+    { label: 'space', lat: ' ', lon: ' ' },
+    { label: 'good', lat: '51.5', lon: '-0.1' }
+  ]);
+  assert.strictEqual(parsed.points.length, 1, 'only the real coordinate is a point');
+  assert.strictEqual(parsed.points[0].label, 'good');
+  assert.deepStrictEqual(parsed.rejected.map(function (r) { return r.row; }), [1, 2, 3]);
+  assert.ok(/empty/.test(parsed.rejected[0].reason), parsed.rejected[0].reason);
+  assert.strictEqual(parsed.duplicates, 0, 'a rejected row is not a duplicate');
+});
+
+test('a measured 0,0 given as numbers is still a coordinate', function () {
+  // The guard against `Number('')` must not reject the equator: a numeric zero is a placed house,
+  // and null/'' means "not placed yet" is a different state from a real 0.
+  const parsed = demand.prepare([{ label: 'equator', lat: 0, lon: 0 }]);
+  assert.strictEqual(parsed.points.length, 1);
+  assert.strictEqual(parsed.points[0].lat, 0);
+  assert.strictEqual(parsed.points[0].lon, 0);
+  assert.strictEqual(parsed.rejected.length, 0);
+});
+
+test('a non-numeric array coordinate is rejected by name, not read as zero', function () {
+  const parsed = demand.prepare([
+    { label: 'a', lat: 'north', lon: '-0.1' },
+    { label: 'b', lat: 51.5, lon: '-0.1' }
+  ]);
+  assert.strictEqual(parsed.points.length, 1);
+  assert.strictEqual(parsed.rejected.length, 1);
+  assert.strictEqual(parsed.rejected[0].row, 1);
+  assert.ok(/not numbers/.test(parsed.rejected[0].reason), parsed.rejected[0].reason);
+});
+
 test('empty and unusable input is refused', function () {
   throws(function () { demand.prepare(''); }, 'empty');
   throws(function () { demand.prepare('lat,lon\n'); }, 'no usable demand points');

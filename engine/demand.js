@@ -23,6 +23,29 @@ const ADDRESS_NAMES = ['address', 'addr', 'street', 'direccion', 'endereco', 'di
 
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 
+/**
+ * A JSON value or cell as a finite number, or null when it is not one.
+ *
+ * `Number('')` is 0 - and so are `Number(null)` and `Number(' ')` - and 0,0 passes every range check.
+ * Converting before testing the raw value put a blank array cell in the Gulf of Guinea, where it
+ * deduped against the other blank cells into one phantom point and never reached `rejected`. The CSV
+ * path already tests the raw cell; this is the same test for the other input path.
+ */
+function numberOrNull(value) {
+  if (typeof value === 'number') return isFinite(value) ? value : null;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    return isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/** True when the value says nothing at all: absent, null, or an empty/whitespace string. */
+function isMissing(value) {
+  return value === undefined || value === null ||
+    (typeof value === 'string' && value.trim() === '');
+}
+
 function normaliseHeader(cell) {
   return String(cell || '').trim().toLowerCase().replace(/^["']|["']$/g, '');
 }
@@ -149,10 +172,14 @@ function parseArray(rows) {
       rejected.push({ row: i + 1, reason: 'row is not an object' });
       return;
     }
-    const lat = typeof row.lat === 'number' ? row.lat : Number(row.lat);
-    const lon = typeof row.lon === 'number' ? row.lon : Number(row.lon);
-    if (!isNum(lat) || !isNum(lon)) {
-      rejected.push({ row: i + 1, reason: 'no lat/lon', text: row.address || row.label || '' });
+    if (isMissing(row.lat) || isMissing(row.lon)) {
+      rejected.push({ row: i + 1, reason: 'latitude or longitude is empty', text: row.address || row.label || '' });
+      return;
+    }
+    const lat = numberOrNull(row.lat);
+    const lon = numberOrNull(row.lon);
+    if (lat === null || lon === null) {
+      rejected.push({ row: i + 1, reason: 'latitude/longitude are not numbers', text: row.address || row.label || '' });
       return;
     }
     if (!geo.isCoordinate({ lat: lat, lon: lon })) {
