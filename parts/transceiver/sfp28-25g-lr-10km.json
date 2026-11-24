@@ -6,15 +6,16 @@
   "speedMbps": 25000,
   "wavelengthNm": 1310,
   "reachM": 10000,
-  "txPowerDbmMin": -4.5,
-  "txPowerDbmMax": 2.0,
-  "rxSensitivityDbm": -11.4,
-  "rxOverloadDbm": 2.4,
+  "txPowerDbmMin": -7,
+  "txPowerDbmMax": 2,
+  "rxSensitivityDbm": -13.3,
+  "rxOverloadDbm": 2,
   "polish": "upc",
   "sourceUrl": "https://standards.ieee.org/ieee/802.3/7071/",
-  "notes": "25GBASE-LR class figures from IEEE 802.3: launch -4.5..2.0 dBm, sensitivity -11.4 dBm, overload 2.4 dBm (6.9 dB). Published class figures - check the module datasheet before designing to the edge of it, and replace these with the module actually purchased.",
+  "notes": "25GBASE-LR per IEEE 802.3cc, Tables 114-6 (transmit) and 114-7 (receive): average launch power -7.0..+2.0 dBm in the 1295-1325 nm lane window, average receive power -13.3 (min) to +2.0 (max) dBm, receive power in OMA +2.2 dBm (max), stressed receiver sensitivity -9.5 dBm OMA. The same figures are printed by compliant module sheets (Coherent FTLF1436W5BTV, Gigalight GSS-SPO250-LRCC), which is what makes them re-checkable. Until 2026-11-24 this row carried launch -4.5, sensitivity -11.4 and a 2.4 dBm overload, and all three disagreed with that table: -4.5 sits 2.5 dB above the class launch floor, -11.4 describes a receiver 1.9 dB weaker than the class specifies, and 2.4 is neither the average (+2.0) nor the OMA (+2.2) receive maximum. Together they printed 6.9 dB between launch floor and sensitivity where the standard allows 6.3, so every 25G link in this catalogue was budgeted 0.6 dB above its class. Read the standard 9.7 dB power budget carefully: it is the 6.3 dB channel insertion loss plus a 3.4 dB transmitter-and-dispersion penalty, and the engine compares average launch with average receive, so 6.3 dB is the whole figure a link may spend - -7.0 minus -13.3 = 6.3, which is also how the 10GBASE-LR and 100GBASE-LR4 rows are read. Consequence at the default 3 dB margin: 10 km x 0.35 dB/km = 3.5 dB of fibre leaves 2.8 dB and reads marginal on margin, not on reach; the last length that clears the margin is 9.4 km (3.3 / 0.35), and with a connector pair at each end (0.6 dB) it is 7.7 km (2.7 / 0.35). Launch ceiling +2.0 dBm equals the receiver maximum, so a back-to-back pair needs no pad - overload is a 1550 nm long-reach problem, not this one. 25GBASE-ER (40 km, launch -3..+6, average receive -21..-4) is a different class and not this row. Replace these class figures with the module actually purchased before pricing a build.",
   "tags": [
     "25000",
-    "1310nm"
+    "1310nm",
+    "25g"
   ]
 }
