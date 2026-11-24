@@ -1,5 +1,5 @@
 name: Part request
-description: A cable, splitter, OLT, ONT, closure, connector or splice to add to the catalogue
+description: A cable, splitter, OLT, ONT, transceiver, closure, connector or splice to add to the catalogue
 labels: [parts]
 body:
   - type: markdown
@@ -10,7 +10,7 @@ body:
     id: kind
     attributes:
       label: Kind
-      description: cable, splitter, olt, ont, closure, connector or splice
+      description: cable, splitter, olt, ont, transceiver, closure, connector or splice
     validations:
       required: true
   - type: input
