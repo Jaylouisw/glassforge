@@ -1,0 +1,19 @@
+{
+  "kind": "connector",
+  "model": "mpo-12-apc-lowloss",
+  "vendor": "senko",
+  "label": "MPO-12/APC connector pair (low loss)",
+  "lossDb": 0.1,
+  "maxLossDb": 0.25,
+  "notes": "0.10 dB typical and 0.25 dB maximum are the single-mode APC 12-fibre low-loss row of the SENKO MPO-PLUS 702/712 datasheet optical table; the standard-loss row beside it is 0.20 / 0.70 and is a separate part in this catalogue because the difference is a grade, not a tolerance. The asterisk on both rows is the caveat that travels: 'based on master grade jumper to low loss random mating test' - a bench measurement against a reference jumper, so the 0.10 dB typical is the best case a trunk sees and 0.25 dB is the figure to hold a supplier to. 0.25 dB is exactly IEC 61753-1 grade B for random mating (grade B 0.25 max, grade C 0.50 max), which the LC and SC rows here also quote - so low-loss MPO is the only multi-fibre part in this catalogue that meets a grade B contract, and it is the row a 288F ribbon trunk should be specified to. Why the row exists: this catalogue sells g652d-ribbon-288 and terminated that cable with nothing. A 288-fibre ribbon feeder ends on MPO adapters in the ODF, so before this row a designer had to charge an SC/APC or LC/APC pair per path (0.30 or 0.25 dB) for a mating the bought cable cannot make, overstating a trunk ODF by 0.15-0.20 dB per end and - the part that matters - putting a connector model in the BOM that will not plug into the cable. The arithmetic the engine performs is one mating per fibre path, not twelve: a path through two MPO ODFs is 2 x 0.10 = 0.20 dB of connector loss, not 12 x 0.30. Against that, the low-loss grade is a purchase-order decision worth 0.2 dB over standard loss across a pair of ODFs, and 0.45 dB against the standard row's 0.70 dB ceiling. Polarity (Method A/B/C), gender and the twelve-paths-at-once failure mode are not modelled - see the mpo-12-apc row - and engine/link.js still budgets the default sc-apc pair, so this row reaches budget.pointToPoint and a project budget through connectorModel or connectors: { model, count }, not link design. Replace with the measured loss of the trunks you buy; a supplier's 0.25 dB is a maximum, and the typical is not a contract.",
+  "sourceUrl": "https://www.senko.com/wp-content/uploads/2024/06/Data-Sheet_MPO-Standard-Connector.pdf",
+  "tags": [
+    "connector",
+    "mpo",
+    "mtp",
+    "ribbon",
+    "low-loss",
+    "high-density"
+  ],
+  "polish": "apc"
+}

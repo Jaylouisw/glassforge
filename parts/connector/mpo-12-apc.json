@@ -1,0 +1,18 @@
+{
+  "kind": "connector",
+  "model": "mpo-12-apc",
+  "vendor": "senko",
+  "label": "MPO-12/APC connector pair (standard loss)",
+  "lossDb": 0.2,
+  "maxLossDb": 0.7,
+  "notes": "0.20 dB typical and 0.70 dB maximum are the single-mode APC 12-fibre row of the SENKO MPO-PLUS 702/712 datasheet optical table, standard-loss grade (its low-loss 12-fibre row is 0.10 typical / 0.25 max, which is the part one row along in this catalogue). The datasheet's own asterisk qualifies both: 'based on master grade jumper to low loss random mating test', so the 0.20 dB is a bench figure measured against a reference jumper, not two field connectors mated to each other. Read the two grades the way this catalogue reads every connector: 0.20 dB is what the engine charges per mating, 0.70 dB is the ceiling the part is held to, and IEC 61753-1's random-mating attenuation grades - grade B 0.25 dB max, grade C 0.50 dB max, the figures the LC and SC rows here quote - have no grade that a 0.70 dB MPO meets. That is not a defect in the sheet, it is what 'standard loss' means for a multi-fibre ferrule, and it is why the purchase order should say low loss rather than just MPO. Two things this row is careful about. First, the ferrule: an SM APC MPO is angle-polished, green, return loss >= 60 dB per the same table, and it mates with nothing else in this catalogue - not the flat UPC MPO, not LC, not SC. Second, what the engine cannot see: MPO polarity (Method A/B/C decides whether strand 1 leaves at position 12, and the engine addresses a strand by tube and fibre, never by its position in a trunk), gender (female no-pin trunks on male adapters are the usual build - one mating either way, so the loss figure is unaffected), and the fact that one dirty end-face costs twelve paths at once where an LC pair costs one. Interface is IEC 61754-7 (type MPO), durability 500 matings per TIA-568.3. Selectable with connectorModel or connectors: { model: 'mpo-12-apc', count: n } on a project budget or budget.pointToPoint; engine/link.js takes only a connector count and budgets the default sc-apc pair, so a site-to-site link cannot name this row without an engine change. Replace with the loss measured on the trunks and fanouts actually purchased.",
+  "sourceUrl": "https://www.senko.com/wp-content/uploads/2024/06/Data-Sheet_MPO-Standard-Connector.pdf",
+  "tags": [
+    "connector",
+    "mpo",
+    "mtp",
+    "ribbon",
+    "high-density"
+  ],
+  "polish": "apc"
+}
