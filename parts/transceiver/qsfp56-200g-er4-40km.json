@@ -1,0 +1,23 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp56-200g-er4-40km",
+  "vendor": "gigalight",
+  "label": "QSFP56 200GBASE-ER4 40 km",
+  "speedMbps": 200000,
+  "wavelengthNm": 1310,
+  "reachM": 40000,
+  "txPowerDbmMin": 0.4,
+  "txPowerDbmMax": 6.6,
+  "rxSensitivityDbm": -17.6,
+  "rxOverloadDbm": -3.4,
+  "polish": "upc",
+  "sourceUrl": "https://www.gigalight.com/datasheets/200g-qsfp56-er4-gqs-spo201-er4cz.pdf",
+  "tags": [
+    "200000",
+    "1310nm",
+    "200g",
+    "long-reach",
+    "dc-to-dc"
+  ],
+  "notes": "The 200G rung the ladder skipped: it went 1G, 10G, 25G, 40G, 50G, 100G, 400G with nothing in between, so a 200G site-to-site service had to be modelled as two 100G rows - two duplex pairs and two modules for one service, a BOM error no per-link verdict would ever flag. Figures: Gigalight GQS-SPO201-ER4CZ data sheet (200GBASE-ER4, QSFP56, cooled 4-channel EA-DFB TOSA and 4-channel APD ROSA, 40 km), optical characteristics table, per lane - average launch power +0.4..+6.6 dBm, average receive power -17.6..-3.4 dBm, receive power (OMAouter) maximum -2.6 dBm, receiver sensitivity (OMAouter) -16.5 dBm, stressed receiver sensitivity (OMAouter) -13.3 dBm, damage threshold -2.4 dBm, four lanes centred 1294.53 / 1299.02 / 1303.54 / 1308.09 nm. The IEEE 802.3cn 40 km baseline proposal (ieee802.org/3/cn/public/18_11/xu_3cn_02b_1118.pdf) prints the same launch, receive and stressed-sensitivity set, which is why the row is budgeted on it rather than on one vendor's generosity. The row keeps the AVERAGE receive power minimum (-17.6), not the OMAouter sensitivity (-16.5), for the reason every class row here does: a launch figure is subtracted from an average receive figure, and the 1.1 dB between the two is the OMA-to-average conversion, not slack. Both ends of the class check out: 0.4 - (-17.6) = 18.0 dB is ER4's maximum channel insertion loss and 6.6 - (-3.4) = 10.0 dB is its minimum, so this is a 10-18 dB optic, not a 0-18 dB one. Measured on G.652.D at 0.35 dB/km with two SC/APC matings: 10 km is 4.10 dB of ODN and 13.90 dB of headroom, ok; 35.0 km is 12.85 dB and 5.15 dB, ok; 35.5 km is 13.03 dB and 4.98 dB, marginal; the declared 40 km is 14.60 dB and 3.40 dB of headroom, MARGINAL rather than ok because it sits 0.40 dB above the default 3 dB margin and inside the engine's 2 dB marginal band; ten fusion splices on that run make it 15.60 dB and 2.40 dB, a fail. The near end is the part that surprises for a long-reach row and is real: the receive maximum (-3.4) sits 10.0 dB below the launch ceiling (+6.6), so ER4's class floor is 10 dB of ODN and anything shorter puts a hot module into overload. The verdict itself reads the declared 0.4 dBm launch, so it fails below 3.8 dB of ODN (0.4 + 3.4), about 9.1 km with two matings: a 300 m span reads -0.30 dBm at the customer optic, 9.3 dB over the point, and the budget asks for a 10 dB pad sized at the 6.6 dBm top of the launch window, with up to 14 dB still passing the margin and the class budget (measured). Above 9.1 km the verdict is ok and the class floor shows up instead as launchWindowPad, the pad a module at the top of its window needs: 7 dB at 9.2 km, 5 dB at 15 km, 1 dB at 25 km, and nothing from 10.0 dB of ODN, about 26.9 km, where a launch at the ceiling lands exactly on the receiver maximum. So the honest reading of this row is: ok from 9.2 km to 35.4 km, marginal to 40 km, fail past 40 km on reach, and a pad on anything short. Four CWDM-adjacent lanes on ONE duplex pair: 1310 nm because the engine budgets one wavelength, per-lane figures are worst-lane, and the cable's 0.35 dB/km 1310 window is the one that applies. Class figures for one module family, not a purchase-tested part - replace the row with the optic actually bought, and its measured per-lane receive power, before pricing a build."
+}
