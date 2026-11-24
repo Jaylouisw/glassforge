@@ -123,6 +123,11 @@ verdict    = ok
 That is `test/budget-optics.test.js`, to the digit. If you change a loss figure, that test is where
 the disagreement surfaces.
 
+That design is in the band as well: +7 dBm at the top of the C+ window puts −5.16 dBm on an ONT whose
+overload is −8 dBm, so the same result carries `warnings` with `2.84 dB above -8 dBm at the 7 dBm top
+of the window` and a `launchWindowPad` of 3 dB. The arithmetic above is unchanged — the band adds a pad
+to buy, not a reason to fail.
+
 ## Too loud: the pad the link needs
 
 Overload is the one failure that more power cannot fix. A long-reach optic on a short duct run, or an
@@ -146,8 +151,9 @@ So `overDb` and `padDb` are measured at the receiver power the transmitter's `tx
 
 Whether a link is too loud at all is still decided at the **minimum** launch: that is the worst-case
 loss the class verdict is built on. A span that is inside its overload point there reports
-`attenuator: null` — a healthy link needs no pad — and the reason a too-loud link carries names the
-launch the pad covers (`even at the 7 dBm top of its launch window`).
+`attenuator: null`, and the reason a too-loud link carries names the launch the pad covers (`even at
+the 7 dBm top of its launch window`). Inside at the floor is not always healthy, though — see the
+band below.
 
 `maxPadDb` exists because **a pad is ODN loss**: it spends the same budget the route spends. A 5 dB pad
 on a link with 4 dB of class headroom does not pass. When `maxPadDb < padDb` the design is
@@ -155,13 +161,39 @@ contradictory — too loud *and* too tight — so no pad satisfies both and the 
 naming a number that would fail on site. Pads are bought in whole dB, so a 14.6 dB allowance funds
 14 dB, and none at all is a plate somebody orders.
 
+### The band between the two launches
+
+Judging overload at the floor leaves a band in which the design is clean with a cold module and over
+the receiver's limit with a hot one. For a C+ card, whose window is +3..+7 dBm, against an ONT whose
+overload is −8 dBm, the band is every ODN between 11 and 15 dB — an ordinary 1:8 estate with a short
+feeder. The engine reports that band instead of passing it in silence:
+
+- `launchWindowPad` on the result is the pad the band needs: the same
+  `{ overDb, padDb, maxPadDb, atTxDbm, fits }` object as `attenuator`, sized at the top of the window.
+  The two are mutually exclusive — `attenuator` means the floor launch is already too loud, and its
+  `reasons` already name the pad; `launchWindowPad` means only the ceiling is.
+- `warnings` gains a sentence naming the receiver, the receive power at each end of the window, the
+  overshoot and the pad to buy: `the ONT gpon-ont-4ge is inside its overload point only at the
+  bottom of the OLT gpon-c-plus-8 launch window: -8.87 dBm at 3 dBm, but 3.13 dB above -8 dBm at the
+  7 dBm top of the window - fit a 4 dB inline pad (up to 18 dB still passes the 3 dB margin and the
+  class budget)`.
+- The verdict does not move: that case is `ok` with no `reasons`, because which launch a design is
+  signed off at is a product decision still open in issue #111. Every surface repeats the warning —
+  the Signal tab, the printed plan, and a synthesised design, whose `metrics.launchWindowOnts` counts
+  the ONTs in the band and whose `warnings` names the worst overshoot once for the whole plant.
+
+A script that reads `verdict` alone therefore misses a plan that only holds while every line card
+lands at the bottom of its window: read `warnings` with the verdict.
+
 The EX example in `test/parts-long-reach-optics.test.js`: 1 km of G.652.D and two connectors is 0.95 dB
 of loss, so a 1000BASE-EX pinned at the 3 dBm top of its −1..+3 dBm window (`txDbm: 3`) receives
 +2.05 dBm at a receiver whose overload is +1 dBm — 1.05 dB too loud, so 2 dB is the smallest pad that
 clears it, and 20 dB is the most the 21 dB link budget (less 0.95 dB of loss, 20.05 dB, floored) and the
 3 dB margin allow. Cisco's own 5 dB pad sits inside that window. The same span with no `txDbm` lands at
-−1.95 dBm at the minimum launch, inside the overload point: the link is `ok` with no pad, and a hot
-module in that chassis is what the pad arithmetic is for.
+−1.95 dBm at the minimum launch, inside the overload point: the link is `ok` with `attenuator: null`,
+and it is in the band — +2.05 dBm at the +3 dBm ceiling is 1.05 dB over the +1 dBm overload, so its
+`warnings` names a 2 dB launch-window pad. A hot module in that chassis is exactly what the pad
+arithmetic is for.
 
 ## What this model does not include
 

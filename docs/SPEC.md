@@ -94,6 +94,13 @@ A design passes only if **both** hold:
    `null` when the receiver is at or below its overload point) — sized at the transmitter's strongest
    launch (`atTxDbm`), because one pad has to hold a module that may run hot — and because a pad is
    ODN loss, `maxPadDb` is the point where the margin and the class budget run out.
+
+   Overload is judged at the **minimum** launch — the worst-case loss the class verdict is built on —
+   so a receiver that is over its limit only at the top of the transmitter’s window is not an overload
+   failure: it reports `attenuator: null`, plus `launchWindowPad` (the same object, sized at
+   `txPowerDbmMax`) and a line in `warnings` naming the launch that overdrives it. Every surface repeats
+   that warning. Whether the band should fail is open in issue #111; today the engine reports it and
+   leaves the verdict where this section puts it.
 2. **The plant's own budget.** For a PON, `ODN loss ≤ class budget` (GPON B+ 28 dB, C+ 32, C++ 35;
    XG-PON N1 29, N2 31; XGS-PON N1 29, N2 31, E1 33, E2 35). For an active link,
    `ODN loss ≤ launch(min) − sensitivity` for the optic pair, and the route must be inside the optic's

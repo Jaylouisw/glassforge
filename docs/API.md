@@ -177,9 +177,12 @@ not a `500` and not a link budget. Point-to-point is `POST /api/design/link` (§
 which calls `budget.pointToPoint` per leg; there is no endpoint that budgets `headEnd`/`cpe` from a
 hand-written body.
 
-A budget `result` carries: `verdict` (`ok`/`marginal`/`fail`), `reasons`, `rxPowerDbm`,
-`headroomDb`, `odnLossDb`, `budgetDb`, `classHeadroomDb`, `cascadeRatio`, `wavelength`, `direction`
-and `breakdown` (one line per loss element). See [SPEC.md](SPEC.md) §2–3.
+A budget `result` carries: `verdict` (`ok`/`marginal`/`fail`), `reasons`, `warnings` (sentences that
+do not move the verdict; the launch-window band
+[OPTICAL.md](OPTICAL.md#the-band-between-the-two-launches) describes is the one an ordinary estate
+carries), `rxPowerDbm`, `headroomDb`, `odnLossDb`, `budgetDb`, `classHeadroomDb`, `cascadeRatio`,
+`wavelength`, `direction`, `attenuator`, `launchWindowPad` and `breakdown` (one line per loss element).
+See [SPEC.md](SPEC.md) §2–4.
 
 `attenuator` is `null` when the receiver is at or below its overload point, and otherwise
 `{ overDb, padDb, maxPadDb, atTxDbm, fits }` — how far above overload the receiver lands with the
@@ -188,6 +191,12 @@ inline pad that clears it, the most pad the margin and class budget can absorb, 
 is achievable. A pad is fitted once, so it is sized for the strongest launch the transmitter can
 present, not the weakest. The overload reason quotes the pad and its launch, so `reasons` alone is
 enough to act on.
+
+`launchWindowPad` is the other half: when the receiver is inside its overload point at the floor of the
+transmitter’s window but over it at the ceiling, `attenuator` is `null` and this carries the pad the band
+needs, in the same shape, sized at the top of the window. The two are never both set, the verdict is not
+moved by it, and `warnings` says which launch overdrives the receiver — see
+[OPTICAL.md](OPTICAL.md#the-band-between-the-two-launches).
 
 ## Printed plan and PNG
 

@@ -142,6 +142,13 @@ overload the receiver lands with the transmitter at `atTxDbm`, the top of its la
 request pinned `txDbm`; `padDb` the smallest whole-dB pad that clears it; and `maxPadDb` the most the
 design margin and the class budget can absorb, because a pad is ODN loss like any other.
 
+**Launch-window pad** — the pad a design needs when the receiver is inside its overload point at the
+bottom of the transmitter’s window and over it at the top: `launchWindowPad` on a budget result, the same
+`{ overDb, padDb, maxPadDb, atTxDbm, fits }` object as `attenuator` and never set with it. The band is
+ordinary — a C+ card’s +3..+7 dBm window against a −8 dBm ONT overload puts every ODN between 11 and
+15 dB in it — so the verdict is not moved and the design says so in `warnings`, in the printed plan and in
+a synthesised plan’s `metrics.launchWindowOnts`. Whether the band should fail is open in issue #111.
+
 **`routedM` / `ownM` / `lengthM`** — the same leg measured three ways, because they answer three
 different questions: `routedM` is what the graph measured between the two snapped site nodes;
 `spurM` is the site-to-edge drops; `ownM` is `routedM + spurM` — the cable you buy, and what the BOM
