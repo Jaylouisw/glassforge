@@ -34,6 +34,50 @@ const DEFAULT_MARGIN_DB = 3;
 const DEFAULT_WAVELENGTH = { down: '1490', up: '1310' };
 
 /**
+ * The carriers a PON actually has, per direction: the OLT launches downstream at 1490 nm (1550 nm
+ * for an RF video overlay) and the ONT launches upstream at 1310 nm.
+ *
+ * `wavelength` used to be read independently of `direction`, so any of the three was accepted in
+ * either one and an *upstream* verdict could be computed at a downstream wavelength - a figure for a
+ * link no PON has, on an answer labelled "Upstream". It is not a rounding difference: the same 16 km
+ * GPON B+ plant through a 1:64 is `fail` upstream at 1310 nm (ODN 27.10 dB, headroom 1.40 dB against
+ * a 3 dB margin) and `marginal` labelled 1550 nm (ODN 24.86 dB, headroom 3.64 dB), because 16 km of
+ * G.652.D attenuates 5.60 dB at 1310 and 3.36 dB at 1550. The loss is wavelength-specific, so a pair
+ * no PON carries is refused by name - the rule `pointToPoint` already applies to an optic ("a link is
+ * budgeted at the wavelength it transmits on").
+ */
+const PON_WAVELENGTH_BY_DIRECTION = { down: ['1490', '1550'], up: ['1310'] };
+
+/**
+ * Refuse a PON budget whose `wavelength` and `direction` do not describe a link, and a wavelength
+ * the budget cannot read.
+ *
+ * Absent is absent (`null` means "not set" everywhere else in this model, and the default per
+ * direction is documented and echoed), but a value that is *present and unusable* used to fall
+ * through `design.wavelength || DEFAULT_WAVELENGTH[direction]`: an empty form cell became 1490 nm
+ * and a `0` became 1490 nm, answered `200` with the default echoed, so the caller never learned the
+ * field they sent was not read. `/api/projects/:id/budget` calls this once, before any ONT is
+ * budgeted, so an impossible pair is one 400 naming the rule rather than a row repeating it.
+ */
+function assertPonWavelength(design) {
+  const direction = design.direction === 'up' ? 'up' : 'down';
+  const raw = design.wavelength;
+  if (raw === undefined || raw === null) return;
+  const wavelength = String(raw);
+  if (partsModule.WAVELENGTHS.indexOf(wavelength) === -1) {
+    throw new Error('unknown wavelength "' + wavelength + '" - expected one of ' + partsModule.WAVELENGTHS.join(', '));
+  }
+  const legal = PON_WAVELENGTH_BY_DIRECTION[direction];
+  if (legal.indexOf(wavelength) !== -1) return;
+  const label = direction === 'up' ? 'upstream' : 'downstream';
+  throw new Error(label + ' is budgeted at ' +
+    (legal.length > 1 ? legal.join(' or ') : legal[0]) + ' nm, not ' + wavelength +
+    ' nm - a PON transmits downstream at 1490 nm (or 1550 for an RF overlay) and upstream at 1310 nm, ' +
+    'so an ODN measured at ' + wavelength + ' nm in the ' + label +
+    ' direction describes a link that does not exist');
+}
+
+/**
  * The fields each budget entry point reads, for `design-fields.assertKnownFields`.
  *
  * A field this engine does not read is a near miss the caller meant to type - a singular `splitter`
@@ -714,11 +758,13 @@ function opticalBudget(design, registry) {
   designFields.assertKnownFields(design, PON_DESIGN_FIELDS, 'the PON budget');
   assertDesignKnobs(design, 'the PON budget');
 
+  // The pair (wavelength, direction) is checked here rather than left to the caller: a downstream
+  // wavelength on an upstream verdict quotes a loss the link never sees.
+  assertPonWavelength(design);
   const direction = design.direction === 'up' ? 'up' : 'down';
-  const wavelength = String(design.wavelength || DEFAULT_WAVELENGTH[direction]);
-  if (partsModule.WAVELENGTHS.indexOf(wavelength) === -1) {
-    throw new Error('unknown wavelength "' + wavelength + '" - expected one of ' + partsModule.WAVELENGTHS.join(', '));
-  }
+  const wavelength = design.wavelength === undefined || design.wavelength === null
+    ? DEFAULT_WAVELENGTH[direction]
+    : String(design.wavelength);
 
   if (!design.olt || !design.olt.model) throw new TypeError('design.olt.model is required');
   if (!design.ont || !design.ont.model) throw new TypeError('design.ont.model is required');
@@ -985,6 +1031,7 @@ function pointToPoint(design, registry) {
 
 module.exports = {
   assertDesignKnobs: assertDesignKnobs,
+  assertPonWavelength: assertPonWavelength,
   assertProjectBudgetFields: assertProjectBudgetFields,
   DEFAULT_MARGIN_DB: DEFAULT_MARGIN_DB,
   DEFAULT_SPLICE_MODEL: DEFAULT_SPLICE_MODEL,

@@ -173,6 +173,20 @@ async function main() {
     assert.ok(notAnOnt.body.error.indexOf('n1') !== -1 && /not "ont"/.test(notAnOnt.body.error), notAnOnt.body.error);
   });
 
+  // A wavelength the direction cannot carry is the caller's mistake, and it fails every ONT the same
+  // way: one 400 naming the rule, not a 200 whose every row repeats the sentence. Upstream at 1550 nm
+  // used to be answered as a real verdict - on a 16 km B+ plant, `marginal` where 1310 nm is `fail`.
+  const wrongPair = await request('POST', '/api/projects/' + id + '/budget', { direction: 'up', wavelength: '1550' });
+  const rightPair = await request('POST', '/api/projects/' + id + '/budget', { direction: 'up', wavelength: '1310' });
+  test('a wavelength the direction cannot carry is a 400 naming the rule, once', function () {
+    assert.strictEqual(wrongPair.status, 400, JSON.stringify(wrongPair.body));
+    assert.ok(wrongPair.body.error.indexOf('upstream is budgeted at 1310 nm, not 1550 nm') !== -1,
+      wrongPair.body.error);
+    assert.strictEqual(rightPair.status, 200, JSON.stringify(rightPair.body));
+    assert.strictEqual(rightPair.body.budgets[0].result.direction, 'up');
+    assert.strictEqual(rightPair.body.budgets[0].result.wavelength, '1310');
+  });
+
   const bom = await request('GET', '/api/projects/' + id + '/bom');
   test('the cable page returns whole drums per cable model', function () {
     assert.strictEqual(bom.status, 200);
@@ -235,6 +249,25 @@ async function main() {
     assert.strictEqual(row.ont, 'o1');
     assert.strictEqual(row.result, undefined, 'a refused ONT must not carry a verdict as well');
     assert.ok(/splitter/.test(row.error) && row.error.indexOf('sp1') !== -1, row.error);
+  });
+
+  // The PON rule is the PON's: a single-fibre active link runs both directions at its optic's own
+  // wavelength, so a 1550 nm circuit budgeted upstream is a real link and must not meet the ONT rule.
+  const activeUpId = 'plegacy0003';
+  fs.writeFileSync(path.join(dataRoot, 'projects', activeUpId + '.json'), JSON.stringify({
+    id: activeUpId,
+    name: 'Active 1550 both ways',
+    nodes: [
+      { id: 'h1', type: 'headend', model: 'sfp-1g-zx-80km', name: 'Head end' },
+      { id: 'o1', type: 'ont', model: 'sfp-1g-zx-80km', name: 'Customer' }
+    ],
+    spans: [{ id: 's1', from: 'h1', to: 'o1', cable: 'g652d-loose-12', lengthM: 1000 }]
+  }));
+  const activeUp = await request('POST', '/api/projects/' + activeUpId + '/budget', { direction: 'up', wavelength: '1550' });
+  test('an active 1550 nm link is budgeted upstream, because that is its own wavelength', function () {
+    assert.strictEqual(activeUp.status, 200, JSON.stringify(activeUp.body));
+    assert.strictEqual(activeUp.body.budgets[0].result.direction, 'up');
+    assert.strictEqual(activeUp.body.budgets[0].result.wavelength, '1550');
   });
 
   const strands = await request('GET', '/api/projects/' + id + '/strands');

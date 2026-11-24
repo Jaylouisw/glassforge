@@ -105,6 +105,13 @@ Upstream (ONT → OLT) uses 1310 nm, the ONT's `txPowerDbmMin`, and the **OLT's*
 and overload — the same spans, different endpoints. The engine refuses a GPON OLT paired with an
 XGS-PON ONT rather than inventing a symmetric answer.
 
+The wavelength is not free to move with the direction. The budget refuses an upstream figure at any
+wavelength but 1310 nm and a downstream one at 1310 nm, because the only thing `wavelength` changes is
+the fibre loss, so the wrong carrier quotes a loss the link never sees: the same 16 km B+ plant through
+a 1:64 is `fail` upstream at 1310 nm — 16.0 km × 0.35 = 5.60 dB of fibre, ODN 27.10 dB, headroom
+1.40 dB against a 3 dB margin — and would read `marginal` at 1550 nm (16.0 × 0.21 = 3.36 dB, ODN
+24.86 dB, headroom 3.64 dB). Downstream may be 1490 nm or 1550 nm, the RF overlay carrier.
+
 ## A worked example
 
 GPON C+, 3.0 km of 24F G.652.D, one 1:8 splice-terminated cassette, 4 fusion splices, 2 connectors:

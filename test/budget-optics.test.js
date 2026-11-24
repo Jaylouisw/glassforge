@@ -65,21 +65,25 @@ test('a design with too little margin fails and says which margin', function () 
 });
 
 test('the class budget can fail a link the receiver tolerance accepts', function () {
-  // The two verdicts are independent, and this is the case that proves it: 26 km at 0.35 = 9.10,
-  // 1:64 = 20.50, 20 splices = 2.00, 3 connectors = 0.90 -> 32.50 dB ODN.
-  // Rx = 3 - 32.50 = -29.50 dBm, which clears the -30 dBm sensitivity by 0.50 dB (no margin asked
+  // The two verdicts are independent, and this is the case that proves it: 41.4 km at 0.22 = 9.108,
+  // 1:64 = 20.50, 20 splices = 2.00, 3 connectors = 0.90 -> 32.508 dB ODN.
+  // Rx = 3 - 32.508 = -29.508 dBm, which clears the -30 dBm sensitivity by 0.49 dB (no margin asked
   // for), but C+ budget is 32 dB, so the class is what refuses the design.
+  //
+  // This case used to be built on 26 km budgeted at 1310 nm with the default *downstream* direction,
+  // a pair no PON carries (1310 nm is the upstream carrier); the budget now refuses it, so the same
+  // ODN is reached honestly at 1490 nm. What the test asserts has not moved: it is a link the
+  // receiver hears and the class refuses.
   const r = budget.opticalBudget({
     olt: { model: 'gpon-c-plus-8' },
     ont: { model: 'gpon-ont-4ge' },
-    wavelength: '1310',
     marginDb: 0,
-    spans: [{ cable: 'g652d-loose-48', lengthM: 26000 }],
+    spans: [{ cable: 'g652d-loose-48', lengthM: 41400 }],
     splitters: [{ model: 'plc-1x64-sca' }],
     splices: 20,
     connectors: 3
   }, registry);
-  close(r.odnLossDb, 32.5, 0.001, 'ODN loss');
+  close(r.odnLossDb, 32.508, 0.001, 'ODN loss');
   assert.ok(r.headroomDb > 0, 'the receiver still hears it: headroom is ' + r.headroomDb);
   assert.ok(r.classHeadroomDb < 0, 'C+ allows 32 dB, this design is over');
   assert.ok(r.reasons.some(function (x) { return x.indexOf('budget of 32 dB') !== -1; }), r.reasons.join(' | '));

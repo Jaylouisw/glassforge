@@ -215,6 +215,17 @@ the same project's `{}` is -8.86 dBm at +3 dBm, inside the ONT's -8 dBm overload
 `{"txDbm":7}` answers `rxPowerDbm` -4.86 and `fail` - 3.14 dB over that point, so `attenuator.padDb` is
 4. A launch the budget cannot read is not a launch: it is refused rather than dropped.
 
+`wavelength` is checked against `direction`, because the ODN loss is wavelength-specific and a pair no
+PON carries quotes a loss the link never sees: a PON transmits downstream at 1490 nm (1550 for an RF
+overlay) and upstream at 1310 nm, so `{"direction":"up","wavelength":"1550"}` is a `400` -
+`upstream is budgeted at 1310 nm, not 1550 nm …` - and not an upstream verdict computed at 1550 nm.
+The difference is a verdict: the same 16 km GPON B+ plant through a 1:64 is `fail` upstream at 1310 nm
+(headroom 1.40 dB) and would have been `marginal` at 1550 nm (3.64 dB). A wavelength the budget cannot
+read (`""`, `0`, `"1550 "`) is refused by the same check instead of falling through to the default, and
+the check runs once per request, so an impossible pair is one 400 rather than a 200 whose every row
+repeats it. An **active** plant is not bound by it: a single-fibre circuit runs both directions at its
+optic's own wavelength, which `pointToPoint` enforces separately.
+
 `direction`, `marginDb`, `allowanceDb` and `txDbm` are checked once, before any ONT is budgeted: a value
 that is present and unusable is a `400` naming the field (`{"allowanceDb":-1}`, `{"marginDb":"3"}`,
 `{"direction":"sideways"}`, `{"txDbm":"7"}`), never a `200` whose every row repeats the same complaint.

@@ -432,6 +432,15 @@ async function handle(req, res, ctx) {
         // caller asked for came back `ok`. The guard stays narrow - only a case slip, a plural, a
         // prefix or one letter wrong - so a caller's own metadata still passes through.
         engine.budget.assertProjectBudgetFields(body);
+        // The wavelength that pairs with the direction is a PON rule - the ONT launches upstream at
+        // 1310 nm - and an active plant budgets its optic's own wavelength in either direction, so it
+        // is checked here only for an OLT root, once, before any ONT is budgeted. Left to the rows, a
+        // caller with `{"direction":"up","wavelength":"1550"}` got a `200` whose every row repeated the
+        // same sentence, which reads as a plant full of broken ONTs instead of one wrong field.
+        const roots = (project.nodes || []).filter(function (n) {
+          return n && (n.type === 'olt' || n.type === 'headend');
+        });
+        if (roots.length === 1 && roots[0].type === 'olt') engine.budget.assertPonWavelength(body);
       } catch (err) {
         throw asBadRequest(err);
       }
