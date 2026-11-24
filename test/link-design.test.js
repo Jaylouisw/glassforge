@@ -290,3 +290,52 @@ test('an explicit splice count is splice events on the leg, and the crew count f
   assert.strictEqual(once.legs[0].splices, 3);
   assert.strictEqual(once.bom.splices, 3);
 });
+
+test('a leased B-leg on a circuit with no B-leg is named, not charged', function () {
+  // No network: one straight-line leg, so a segment assigned to the B-leg belongs to a leg that does
+  // not exist. It is not on the path the light takes and nobody buys it, yet it used to be counted in
+  // the BOM anyway: thirdParty read 400 m and 1600 while the one leg carried 100 m and 400 of that.
+  // The lease is still LISTED - dropping it silently is the other way to be wrong about money.
+  const r = link.design({ sites: { a: A, b: B }, optics: ER, thirdParty: [
+    { provider: 'CityFibre', lengthM: 300, lossDb: 0.6, cost: 1200, leg: 'b' },
+    { provider: 'Zayo', lengthM: 100, lossDb: 0.2, cost: 400, leg: 'a' }
+  ] }, registry);
+  assert.strictEqual(r.legs.length, 1);
+  close(r.legs[0].leasedM, 100, 0.001, 'the one leg runs on the A-leg lease');
+  // 100 m of lease on the only leg; the 300 m B-leg lease is on no leg at all.
+  close(r.bom.thirdParty.totalM, 100, 0.001, 'the leased total is the lease the circuit runs on');
+  close(r.bom.thirdParty.lossDb, 0.2, 0.001, 'only a charged lease costs the light loss');
+  assert.strictEqual(r.bom.thirdParty.cost, 400);
+  close(r.bom.leasedTotalM, 100, 0.001);
+  const cityFibre = r.thirdParty.segments.filter(function (s) { return s.provider === 'CityFibre'; })[0];
+  assert.strictEqual(cityFibre.attached, false, 'the B-leg lease is not on this circuit');
+  assert.strictEqual(r.thirdParty.unattached.length, 1, 'one declared segment rides no leg');
+  close(r.thirdParty.unattachedM, 300, 0.001);
+  assert.strictEqual(r.thirdParty.unattachedCost, 1200);
+  assert.ok(r.warnings.some(function (w) {
+    return w.indexOf('CityFibre') !== -1 && w.indexOf('B-leg') !== -1 && w.indexOf('not part of the circuit') !== -1;
+  }), r.warnings.join(' | '));
+});
+
+test('protection single drops the B-leg lease from the cost, and still names it', function () {
+  const r = link.design({ sites: { a: A, b: B }, network: grid(), optics: ER, protection: 'single',
+    thirdParty: [{ provider: 'CityFibre', lengthM: 300, lossDb: 0.6, cost: 1200, leg: 'b' }] }, registry);
+  assert.strictEqual(r.legs.length, 1);
+  assert.strictEqual(r.bom.thirdParty.totalM, 0, 'no leg carries the lease');
+  assert.strictEqual(r.bom.thirdParty.cost, 0);
+  assert.strictEqual(r.thirdParty.segments[0].attached, false);
+  assert.strictEqual(r.thirdParty.unattachedCost, 1200, 'the intent is still reported, outside the cost');
+  assert.ok(r.warnings.some(function (w) { return w.indexOf('protection is single') === 0; }), r.warnings.join(' | '));
+});
+
+test('a refused link still lists its declared leases, unattached and uncosted', function () {
+  const far = { name: 'DC-Nowhere', lat: 51.53, lon: -0.1020 };
+  const r = link.design({ sites: { a: far, b: B }, network: grid(), optics: ER,
+    thirdParty: [{ provider: 'CityFibre', lengthM: 300, lossDb: 0.6, cost: 1200, leg: 'b' }] }, registry);
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.bom, null);
+  assert.strictEqual(r.thirdParty.segments.length, 1, 'the declared lease is not dropped from the report');
+  assert.strictEqual(r.thirdParty.segments[0].attached, false);
+  assert.strictEqual(r.thirdParty.totalM, 0);
+  assert.strictEqual(r.thirdParty.unattachedCost, 1200);
+});

@@ -238,7 +238,8 @@ function refusal(opts, context, reason) {
       leasedShared: [],
       sentence: 'no route was found: ' + reason
     },
-    thirdParty: thirdPartyReport(opts, 1),
+    // Nothing was built, so no lease rides a leg: the segments are still listed, marked unattached.
+    thirdParty: thirdPartyReport(opts, []),
     bom: null,
     verdict: 'fail',
     reasons: [reason],
@@ -266,8 +267,17 @@ function sitesOf(opts, snaps) {
  * The leased side of the circuit, counted once per physical segment. A segment on `both` legs is one
  * purchase used twice, so it is not doubled in `totalM` or `cost` - but it IS a diversity gap, and the
  * caller is told so.
+ *
+ * A lease is in the totals only when it rides a leg this circuit actually has. A B-leg segment on a
+ * one-leg circuit - `protection: 'single'`, or no graph to draw a second leg on - belongs to a leg that
+ * was never built: the light never crosses it, so no budget is charged its loss, and nobody buys it.
+ * Counting it anyway made the BOM quote a lease the circuit does not use (`thirdParty.totalM` read
+ * 400 m while the one leg carried 100 m of lease), a purchase order for a duct the design does not
+ * enter. Those segments are still listed, with `attached: false`, and summed in the `unattached*`
+ * fields, because dropping one from the report silently is the other way to be wrong about money.
  */
-function thirdPartyReport(opts, legCount) {
+function thirdPartyReport(opts, legIds) {
+  const built = Array.isArray(legIds) ? legIds : [];
   const segments = opts.thirdParty.map(function (seg) {
     return {
       provider: seg.provider,
@@ -276,16 +286,28 @@ function thirdPartyReport(opts, legCount) {
       leg: seg.leg,
       cost: seg.cost,
       reference: seg.reference,
-      onBothLegs: seg.leg === 'both' && legCount > 1
+      attached: seg.leg === 'both' ? built.length > 0 : built.indexOf(seg.leg) !== -1,
+      onBothLegs: seg.leg === 'both' && built.length > 1
     };
   });
-  const priced = segments.every(function (s) { return s.cost !== null; });
+  const attached = segments.filter(function (seg) { return seg.attached; });
+  const unattached = segments.filter(function (seg) { return !seg.attached; });
+  function allPriced(list) { return list.every(function (seg) { return seg.cost !== null; }); }
+  function costOf(list) {
+    if (!list.length) return 0;
+    return allPriced(list) ? sum(list, function (seg) { return seg.cost; }) : null;
+  }
   return {
     segments: segments,
-    totalM: round(sum(segments, function (s) { return s.lengthM; }), 2),
-    lossDb: round(sum(segments, function (s) { return s.lossDb; }), 3),
-    cost: priced && segments.length ? sum(segments, function (s) { return s.cost; }) : (segments.length ? null : 0),
-    costComplete: priced,
+    totalM: round(sum(attached, function (seg) { return seg.lengthM; }), 2),
+    lossDb: round(sum(attached, function (seg) { return seg.lossDb; }), 3),
+    cost: costOf(attached),
+    costComplete: allPriced(attached),
+    unattached: unattached,
+    unattachedM: round(sum(unattached, function (seg) { return seg.lengthM; }), 2),
+    unattachedLossDb: round(sum(unattached, function (seg) { return seg.lossDb; }), 3),
+    unattachedCost: costOf(unattached),
+    unattachedCostComplete: allPriced(unattached),
     costUnit: 'unspecified: the caller states cost in whatever unit it buys in; this tool never invents a price',
     inCableBom: false
   };
@@ -441,12 +463,19 @@ function design(input, registry) {
     });
   });
 
-  if (legs.length === 1 && opts.protection === 'single') {
-    const orphaned = opts.thirdParty.filter(function (seg) { return seg.leg === 'b'; });
-    if (orphaned.length) {
-      warnings.push('protection is single, so the leased segment(s) assigned to the B-leg (' +
-        orphaned.map(function (seg) { return seg.provider; }).join(', ') + ') are not part of the circuit');
-    }
+  // A leased segment on a leg that was never built is dropped from the budget and the cost, so the
+  // warning has to say which one and why. `protection: 'single'` is the obvious case; the other is a
+  // diverse request with no graph to draw a second leg on, which is one straight-line leg and no B-leg.
+  const builtLegs = legs.map(function (leg) { return leg.id; });
+  const orphaned = opts.thirdParty.filter(function (seg) {
+    return seg.leg !== 'both' && builtLegs.indexOf(seg.leg) === -1;
+  });
+  if (orphaned.length) {
+    warnings.push((opts.protection === 'single'
+      ? 'protection is single'
+      : 'no B-leg could be drawn (this circuit has one leg)') +
+      ', so the leased segment(s) assigned to the B-leg (' +
+      orphaned.map(function (seg) { return seg.provider; }).join(', ') + ') are not part of the circuit');
   }
 
   // ---- diversity report ---------------------------------------------------------
@@ -502,7 +531,7 @@ function design(input, registry) {
       opts.overlengthPct === undefined ? {} : { overlengthPct: opts.overlengthPct })
     : { lines: [], byCable: [] };
   const byCable = plantBom.byCable;
-  const thirdParty = thirdPartyReport(opts, legs.length);
+  const thirdParty = thirdPartyReport(opts, legs.map(function (leg) { return leg.id; }));
   const bom = {
     cable: byCable,
     lengths: plantBom.lines,
