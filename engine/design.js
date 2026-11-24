@@ -115,6 +115,153 @@ function costModel(input) {
   return out;
 }
 
+/**
+ * A value said back the way the caller sent it, for an option block of the wrong shape.
+ *
+ * JSON.stringify is what keeps a string a string: `String('16')` prints `16`, which reads as the
+ * number the caller meant, so a refusal built on `String` argues with a value that looks right.
+ */
+function showOption(value) {
+  if (value === undefined) return 'undefined';
+  try { return JSON.stringify(value); } catch (err) { return String(value); }
+}
+
+/**
+ * A nested option block that is not an object is refused, because `Object.assign` merges nothing.
+ *
+ * `pon: 'gpon'` and `active: 'sfp'` were both accepted: the string's character keys landed on a copy
+ * of the defaults and the design ran on `DEFAULTS.pon.ratios` / `DEFAULTS.active.optics` - a plant
+ * built and ranked from parts the caller never named, answered with a 200 and no note. A block is a
+ * set of named options, so anything else is a caller mistake and is refused by name.
+ */
+function assertOptionBlock(block, name, known) {
+  if (block === undefined) return;
+  if (typeof block !== 'object' || block === null || Array.isArray(block)) {
+    throw new TypeError('the design reads "' + name + '" as an object of ' + known.join(', ') + ' and got ' +
+      showOption(block) + '. A block of another shape is refused rather than merged into the defaults, ' +
+      'because the design would then design and rank a plant from options the caller did not name.');
+  }
+  designFields.assertKnownFields(block, known, 'the design\'s "' + name + '" block');
+}
+
+/**
+ * The PON search's own options: the split ratios to try, the drop limit, the parts.
+ *
+ * `pon` is merged into `DEFAULTS.pon` with `Object.assign`, so before this guard a value the design
+ * could not read was not reported - it was replaced, and the search then ran on the default:
+ *
+ *   ratios: '16'      a string is iterated *by character*, so the search tried 1:1 and 1:6, found no
+ *                     such splitter, and answered "no candidate topology could be built for
+ *                     technology \"pon\"" - the estate blamed for a missing pair of brackets.
+ *   ratios: '8'       one character, so it designed the 1:8 plant the caller meant. Luck, not a read.
+ *   ratios: []        searched nothing and then fell through to the active topologies.
+ *   ratios: [8.5]     looked up `plc-1x8.5-sca` and reported it as a missing part.
+ *   maxDropM: -5      no house is within -5 m of a splitter, so the clustering gave every house its
+ *                     own 1:1 site: 8 splitter sites and 557.9 m of design length on an estate whose
+ *                     shared tree is 707.3 m. Fewer metres to buy, so it *won* the ranking.
+ *
+ * `pon.olt` and `pon.ont` are left to the registry, which refuses an unknown model by naming the ones
+ * the catalogue has - that refusal is already better than anything this module could add.
+ */
+function assertPonOptions(block) {
+  assertOptionBlock(block, 'pon', Object.keys(DEFAULTS.pon));
+  if (block === undefined) return;
+  const ratios = block.ratios;
+  if (ratios !== undefined) {
+    if (!Array.isArray(ratios)) {
+      throw new TypeError('the design reads "pon.ratios" as a list of splitter ratios and got ' +
+        showOption(ratios) + '. The list is read by iterating it: a string is iterated by character, ' +
+        'so "16" would try 1:1 and 1:6, and a bare number is not a list at all. Pass e.g. [8, 16, 32], ' +
+        'or omit the field for the default ' + DEFAULTS.pon.ratios.join(', ') + '.');
+    }
+    if (!ratios.length) {
+      throw new TypeError('the design reads "pon.ratios" as at least one splitter ratio and got an empty ' +
+        'list. Omitting the field is how the default is taken (' + DEFAULTS.pon.ratios.join(', ') +
+        '); an empty list is refused rather than read as that default, because the search it describes ' +
+        'buys no splitter at all and the design then falls through to the active topologies.');
+    }
+    for (let i = 0; i < ratios.length; i++) {
+      const ratio = ratios[i];
+      if (typeof ratio !== 'number' || !isFinite(ratio) || !Number.isInteger(ratio) || ratio < 2) {
+        throw new TypeError('the design reads "pon.ratios" as whole splitter ratios of at least 2 and got ' +
+          showOption(ratio) + ' at position ' + i + '. A splitter is 1:N with N a whole number of 2 or ' +
+          'more - 1:0 and 1:8.5 are not parts, and this one would be looked up as "plc-1x' +
+          String(ratio) + '-sca".');
+      }
+    }
+  }
+  designFields.assertNumberField(block, 'maxDropM', 0, 'the design\'s "pon" block', {
+    measure: 'a number of metres',
+    unusable: 'A drop limit the design cannot read falls back to ' + DEFAULTS.pon.maxDropM +
+      ' m, so every house is placed against a reach the caller did not ask for.',
+    belowMin: 'A negative drop limit says no house is within reach of its splitter, and the clustering ' +
+      'then gives every house its own 1:1 site - a plant of closures and splitters that is cheaper to ' +
+      'cable than the shared tree, so it is ranked as the answer.'
+  });
+}
+
+/** The optic ends a pair is made of, in the order a refusal should name them. */
+const OPTIC_ENDS = ['headEndOptic', 'cpeOptic'];
+
+/**
+ * The active search's optics, refused when a pair is not a pair.
+ *
+ * `optics` decides which parts the whole active design is built from, and it was read the same way:
+ *
+ *   optics: 'sfp-1g-lx-10km'    not a list, so `Array.isArray` failed and the design searched the
+ *                               three DEFAULT pairs, then answered with a 10G LR-10KM plant.
+ *   optics: []                  the same fallback, one default pair instead of three.
+ *   optics: [{}]                each end took the default of its own generation, so the plan was a
+ *                               10G LR pair nobody chose.
+ *   optics: [{ cpeOptic: 1G }]  paired the caller's 1G CPE with the default 10G head-end optic and
+ *                               reported every ONT as "the optics run at different rates" - six rows
+ *                               blaming the estate for a field the caller left out.
+ *
+ * An end may be named once for the whole block (`active: { headEndOptic, optics: [{ cpeOptic }] }`),
+ * which is the documented shape, so an entry is only refused when the end is named nowhere: filling it
+ * from the *default* is the substitution this guard exists to stop.
+ */
+function assertActiveOptions(block) {
+  assertOptionBlock(block, 'active', Object.keys(DEFAULTS.active));
+  if (block === undefined) return;
+  const optics = block.optics;
+  if (optics === undefined) return;
+  const defaultPairs = DEFAULTS.active.optics.map(function (pair) {
+    return pair.headEndOptic + '/' + pair.cpeOptic;
+  }).join(', ');
+  if (!Array.isArray(optics)) {
+    throw new TypeError('the design reads "active.optics" as a list of { headEndOptic, cpeOptic } pairs ' +
+      'and got ' + showOption(optics) + '. A value of another shape is refused rather than replaced: the ' +
+      'design would search the default pairs (' + defaultPairs + ') and answer with a plant built from ' +
+      'optics the caller never named.');
+  }
+  if (!optics.length) {
+    throw new TypeError('the design reads "active.optics" as at least one optic pair and got an empty list. ' +
+      'Omitting the field is how the default is taken (it searches ' + defaultPairs + '); an empty list is ' +
+      'refused rather than read as the single default pair, so a caller who meant to narrow the search ' +
+      'does not get a design chosen for them.');
+  }
+  for (let i = 0; i < optics.length; i++) {
+    const pair = optics[i];
+    if (typeof pair !== 'object' || pair === null || Array.isArray(pair)) {
+      throw new TypeError('the design reads "active.optics" as { headEndOptic, cpeOptic } pairs and got ' +
+        showOption(pair) + ' at position ' + i + '. Each entry is one optic at each end of the link.');
+    }
+    for (const end of OPTIC_ENDS) {
+      const model = pair[end];
+      if (typeof model === 'string' && model !== '') continue;
+      const named = block[end];
+      if (typeof named === 'string' && named !== '') continue;
+      throw new TypeError('the design reads "active.optics" as { headEndOptic, cpeOptic } pairs and the ' +
+        'entry at position ' + i + ' names no "' + end + '", and nor does "active.' + end + '". A pair is ' +
+        'two optics: an end that is named nowhere is filled from the default "' + DEFAULTS.active[end] +
+        '", so the design is built from a part nobody chose and the ONTs then fail as "the optics run at ' +
+        'different rates" rather than naming the missing field. Name both ends, e.g. ' +
+        showOption({ headEndOptic: 'sfp-1g-lx-10km', cpeOptic: 'sfp-1g-lx-10km' }) + '.');
+    }
+  }
+}
+
 function options(input, registry) {
   const o = input || {};
   // A reserve is read straight into the verdict of every ONT in the design, so a value the budget
@@ -164,6 +311,16 @@ function options(input, registry) {
   // is legitimate; anything else present is refused by name, at its position (see design-fields).
   designFields.assertCableLadder(o.ladder, function (model) { return registry.has('cable', model); },
     registry.all('cable').map(function (cable) { return cable.model; }), 'the design');
+  // The nested blocks were the last unguarded options after #157, and each one fails the same way:
+  // `Object.assign` replaces a shape the design cannot read instead of reporting it, so the plant is
+  // built and ranked from options nobody named - see `assertPonOptions` and `assertActiveOptions`.
+  //
+  // Only the block the chosen technology reads is guarded. A caller who sends one form with both
+  // blocks always is not wrong, and a `pon` block beside `technology: 'active'` is not a setting.
+  const wanted = o.technology || DEFAULTS.technology;
+  if (wanted === 'auto' || wanted === 'pon') assertPonOptions(o.pon);
+  if (wanted === 'auto' || wanted === 'active') assertActiveOptions(o.active);
+
   return {
     technology: o.technology || DEFAULTS.technology,
     routeFactor: isNum(o.routeFactor) && o.routeFactor >= 1 ? o.routeFactor : DEFAULTS.routeFactor,
