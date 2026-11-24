@@ -31,6 +31,7 @@
 const geo = require('./geo');
 const network = require('./network');
 const demandModule = require('./demand');
+const designFields = require('./design-fields');
 const lengthModule = require('./length');
 const street = require('./street');
 
@@ -115,6 +116,11 @@ function costModel(input) {
 
 function options(input) {
   const o = input || {};
+  // A reserve is read straight into the verdict of every ONT in the design, so a value the budget
+  // cannot use is refused here rather than defaulted: `marginDb: '3'` was replaced by 3 (right by
+  // luck), and `marginDb: -5` passed through to every candidate - which then came back infeasible,
+  // one copy of the refusal per demand point, instead of one sentence naming the field.
+  designFields.assertNumberField(o, 'marginDb', 0, 'the design');
   return {
     technology: o.technology || DEFAULTS.technology,
     routeFactor: isNum(o.routeFactor) && o.routeFactor >= 1 ? o.routeFactor : DEFAULTS.routeFactor,

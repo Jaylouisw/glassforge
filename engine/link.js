@@ -33,6 +33,7 @@ const street = require('./street');
 const budget = require('./budget');
 const lengthModule = require('./length');
 const designModule = require('./design');
+const designFields = require('./design-fields');
 
 const DEFAULTS = {
   fibres: 2,
@@ -76,6 +77,11 @@ function protectionOf(value) {
 
 /** Normalise what a caller may hand us, and refuse the shapes that cannot describe a link. */
 function options(input) {
+  // A site-to-site budget reads the same two knobs, so it refuses the same two values: a reserve
+  // that is not a number is not a reserve, and a direction it cannot place is a different receiver
+  // at a different wavelength - `direction` was answered as `down` and nothing said so.
+  designFields.assertNumberField(input, 'marginDb', 0, 'the link design');
+  designFields.assertChoiceField(input, 'direction', ['up', 'down'], 'the link design');
   const o = input || {};
   const sitesInput = o.sites || { a: o.a || o.from, b: o.b || o.to };
   const sites = {

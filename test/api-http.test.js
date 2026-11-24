@@ -347,6 +347,30 @@ async function main() {
     assert.ok(typoBudget.body.error.indexOf('splitters') !== -1, typoBudget.body.error);
   });
 
+  // The other half of that: a field the budget *does* read, holding a value it cannot use. `marginDb`
+  // is the reserve the headroom test is measured against, so `-5` passes every link that is 2.2 dB
+  // short of the 3 dB default - it answered 200 `marginal` for a design that is `fail` untouched, and
+  // on a project it answered 200 with the same sentence in every ONT's row instead of one refusal.
+  const tightDesign = {
+    olt: { model: 'gpon-b-plus-8' }, ont: { model: 'gpon-ont-1ge' }, wavelength: '1490',
+    spans: [{ cable: 'g652d-loose-96', lengthM: 20000 }], splitters: [{ model: 'plc-1x64-sca' }],
+    splices: 10, connectors: 6
+  };
+  const tightPlain = await request('POST', '/api/design/budget', { design: tightDesign });
+  const negativeMargin = await request('POST', '/api/design/budget', {
+    design: Object.assign({}, tightDesign, { marginDb: -5 })
+  });
+  const projectNegativeMargin = await request('POST', '/api/projects/' + id + '/budget', { marginDb: -5 });
+  test('a reserve that is not a reserve is a 400 on both budget endpoints', function () {
+    assert.strictEqual(tightPlain.status, 200);
+    assert.strictEqual(tightPlain.body.verdict, 'fail', 'the baseline design is a failure to begin with');
+    assert.strictEqual(negativeMargin.status, 400, 'status ' + negativeMargin.status + ': ' + JSON.stringify(negativeMargin.body));
+    assert.ok(negativeMargin.body.error.indexOf('marginDb') !== -1, negativeMargin.body.error);
+    assert.strictEqual(projectNegativeMargin.status, 400,
+      'status ' + projectNegativeMargin.status + ': ' + JSON.stringify(projectNegativeMargin.body));
+    assert.ok(projectNegativeMargin.body.error.indexOf('marginDb') !== -1, projectNegativeMargin.body.error);
+  });
+
   // A JSON body of `null` is valid JSON and is what a client sends when it has no object to send.
   // Every handler reads a field off the body, so the first access threw a TypeError and the generic
   // handler answered 500 "Cannot read properties of null (reading 'demand')" - the caller was told

@@ -406,6 +406,15 @@ async function handle(req, res, ctx) {
 
     if (action === '/budget' && method === 'POST') {
       const body = await readJsonBody(req);
+      // A budget knob that is present and unusable is the request's mistake, not the plant's: it
+      // fails every ONT the same way, so the answer is one 400 naming the field - not a 200 whose
+      // rows each repeat the same sentence, which reads as a plant full of broken ONTs and buries
+      // the typo the caller actually made. `marginDb: -5` used to pass every link that was short.
+      try {
+        engine.budget.assertDesignKnobs(body, 'the project budget');
+      } catch (err) {
+        throw asBadRequest(err);
+      }
       // ontId is a node id: an id that names nothing, or names the OLT, is the caller's
       // mistake. designForOnt throws for both, and uncaught that becomes a 500 - "the server
       // broke" - when the answer is a 400 naming the id and the ONTs this plant actually has.

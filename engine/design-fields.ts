@@ -91,3 +91,84 @@ export function assertKnownFields(design: unknown, known: FieldList, what: strin
       'near miss is refused rather than skipped. Fields it reads: ' + known.join(', '));
   }
 }
+
+/**
+ * A value said back the way the caller sent it.
+ *
+ * JSON.stringify is the only rendering that keeps a string a string: `String("2")` prints `2`, which
+ * reads as the number the caller meant, so a refusal built on `String` tells somebody their `2` is
+ * wrong when what was wrong is the quotes around it. A number prints as itself; anything JSON cannot
+ * express is named by kind, because there is no useful text for it.
+ */
+function showValue(value: unknown): string {
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'an array';
+  if (typeof value === 'object') return 'an object';
+  return typeof value;
+}
+
+/** `a string`, `a number`, `an object` - so the refusal names the cause and not only the field. */
+function kindOf(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'an array';
+  return 'a ' + typeof value;
+}
+
+/**
+ * Refuse a design field the budget reads *as a number* when the value is not one, or is below `min`.
+ *
+ * The sibling of `assertKnownFields`, and it exists for the same measured reason. A field the engine
+ * cannot read is not a setting - but neither is one it reads and cannot use, and this one is worse,
+ * because the key is right and nothing complains. Measured on this engine, on a GPON B+ design of
+ * 20 km at 1:64 (ODN 27.70 dB, -26.20 dBm into a -27 dBm receiver, 0.80 dB of headroom against a 3 dB
+ * margin, verdict `fail`):
+ *
+ *   marginDb: -5      read straight into `headroomDb < marginDb`, so 0.80 < -5 is false - `marginal`
+ *   allowanceDb: -3   subtracted from ODN loss instead of added: 24.70 dB, -23.20 dBm, `marginal`
+ *   marginDb: '3'     `isNum('3')` is false, so it fell back to the default 3 - right by luck
+ *   allowanceDb: '2'  fell back to 0: the caller's 2 dB of allowance vanished from the plan
+ *
+ * Every one of those moves the verdict in the optimistic direction, and `/api/design/budget` hands the
+ * caller's body straight in, so an API client makes the mistake and gets a `200` with a verdict.
+ *
+ * `design` is `unknown` because it arrives as API JSON; a non-object is the entry point's business.
+ * A field that is absent is absent - the budget's own default applies and is reported in the result.
+ */
+export function assertNumberField(design: unknown, field: string, min: number, what: string): void {
+  if (typeof design !== 'object' || design === null || Array.isArray(design)) return;
+  const value = (design as Record<string, unknown>)[field];
+  if (value === undefined) return;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(what + ' reads "' + field + '" as a number of dB and got ' + showValue(value) +
+      ' (' + kindOf(value) + '). A value it cannot use is refused rather than skipped: a reserve that ' +
+      'is ignored leaves a verdict computed without the loss the caller asked for.');
+  }
+  if (value < min) {
+    throw new TypeError(what + ' reads "' + field + '" as a number of dB at or above ' + min +
+      ' and got ' + showValue(value) + '. A design reserve is loss the route is allowed to spend, so a ' +
+      'negative one is not a small reserve - it passes links that are short of the reserve it names.');
+  }
+}
+
+/**
+ * Refuse a design field that picks one of a fixed set when its value is not in that set.
+ *
+ * `design.direction === 'up' ? 'up' : 'down'` answered a downstream budget to a caller who asked for
+ * something else. The two are different networks, not two spellings of one: downstream is the ONT's
+ * receiver at 1490 nm, upstream the OLT's at 1310 nm, so the wrong branch is a wrong receiver at a
+ * wrong wavelength. The result does echo `direction`, but a typo a caller has to spot in the answer
+ * is a typo that reaches the plan. Nothing is refused for *being absent*: the default still applies.
+ */
+export function assertChoiceField(design: unknown, field: string, allowed: readonly string[], what: string): void {
+  if (typeof design !== 'object' || design === null || Array.isArray(design)) return;
+  const value = (design as Record<string, unknown>)[field];
+  if (value === undefined) return;
+  if (typeof value === 'string' && allowed.indexOf(value) !== -1) return;
+  const quoted = allowed.map(function (v) { return '"' + v + '"'; });
+  throw new TypeError(what + ' reads "' + field + '" as one of ' + quoted.join(', ') + ' and got ' +
+    showValue(value) + ' (' + kindOf(value) + '). A direction it cannot place is refused rather than ' +
+    'read as "' + String(allowed[allowed.length - 1]) + '": the two directions are different receivers ' +
+    'at different wavelengths.');
+}

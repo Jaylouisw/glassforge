@@ -358,6 +358,23 @@ function attenuatorClause(pad, marginDb) {
 }
 
 /**
+ * The knobs every budget entry point reads, checked once - by the PON budget, by the active budget,
+ * and by `/api/projects/:id/budget` before it budgets a single ONT.
+ *
+ * They are the same three on every path, and they all move the verdict: a negative `marginDb` or
+ * `allowanceDb` is read straight into the headroom test, and a `direction` that is not `up` or `down`
+ * is answered as `down` - a different receiver at a different wavelength. A value that is present and
+ * unusable is refused here rather than dropped, because a dropped reserve is a verdict computed
+ * without the loss the caller asked for. Absent is absent: the defaults are documented and echoed in
+ * the result.
+ */
+function assertDesignKnobs(design, what) {
+  designFields.assertChoiceField(design, 'direction', ['up', 'down'], what);
+  designFields.assertNumberField(design, 'marginDb', 0, what);
+  designFields.assertNumberField(design, 'allowanceDb', 0, what);
+}
+
+/**
  * Run a PON budget.
  *
  * `design` (all lengths in metres):
@@ -376,6 +393,7 @@ function opticalBudget(design, registry) {
   if (!design || typeof design !== 'object') throw new TypeError('opticalBudget needs a design object');
   if (!registry) throw new TypeError('opticalBudget needs a parts registry');
   designFields.assertKnownFields(design, PON_DESIGN_FIELDS, 'the PON budget');
+  assertDesignKnobs(design, 'the PON budget');
 
   const direction = design.direction === 'up' ? 'up' : 'down';
   const wavelength = String(design.wavelength || DEFAULT_WAVELENGTH[direction]);
@@ -511,6 +529,7 @@ function pointToPoint(design, registry) {
   if (!design || typeof design !== 'object') throw new TypeError('pointToPoint needs a design object');
   if (!registry) throw new TypeError('pointToPoint needs a parts registry');
   designFields.assertKnownFields(design, ACTIVE_DESIGN_FIELDS, 'the active budget');
+  assertDesignKnobs(design, 'the active budget');
   if (!design.headEnd || !design.headEnd.model) throw new TypeError('design.headEnd.model is required (the optic at the aggregation end)');
   if (!design.cpe || !design.cpe.model) throw new TypeError('design.cpe.model is required (the optic at the customer end)');
 
@@ -640,6 +659,7 @@ function pointToPoint(design, registry) {
 }
 
 module.exports = {
+  assertDesignKnobs: assertDesignKnobs,
   DEFAULT_MARGIN_DB: DEFAULT_MARGIN_DB,
   DEFAULT_SPLICE_MODEL: DEFAULT_SPLICE_MODEL,
   DEFAULT_CONNECTOR_MODEL: DEFAULT_CONNECTOR_MODEL,
