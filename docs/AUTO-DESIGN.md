@@ -12,15 +12,18 @@ POST /api/design/synthesise
 }
 ```
 
-Four candidate topologies are built from the same demand, each one is validated and budgeted, and the
-cheapest feasible one wins.
+The same demand becomes one candidate per shape and setting, each one is validated and budgeted, and
+the best-ranked feasible one wins — fibre-metres by default, money when a `costs` model is supplied.
+With the defaults that is **nine** candidates: three PON ratios (`pon.ratios`: 1:8, 1:16, 1:32) and
+both active shapes for each of three optic pairs (`active.optics`: 1G-LX-10KM, 10G-LR-10KM,
+10G-ER-40KM). `technology: "pon"` or `"active"` drops the other family, and the count follows the
+ratios and optics you pass.
 
 | Candidate | Shape | What one customer costs |
 |---|---|---|
-| `pon` (per splitter ratio) | feeder tree → splitter sites → distribution tree | one fibre per ONT, one splitter port |
-| `active-tree` | one cable tree with closures, tapered | a dedicated fibre pair per ONT |
-| `active-home-run` | one cable per customer | a dedicated fibre pair, and a drum per house |
-| `pon` at another ratio | as above | a shorter splitter cascade, fewer sites |
+| `pon`, one per ratio in `pon.ratios` | feeder tree → splitter sites → distribution tree | one fibre per ONT, one splitter port |
+| `active-tree`, one per optic pair in `active.optics` | one cable tree with closures, tapered | a dedicated fibre pair per ONT |
+| `active-home-run`, one per optic pair | one cable per customer | a dedicated fibre pair, and a drum per house |
 
 Each candidate is reported whether it wins or not, with its numbers and the reason it was refused.
 
