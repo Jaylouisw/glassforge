@@ -88,8 +88,58 @@ function asBadRequest(err) {
   return err;
 }
 
-function fail(req, res, status, message, extra) {
-  sendJson(req, res, status, Object.assign({ error: message }, extra || {}));
+function fail(req, res, status, message, extra, headers) {
+  sendJson(req, res, status, Object.assign({ error: message }, extra || {}), headers);
+}
+
+/**
+ * Every endpoint this server has, and the methods it answers.
+ *
+ * The gate exists because the fallthrough could not tell two different mistakes apart:
+ * `GET /api/design/synthesise` - a URL straight out of docs/API.md - came back as
+ * `404 no such endpoint`, a caller sent hunting for a path that is right there; and the endpoints
+ * whose handlers never looked at the method (`/api/health`, `/api/parts`, a single part) answered
+ * `POST` with a 200, so a script that "worked" was calling a read as a write. A path that exists
+ * with the wrong method is a 405 naming the methods it does answer, and `Allow` carries them.
+ *
+ * 404 keeps its own meaning: the path is not an endpoint at all. `HEAD` follows `GET`.
+ */
+const ENDPOINT_METHODS = [
+  { pattern: /^\/api\/health$/, methods: ['GET'] },
+  { pattern: /^\/api\/parts$/, methods: ['GET'] },
+  { pattern: /^\/api\/parts\/[a-z]+\/[a-z0-9._-]+$/, methods: ['GET'] },
+  { pattern: /^\/api\/projects$/, methods: ['GET', 'POST'] },
+  { pattern: /^\/api\/projects\/[a-z0-9-]+$/, methods: ['GET', 'PUT', 'DELETE'] },
+  { pattern: /^\/api\/projects\/[a-z0-9-]+\/ops$/, methods: ['POST'] },
+  { pattern: /^\/api\/projects\/[a-z0-9-]+\/undo$/, methods: ['POST'] },
+  { pattern: /^\/api\/projects\/[a-z0-9-]+\/budget$/, methods: ['POST'] },
+  { pattern: /^\/api\/projects\/[a-z0-9-]+\/bom$/, methods: ['GET'] },
+  { pattern: /^\/api\/projects\/[a-z0-9-]+\/strands$/, methods: ['GET'] },
+  { pattern: /^\/api\/design\/synthesise$/, methods: ['POST'] },
+  { pattern: /^\/api\/design\/budget$/, methods: ['POST'] },
+  { pattern: /^\/api\/design\/link$/, methods: ['POST'] },
+  { pattern: /^\/api\/design\/length$/, methods: ['POST'] },
+  { pattern: /^\/api\/design\/splitter$/, methods: ['GET'] },
+  { pattern: /^\/api\/import\/network$/, methods: ['POST'] },
+  { pattern: /^\/api\/import\/demand$/, methods: ['POST'] },
+  { pattern: /^\/api\/import\/kml$/, methods: ['POST'] }
+];
+
+/** The methods an endpoint answers, or null when the path is not an endpoint at all. */
+function allowedMethods(pathname) {
+  for (const route of ENDPOINT_METHODS) {
+    if (route.pattern.test(pathname)) {
+      return route.methods.indexOf('GET') !== -1 ? route.methods.concat('HEAD') : route.methods.slice();
+    }
+  }
+  return null;
+}
+
+function methodNotAllowed(req, res, pathname, methods) {
+  const allow = methods.join(', ');
+  return fail(req, res, 405,
+    'method ' + req.method + ' is not allowed on ' + pathname + ' - it answers ' + allow,
+    undefined, { Allow: allow });
 }
 
 function readBody(req, limit) {
@@ -221,6 +271,15 @@ async function handle(req, res, ctx) {
   const pathname = decodeURIComponent(url.pathname);
   const method = req.method || 'GET';
   const registry = ctx.registry;
+
+  // The method gate runs before dispatch, so every endpoint below is reached with a method it
+  // answers. The per-block 405s further down stay as the fallback for a route added to the handler
+  // without an entry in ENDPOINT_METHODS - they cannot name `Allow`, which is why the table is the
+  // authority and this is the default.
+  const allowed = allowedMethods(pathname);
+  if (allowed && allowed.indexOf(method === 'HEAD' ? 'GET' : method) === -1) {
+    return methodNotAllowed(req, res, pathname, allowed);
+  }
 
   if (pathname === '/api/health') {
     return sendJson(req, res, 200, {
@@ -390,7 +449,9 @@ async function handle(req, res, ctx) {
       return sendJson(req, res, 200, engine.network.strandLedger(project, registry));
     }
 
-    return fail(req, res, 405, 'method not allowed on ' + pathname);
+    // An action that is not in the table above is a sub-resource that does not exist: no method
+    // makes `/api/projects/x/nope` work, and the old 405 ("method not allowed") implied one might.
+    return fail(req, res, 404, 'no such endpoint: ' + pathname);
   }
 
   if (pathname === '/api/design/synthesise' && method === 'POST') {

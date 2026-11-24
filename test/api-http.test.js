@@ -525,6 +525,65 @@ async function main() {
     assert.ok(unknown.body.error.indexOf('no such endpoint') !== -1);
   });
 
+  // docs/API.md line 5 promises `405` for a wrong method and `404` for an unknown thing. The
+  // fallthrough answered every wrong method with `404 no such endpoint` - including
+  // `GET /api/design/synthesise`, a URL a caller has just read in the docs - and the two endpoints
+  // that never looked at the method at all (health, parts) answered `POST` with a 200. A path that
+  // exists with the wrong method must say which methods it does answer.
+  const postHealth = await request('POST', '/api/health');
+  test('POST to a GET-only endpoint is a 405 naming the methods it answers, not a 200', function () {
+    assert.strictEqual(postHealth.status, 405);
+    assert.strictEqual(postHealth.headers.allow, 'GET, HEAD');
+    assert.ok(String(postHealth.body.error).indexOf('/api/health') !== -1,
+      'the refusal must name the path, got: ' + JSON.stringify(postHealth.body));
+    assert.ok(String(postHealth.body.error).indexOf('GET') !== -1,
+      'the refusal must name the method it does answer, got: ' + JSON.stringify(postHealth.body));
+  });
+
+  const deleteParts = await request('DELETE', '/api/parts');
+  test('a wrong method on the catalogue is a 405, not a 404 saying the endpoint does not exist', function () {
+    assert.strictEqual(deleteParts.status, 405);
+    assert.strictEqual(deleteParts.headers.allow, 'GET, HEAD');
+    assert.ok(String(deleteParts.body.error).indexOf('no such endpoint') === -1,
+      'the endpoint exists; calling it unknown sends the caller hunting a URL that is in the docs');
+  });
+
+  const getSynthesise = await request('GET', '/api/design/synthesise');
+  test('a POST-only endpoint refuses GET with a 405 and allow: POST', function () {
+    assert.strictEqual(getSynthesise.status, 405);
+    assert.strictEqual(getSynthesise.headers.allow, 'POST');
+  });
+
+  const postBom = await request('POST', '/api/projects/' + emptyProject.body.id + '/bom');
+  const getOps = await request('GET', '/api/projects/' + emptyProject.body.id + '/ops');
+  test('a project sub-resource answers 405 for the wrong method and names what it takes', function () {
+    assert.strictEqual(postBom.status, 405);
+    assert.strictEqual(postBom.headers.allow, 'GET, HEAD');
+    assert.strictEqual(getOps.status, 405);
+    assert.strictEqual(getOps.headers.allow, 'POST');
+  });
+
+  const getSplitterPost = await request('POST', '/api/design/splitter?ratio=8');
+  const getSplitterGet = await request('GET', '/api/design/splitter?ratio=8');
+  test('the splitter ratio is a GET (9.03 dB for 1:8) and POST to it is refused', function () {
+    assert.strictEqual(getSplitterGet.status, 200);
+    assert.strictEqual(getSplitterGet.body.idealSplitLossDb, 9.03); // 10*log10(8) = 9.0309 -> 9.03
+    assert.strictEqual(getSplitterPost.status, 405);
+    assert.strictEqual(getSplitterPost.headers.allow, 'GET, HEAD');
+  });
+
+  const unknownAction = await request('GET', '/api/projects/' + emptyProject.body.id + '/nope');
+  test('an unknown project sub-resource is a 404, not a 405 for a method nobody can pick', function () {
+    assert.strictEqual(unknownAction.status, 404);
+    assert.ok(String(unknownAction.body.error).indexOf('no such endpoint') !== -1);
+  });
+
+  const headParts = await request('HEAD', '/api/parts');
+  test('HEAD follows GET on an endpoint that has one', function () {
+    assert.strictEqual(headParts.status, 200);
+    assert.strictEqual(headParts.headers.allow, undefined, 'a HEAD that is allowed is a 200, not a 405');
+  });
+
   const page = await request('GET', '/');
   test('the app itself is served', function () {
     assert.strictEqual(page.status, 200);

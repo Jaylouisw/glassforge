@@ -4,6 +4,11 @@ Everything the UI does goes through these endpoints, so anything the UI can do c
 All responses are JSON unless noted. Errors are `{ "error": "..." }` with `400` (bad input), `404`
 (unknown thing) or `405` (wrong method); a `500` means the server broke, not that your design is wrong.
 
+A `405` names the path and the methods it does answer, and carries them in `Allow` — `GET
+/api/design/synthesise` is refused with `405 … it answers POST`, never `404`, because the endpoint
+exists. `404` is for a path that is not an endpoint at all, and an action that is not one of a
+project's (`/api/projects/:id/nope`) is one of those. `HEAD` follows `GET`; `OPTIONS` is not answered.
+
 The server binds `127.0.0.1:8000` by default (`HOST`, `PORT`), and stores projects under `GF_DATA`
 (default `data/`).
 
