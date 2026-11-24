@@ -1,0 +1,29 @@
+{
+  "kind": "cable",
+  "model": "g657a2-indoor-12",
+  "vendor": "belden",
+  "label": "Belden GIMTF12 indoor tight-buffer 12F G.657.A2 LSZH",
+  "fiberCount": 12,
+  "fibersPerTube": 12,
+  "construction": "tight-buffer",
+  "fiberStandard": "G.657.A2",
+  "use": [
+    "indoor"
+  ],
+  "drumM": 4100,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Belden GIMTF12 technical data sheet, revision 0.163 dated 2026-09-26: indoor tight-buffered distribution cable, 12 fibres OS2 to ITU-T G.657.A2, 0.9 mm tight buffer, LSZH jacket, nominal 7.0 mm, GRP central strength member, waterblocking aramid yarns, TIA colour coding (blue, orange, green, brown, grey, white, red, black, yellow, violet, pink, aqua - the sequence engine/fiber.js serves at /fiber.js), CPR Euroclass Dca-s1,d1,a1, built to the IEC 60794-2-20 indoor multi-fibre family specification, 140 mm installation / 70 mm operating bend radius, 800 N short-term tensile, 46 kg/km. drumM is the putup of the variant this row is priced on, GIMTF12.044100: one 4,100 m yellow reel - Belden does not publish a per-metre part, so a short riser is buying a reel and the BOM says so. Attenuation: the sheet publishes MAXIMUM 0.40 dB/km at 1310 nm and 0.30 dB/km at 1550 nm and 1625 nm. This row carries 0.35 / 0.22 / 0.21, the same typical installed figures the feeder and drop rows carry, deliberately: budgeting a riser at the maxima prices every building as the worst cable ever shipped out of the factory. 1490 nm is interpolated and is not a citation - neither Belden nor the ITU-T/IEC documents this catalogue cites publish a 1490 nm figure, and 0.22 bridges the two published windows exactly as the G.652.D rows do. For a riser budget that gets signed, replace all three with the as-built OTDR trace, which is the only 1490 nm number that will ever exist. Why this row exists: `use` has documented `indoor` since the schema was written and no part carried it, so a building riser had nothing to select - the catalogue's only 12F was loose-tube, an outdoor cable and the wrong one to pull in a shaft. Twelve is also the size the engine's own rule asks for: cableForSpan floors every non-drop span at 12 fibres, so a riser serving eight flats is a 12F cable, never an 8F one. Two traps. It is not a substitute for drop cable into a single flat - the g657a2-drop-* rows are what goes to the ONT, and this row budgets no bend loss for a 0.9 mm tight buffer turned round a skirting board. And it is indoor-only in the load-bearing sense: CPR Dca is a reaction-to-fire class, not a UV or water rating, so it must not be pulled between buildings; nothing in the engine stops this model being named on an outdoor span, and the design will do exactly what it is told. Replace with the cable actually purchased and its as-built attenuation before construction.",
+  "sourceUrl": "https://catalog.belden.com/techdata/EN/GIMTF12_techdata.pdf",
+  "tags": [
+    "belden",
+    "indoor",
+    "riser",
+    "g.657.a2",
+    "12f",
+    "lszh"
+  ]
+}
