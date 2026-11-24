@@ -125,6 +125,19 @@ function apply(project, operation, opts) {
       if (typeof input.lengthM !== 'number' || !isFinite(input.lengthM) || input.lengthM <= 0) {
         return fail('span.lengthM must be a positive number of metres');
       }
+      // A count, not whatever the caller's form sent. `input.splices || 0` used to copy text straight
+      // through, and cableToBuy refuses text - so the edit was saved with a 200 and every later /bom
+      // call for the project was a 500, blaming the server for a typo made at save time.
+      const splices = input.splices === undefined ? 0 : input.splices;
+      const closures = input.closures === undefined ? 0 : input.closures;
+      if (!network.isSpanCount(splices)) {
+        return fail('span.splices must be a non-negative whole number or a list of splices, got "' +
+          String(input.splices) + '"');
+      }
+      if (!network.isSpanCount(closures)) {
+        return fail('span.closures must be a non-negative whole number or a list of closures, got "' +
+          String(input.closures) + '"');
+      }
       const span = {
         id: input.id || nextId(next.spans, 's'),
         from: input.from,
@@ -132,8 +145,8 @@ function apply(project, operation, opts) {
         cable: input.cable,
         lengthM: input.lengthM,
         strands: Array.isArray(input.strands) ? input.strands.slice() : [],
-        splices: input.splices || 0,
-        closures: input.closures || 0,
+        splices: splices,
+        closures: closures,
         route: Array.isArray(input.route) ? input.route : null
       };
       if (next.spans.some(function (s) { return s.id === span.id; })) return fail('span id "' + span.id + '" already exists');

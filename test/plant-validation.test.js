@@ -131,4 +131,36 @@ test('a long drop is a warning', function () {
   assert.ok(engine.network.validate(p, registry).warnings.some(function (w) { return w.indexOf('check the run') !== -1; }));
 });
 
+test('a span splice count that is not a count is refused, naming the span and the field', function () {
+  // `billOfMaterials` feeds span.splices straight into cableToBuy, which refuses text. Nothing
+  // checked the field at save time, so a plant with splices: 'two' validated clean and every /bom
+  // call for it was a 500 - the server blamed for the caller's own typo.
+  const p = base();
+  p.spans[0].splices = 'two';
+  const result = engine.network.validate(p, registry);
+  assert.strictEqual(result.ok, false);
+  assert.deepStrictEqual(result.errors, ['span "s1" has an invalid splices count "two"']);
+});
+
+test('a negative or fractional count is refused too - a count is a whole number', function () {
+  const negative = base();
+  negative.spans[1].closures = -1;
+  assert.deepStrictEqual(engine.network.validate(negative, registry).errors,
+    ['span "s2" has an invalid closures count "-1"']);
+  const fractional = base();
+  fractional.spans[0].splices = 2.5;
+  assert.deepStrictEqual(engine.network.validate(fractional, registry).errors,
+    ['span "s1" has an invalid splices count "2.5"']);
+});
+
+test('a splice list and a zero count are counts the BOM can price, so they validate', function () {
+  // cableToBuy counts a splice list by its length, so a list already prices and must not become a
+  // refusal here. 900 m + 3% overlength (27 m) + 2 x 30 m splice reserve = 987 m design length.
+  const p = base();
+  p.spans[0].splices = [{ model: 'fusion' }, { model: 'fusion' }];
+  p.spans[1].closures = 0;
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors, []);
+  assert.strictEqual(engine.length.billOfMaterials(p, registry, {}).lines[0].designM, 987);
+});
+
 done();

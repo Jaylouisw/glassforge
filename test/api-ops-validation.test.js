@@ -242,6 +242,72 @@ async function main() {
     assert.deepStrictEqual(finalGet.body.derived.errors, []);
   });
 
+  // ------------------------------------------------------------------ a splice count that is not a count
+  // `cableToBuy` refuses text ("splices must be a number or an array"), so a span saved with
+  // splices: 'two' made every /bom call for its project a 500 - the server blamed for the caller's
+  // own typo at save time. The write gate now refuses the field, the stored plant still prices, and
+  // a file edited by hand is named by the validator and by /bom.
+  const countId = (await request('POST', '/api/projects', { name: 'Bad counts' })).body.id;
+  await build(countId, validPlant);
+
+  const textSplices = await op(countId, {
+    op: 'add-span', span: { from: 'n3', to: 'n2', cable: 'g657a2-drop-1', lengthM: 10, splices: 'two' }
+  });
+  test('an edit whose splice count is text is refused with a 400 naming the field and the value', function () {
+    assert.strictEqual(textSplices.status, 400, brief(textSplices));
+    assert.ok(textSplices.body.error.indexOf('span.splices') !== -1, textSplices.body.error);
+    assert.ok(textSplices.body.error.indexOf('"two"') !== -1, textSplices.body.error);
+  });
+
+  const afterTextSplices = await request('GET', '/api/projects/' + countId);
+  const bomAfterText = await request('GET', '/api/projects/' + countId + '/bom');
+  test('the refused count was not saved, and the BOM for the stored plant still prices', function () {
+    assert.strictEqual(afterTextSplices.body.spans.length, 2, 'the text count was persisted');
+    assert.strictEqual(bomAfterText.status, 200, brief(bomAfterText));
+    assert.strictEqual(bomAfterText.body.spanCount, 2);
+  });
+
+  const negativeClosures = await op(countId, {
+    op: 'add-span', span: { from: 'n3', to: 'n2', cable: 'g657a2-drop-1', lengthM: 10, closures: -2 }
+  });
+  const fractionalSplices = await op(countId, {
+    op: 'add-span', span: { from: 'n3', to: 'n2', cable: 'g657a2-drop-1', lengthM: 10, splices: 1.5 }
+  });
+  test('a negative or fractional count is refused too - a count is a whole number', function () {
+    assert.strictEqual(negativeClosures.status, 400, brief(negativeClosures));
+    assert.ok(negativeClosures.body.error.indexOf('span.closures') !== -1, negativeClosures.body.error);
+    assert.strictEqual(fractionalSplices.status, 400, brief(fractionalSplices));
+    assert.ok(fractionalSplices.body.error.indexOf('span.splices') !== -1, fractionalSplices.body.error);
+  });
+
+  const storedForPut = await request('GET', '/api/projects/' + countId);
+  const putBadCount = await request('PUT', '/api/projects/' + countId, {
+    nodes: storedForPut.body.nodes,
+    spans: storedForPut.body.spans.concat([{
+      id: 's9', from: 'n3', to: 'n2', cable: 'g657a2-drop-1', lengthM: 10, splices: 'two', closures: 0
+    }])
+  });
+  test('PUT refuses the same field, because a PUT body never passes through apply()', function () {
+    assert.strictEqual(putBadCount.status, 400, brief(putBadCount));
+    assert.deepStrictEqual(putBadCount.body.errors, ['span "s9" has an invalid splices count "two"']);
+  });
+
+  // A file edited by hand never met the write gate. It is still this API's job to say which span is
+  // wrong rather than to throw cableToBuy's sentence through the 500 path.
+  const handPath = path.join(dataRoot, 'projects', countId + '.json');
+  const hand = JSON.parse(fs.readFileSync(handPath, 'utf8'));
+  hand.spans[0].splices = 'two';
+  fs.writeFileSync(handPath, JSON.stringify(hand));
+  const handRead = await request('GET', '/api/projects/' + countId);
+  test('a hand-edited project is named by the validator instead of validating clean', function () {
+    assert.deepStrictEqual(handRead.body.derived.errors, ['span "s1" has an invalid splices count "two"']);
+  });
+  const handBom = await request('GET', '/api/projects/' + countId + '/bom');
+  test('the BOM for that file is a 400 naming the span, not a 500 blaming the server', function () {
+    assert.strictEqual(handBom.status, 400, brief(handBom));
+    assert.ok(handBom.body.error.indexOf('span "s1" has an invalid splices count "two"') !== -1, handBom.body.error);
+  });
+
   await new Promise(function (resolve) { server.close(resolve); });
   fs.rmSync(dataRoot, { recursive: true, force: true });
   done();

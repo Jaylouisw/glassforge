@@ -364,11 +364,22 @@ async function handle(req, res, ctx) {
       try {
         bom = engine.length.billOfMaterials(project, registry, {});
       } catch (err) {
-        const unpriceable = (project.spans || []).filter(function (span) {
-          return span && span.cable && !registry.has('cable', span.cable);
-        }).map(function (span) {
-          return 'span "' + span.id + '" uses unknown cable model "' + span.cable + '"';
-        });
+        // The same read as the validator, naming the span. A file edited by hand never met the write
+        // gate, and cableToBuy's own sentence ("splices must be a number or an array") tells the
+        // caller the server broke when it was the file's field that is not a count.
+        const unpriceable = (project.spans || []).map(function (span) {
+          if (!span) return null;
+          if (span.cable && !registry.has('cable', span.cable)) {
+            return 'span "' + span.id + '" uses unknown cable model "' + span.cable + '"';
+          }
+          if (!engine.network.isSpanCount(span.splices)) {
+            return 'span "' + span.id + '" has an invalid splices count "' + String(span.splices) + '"';
+          }
+          if (!engine.network.isSpanCount(span.closures)) {
+            return 'span "' + span.id + '" has an invalid closures count "' + String(span.closures) + '"';
+          }
+          return null;
+        }).filter(function (problem) { return problem !== null; });
         if (!unpriceable.length) throw err;
         throw asBadRequest(new Error(unpriceable.join('; ')));
       }

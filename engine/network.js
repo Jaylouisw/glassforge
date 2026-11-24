@@ -55,6 +55,20 @@ const MODEL_KINDS = {
 
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 
+/**
+ * A splice or closure count on a span.
+ *
+ * Absent means none - the design builders omit the field on a span with nothing to count - so
+ * `undefined` is valid and the BOM reads it as 0. Otherwise it is a non-negative whole number, or a
+ * list of splices, which the BOM counts by its length. Text, a negative, a fraction and `null` are
+ * not priceable: `cableToBuy` throws its own sentence for them, and at `/bom` that sentence arrives
+ * as a 500 blaming the server for the caller's field. Refused here instead, by span and by field.
+ */
+function isSpanCount(value) {
+  if (value === undefined) return true;
+  return Array.isArray(value) || (typeof value === 'number' && Number.isInteger(value) && value >= 0);
+}
+
 function nodeById(plant, id) {
   return (plant.nodes || []).find(function (n) { return n.id === id; }) || null;
 }
@@ -454,6 +468,12 @@ function validate(plant, registry) {
     else if (!registry.has('cable', span.cable)) errors.push('span "' + span.id + '" uses unknown cable model "' + span.cable + '"');
     if (!isNum(span.lengthM) || span.lengthM <= 0) errors.push('span "' + span.id + '" has no measured length');
     if (span.lengthM > 20000) warnings.push('span "' + span.id + '" is over 20 km - is the length in metres?');
+    if (!isSpanCount(span.splices)) {
+      errors.push('span "' + span.id + '" has an invalid splices count "' + String(span.splices) + '"');
+    }
+    if (!isSpanCount(span.closures)) {
+      errors.push('span "' + span.id + '" has an invalid closures count "' + String(span.closures) + '"');
+    }
   }
 
   if (!errors.length) {
@@ -599,5 +619,6 @@ module.exports = {
   spliceTable: spliceTable,
   capacity: capacity,
   validate: validate,
+  isSpanCount: isSpanCount,
   stats: stats
 };
