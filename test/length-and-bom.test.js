@@ -43,6 +43,26 @@ test('a route drawn as points measures itself', function () {
   assert.ok(r.routeM > 110 && r.routeM < 112, 'one thousandth of a degree of latitude is about 111 m, got ' + r.routeM);
 });
 
+test('a route with no measurable length is refused, not priced at zero metres', function () {
+  // Measured before this guard: `POST /api/design/length {"points":[]}` answered 200 with routeM 0,
+  // designM 0, drums 0 and purchaseM 0 - a purchase order for nothing, from a caller who sent no
+  // route at all. `billOfMaterials` already refuses a span with no measured length ("measure the
+  // route before building a BOM"); the route form has no measured length either, and 0.00 m is not
+  // the same answer as "nothing was drawn".
+  throws(function () { length.cableToBuyForRoute([], {}); }, 'at least two', 'an empty route');
+  throws(function () { length.cableToBuyForRoute([{ lat: 51.5, lon: -0.1 }], {}); }, 'at least two', 'a one-point route');
+});
+
+test('a route point that is not a coordinate is named by its index', function () {
+  // An empty CSV/import cell is the classic case: `Number('')` is 0, and a point at 0,0 used to be
+  // reached as a real coordinate. It is refused, but "distanceM needs two { lat, lon } coordinates"
+  // names an internal function and neither the point nor the file - on a 40-point route that is a
+  // hunt. The refusal names the position instead.
+  const points = [{ lat: 51.5, lon: -0.1 }, { lat: 51.51, lon: -0.1 }, { lat: '', lon: '' }, { lat: 51.52, lon: -0.1 }];
+  throws(function () { length.cableToBuyForRoute(points, {}); }, 'point 2', 'an empty cell in a route');
+  throws(function () { length.cableToBuyForRoute([{ lat: 51.5, lon: -0.1 }, { lat: 95, lon: 0 }], {}); }, 'point 1', 'a latitude off the globe');
+});
+
 test('the BOM aggregates per cable model across spans', function () {
   const plant = {
     nodes: [

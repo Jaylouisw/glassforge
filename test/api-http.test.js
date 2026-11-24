@@ -534,6 +534,15 @@ async function main() {
     assert.strictEqual(goodLength.body.drums, 2);
   });
 
+  // The route form of the same endpoint had no measured length and said nothing: `{"points":[]}`
+  // answered 200 with `routeM: 0, drums: 0, purchaseM: 0` - a purchase order for nothing. A caller's
+  // mistake is a 400 (see AGENTS.md), and it names what a route needs.
+  const noRoutePoints = await request('POST', '/api/design/length', { points: [] });
+  test('a route with no points is a 400, not a zero-metre BOM', function () {
+    assert.strictEqual(noRoutePoints.status, 400, 'status ' + noRoutePoints.status + ': ' + JSON.stringify(noRoutePoints.body));
+    assert.ok(noRoutePoints.body.error.indexOf('at least two') !== -1, noRoutePoints.body.error);
+  });
+
   // The body limit is mapped to a 413, and that status used to be unreachable: `readBody` answered an
   // over-limit body by destroying the request, which tears down the socket the refusal has to travel
   // on. The caller's next read was ECONNRESET ("socket hang up"), so an upload that was merely too

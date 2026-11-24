@@ -144,9 +144,35 @@ function cableToBuy(opts) {
   };
 }
 
-/** Same calculation, starting from a freshly drawn route on a map. */
+/**
+ * Same calculation, starting from a freshly drawn route on a map.
+ *
+ * A route is measured *between* coordinates, so a route that cannot be measured is not a short route
+ * - and it is certainly not a purchase of zero metres. `pathLengthM` answers 0 for fewer than two
+ * points on purpose (it is geometry, and a single point has no length); through this function that 0
+ * became a BOM the caller could spend: `POST /api/design/length {"points":[]}` answered 200 with
+ * `routeM: 0, drums: 0, purchaseM: 0`, and a route of one point did the same. `billOfMaterials`
+ * already refuses a span with no measured length for this reason; this is the same refusal on the
+ * drawn-route form, naming what a route needs.
+ *
+ * A point the route cannot place is refused by its index. `distanceM` checks both ends of a segment
+ * and says "distanceM needs two { lat, lon } coordinates", which names an internal function, no
+ * position and no file - on an imported 40-point route that is a hunt. The empty cell is the classic
+ * one: `Number('')` is 0, so `{"lat":"","lon":""}` reads as a coordinate unless it is tested as a
+ * raw value, and at lat 0, lon 0 it would measure a route across the Gulf of Guinea.
+ */
 function cableToBuyForRoute(points, opts) {
   if (!Array.isArray(points)) throw new TypeError('points must be an array of { lat, lon }');
+  if (points.length < 2) {
+    throw new TypeError('a route needs at least two { lat, lon } points to measure - got ' + points.length +
+      '. A route with no measurable length is not a purchase of 0 m: draw the route, or send `routeM` directly');
+  }
+  for (let i = 0; i < points.length; i++) {
+    if (geo.isCoordinate(points[i])) continue;
+    throw new TypeError('route point ' + i + ' is not a { lat, lon } coordinate - got ' +
+      JSON.stringify(points[i]) + '. Every point is measured, so a point the route cannot place is ' +
+      'refused rather than skipped: skipping it would shorten the cable without shortening the plan');
+  }
   const routeM = geo.pathLengthM(points);
   return cableToBuy(Object.assign({}, opts || {}, { routeM: routeM }));
 }
