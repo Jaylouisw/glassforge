@@ -65,7 +65,8 @@ function snapshot(project, op, clock) {
  *
  * Ops:
  *   { op: 'add-node',  node: { type, model?, name?, lat?, lon? } }
- *   { op: 'add-span',  span: { from, to, cable, lengthM, strands?, splices?, closures? } }
+ *   { op: 'add-span',  span: { from, to, cable, lengthM, strands?, splices?, closures?,
+ *                                 bundles?, dropReserveM?, purpose?, route? } }
  *   { op: 'update-node', id, patch: { name?, model?, lat?, lon? } }
  *   { op: 'move-node', id, lat, lon }
  *   { op: 'remove-node', id }
@@ -138,6 +139,27 @@ function apply(project, operation, opts) {
         return fail('span.closures must be a non-negative whole number or a list of closures, got "' +
           String(input.closures) + '"');
       }
+      // The rest of the span model, carried rather than dropped. `bundles` is the one that costs
+      // money: the BOM multiplies the measured route by it, so a span that really runs two cables
+      // was billed as one and the order came up half the cable - answered 200, no field in the
+      // saved span, nothing said. `dropReserveM` is a term of the same BOM, and `purpose` is what
+      // the splice schedule reads to know a 1 m tail is a splitter's input. `PUT` keeps all three
+      // from the same body, so this op losing them made two writers disagree about one plant. A
+      // value the plant cannot hold is refused by name - the validator's own bundle rule - instead
+      // of being dropped, because a dropped field is a 200 that hides a short order.
+      if (input.bundles !== undefined && !network.isBundleCount(input.bundles)) {
+        return fail('span.bundles must be a positive whole number of cables, got "' +
+          String(input.bundles) + '" - a span runs one cable or more');
+      }
+      if (input.dropReserveM !== undefined &&
+          (typeof input.dropReserveM !== 'number' || !isFinite(input.dropReserveM) || input.dropReserveM < 0)) {
+        return fail('span.dropReserveM must be a non-negative number of metres, got "' +
+          String(input.dropReserveM) + '"');
+      }
+      if (input.purpose !== undefined &&
+          (typeof input.purpose !== 'string' || !input.purpose.trim())) {
+        return fail('span.purpose must be a non-empty word, got "' + String(input.purpose) + '"');
+      }
       const span = {
         id: input.id || nextId(next.spans, 's'),
         from: input.from,
@@ -149,6 +171,9 @@ function apply(project, operation, opts) {
         closures: closures,
         route: Array.isArray(input.route) ? input.route : null
       };
+      if (input.bundles !== undefined) span.bundles = input.bundles;
+      if (input.dropReserveM !== undefined) span.dropReserveM = input.dropReserveM;
+      if (input.purpose !== undefined) span.purpose = input.purpose.trim();
       if (next.spans.some(function (s) { return s.id === span.id; })) return fail('span id "' + span.id + '" already exists');
       next.history = snapshot(project, operation.op + ' ' + span.id, o.now);
       next.spans.push(span);
