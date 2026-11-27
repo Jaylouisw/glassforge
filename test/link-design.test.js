@@ -455,3 +455,47 @@ test('a near-miss link option is refused by name, not silently defaulted', funct
   assert.strictEqual(named.ok, true);
   close(named.bom.cable[0].designM, 1199.15, 0.05, 'bookkeeping keys change no metres');
 });
+
+// `optics` is the link design's one nested block, and it was read without a shape guard:
+// `const opticInput = o.optics || {}` then `opticInput.a` / `.b`, so a pair that did not spell those
+// two keys was not a pair the link rejected - it was not a pair at all, and the default
+// `sfp-plus-10g-lr-10km` ran at both ends. Measured on this fixture before the guard, with
+// `R = sfp-plus-10g-er-40km`: `{ optics: { headEndOptic: R, cpeOptic: R } }` (the auto-design's
+// `active.optics` shape), `{ optics: [{ headEndOptic: R, cpeOptic: R }] }` and `{ optics: R }` (a
+// bare slug) all answered `ok: true` with both legs on 10 km LR optics and `reachM` 10000 - a
+// circuit routed, budgeted and billed on a reach and a loss budget nobody named. A 40 km ER pair on
+// a 15 km duct run would have been refused by the LR pair's reach, or worse, signed off where the
+// tighter 10 km loss budget happens to pass.
+test('an optic pair the link cannot read is refused, not replaced by the 10 km default', function () {
+  const ER40 = 'sfp-plus-10g-er-40km';
+  // The pair shape one endpoint over: `/api/design/synthesise` names `active.optics` as
+  // [{ headEndOptic, cpeOptic }], and a caller who copies it here names two optics the link ignores.
+  throws(function () { gridLink({ optics: { headEndOptic: ER40, cpeOptic: ER40 } }); },
+    'headEndOptic', 'the auto-design pair shape');
+  // The same pair in a list: not an object, so it was read as "no opinion" and defaulted.
+  throws(function () { gridLink({ optics: [{ headEndOptic: ER40, cpeOptic: ER40 }] }); },
+    'a list', 'a list where a pair belongs');
+  // A bare model name reads as "both ends this optic" to a human and as nothing to this code.
+  throws(function () { gridLink({ optics: ER40 }); }, 'sfp-plus-10g-er-40km', 'a bare slug');
+  // A case slip on a key it does read: `A` is a near miss of `a`, and the pair was defaulted.
+  throws(function () { gridLink({ optics: { A: ER40, B: ER40 } }); }, 'did you mean "a"', 'a case slip on a');
+  // A third key in the block: the pair is exactly two models, so anything else is not a setting.
+  throws(function () { gridLink({ optics: { a: ER40, b: ER40, note: 'MO-1' } }); }, '"note"', 'a third key');
+  // The refusal names the shape, the consequence, and the fix - the default pair it would have used.
+  const err = throws(function () { gridLink({ optics: { headEndOptic: ER40, cpeOptic: ER40 } }); });
+  assert.ok(err.message.indexOf('sfp-plus-10g-lr-10km') !== -1,
+    'the refusal names the default pair that would have been bought: ' + err.message);
+  assert.ok(err.message.indexOf('"a"') !== -1 && err.message.indexOf('"b"') !== -1,
+    'the refusal names the two keys the pair reads: ' + err.message);
+  // One end named, the other defaulting: the named end is read, not ignored. ER is 1550 nm and the
+  // default LR is 1310 nm, so the budget refuses the mixed pair - if `a` had been dropped this call
+  // would have answered 200 on two LR optics instead.
+  throws(function () { gridLink({ optics: { a: ER40 } }); }, 'different wavelengths', 'the named end is read');
+  // What still reads as before: an empty block and no block at all are "no opinion", not a refusal.
+  const partial = gridLink({ optics: { a: 'sfp-plus-10g-lr-10km' } });
+  assert.strictEqual(partial.legs[0].optics.b, 'sfp-plus-10g-lr-10km', 'the end named nowhere keeps the default');
+  const empty = link.design({ sites: { a: A, b: B }, optics: {} }, registry);
+  assert.strictEqual(empty.legs[0].optics.a, 'sfp-plus-10g-lr-10km', 'an empty block is no opinion');
+  const absent = link.design({ sites: { a: A, b: B } }, registry);
+  assert.strictEqual(absent.legs[0].optics.b, 'sfp-plus-10g-lr-10km', 'an absent block is no opinion');
+});

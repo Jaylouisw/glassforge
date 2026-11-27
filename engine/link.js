@@ -103,6 +103,48 @@ const LINK_OPTION_FIELDS = ['sites', 'a', 'from', 'b', 'to', 'optics', 'optic', 
   'joinToleranceM', 'routeFactor', 'marginDb', 'direction', 'cable', 'ladder', 'overlengthPct',
   'closure', 'thirdParty'];
 
+/** The two keys the link design's `optics` block names: one transceiver model per site. */
+const LINK_OPTIC_FIELDS = ['a', 'b'];
+
+/**
+ * The optic pair, or a refusal naming the shape the link reads.
+ *
+ * `optics` is the one nested block the link reads, and it was read without a shape guard:
+ * `const opticInput = o.optics || {}` then `opticInput.a` / `.b`, so anything that did not spell
+ * those two keys was not a pair the link rejected - it was not a pair at all, and the default
+ * `sfp-plus-10g-lr-10km` ran at both ends. Measured on the two-leg grid fixture (test/link-design),
+ * with R = `sfp-plus-10g-er-40km`: `{ headEndOptic: R, cpeOptic: R }` (the auto-design's
+ * `active.optics` pair), the same pair in a list, and a bare model name all answered `ok: true`
+ * with both legs on LR-10KM optics and `reachM` 10000. The circuit is routed, budgeted and billed
+ * on optics nobody named - a 40 km ER pair replaced by a 10 km LR one is a different reach and a
+ * different loss budget, and the answer looked complete.
+ *
+ * The pair is exactly two models, so a third key is the wrong block, not a caller's bookkeeping. An
+ * end named nowhere keeps the default; a pair that cannot meet (two wavelengths, two rates) is
+ * already refused by the budget, so this guard only refuses a pair the link cannot read at all.
+ */
+function assertOpticPair(value, fallbackOptic) {
+  if (value === undefined || value === null) return;
+  const example = '{"a":"sfp-1g-lx-10km","b":"sfp-1g-lx-10km"}';
+  const consequence = ' A pair of another shape is refused rather than replaced: the default ' +
+    fallbackOptic + ' at both ends would be routed, budgeted and billed instead of the optics the ' +
+    'caller named, with its own reach and loss budget.';
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    const got = typeof value === 'string' ? JSON.stringify(value)
+      : (Array.isArray(value) ? 'a list' : 'a ' + typeof value);
+    throw new TypeError('the link design reads "optics" as { a: model, b: model } - one transceiver ' +
+      'model at each site - and got ' + got + '.' + consequence + ' Name both ends, e.g. ' + example + '.');
+  }
+  for (const key of Object.keys(value)) {
+    if (LINK_OPTIC_FIELDS.indexOf(key) !== -1) continue;
+    const suggestion = designFields.suggestField(key, LINK_OPTIC_FIELDS);
+    const refusal = 'the link design reads "optics" as { a: model, b: model } and has no "' + key + '" key';
+    throw new TypeError(refusal + (suggestion ? ' - did you mean "' + suggestion + '"?' : '.') +
+      ' It names one transceiver model per site: "a" at site A, "b" at site B.' + consequence +
+      ' Name both ends, e.g. ' + example + '.');
+  }
+}
+
 /** Normalise what a caller may hand us, and refuse the shapes that cannot describe a link. */
 function options(input, registry) {
   // Before the values are read, because a typo is the cause and "marginDb must be a number" would be
@@ -190,8 +232,11 @@ function options(input, registry) {
     throw new Error('sites A and B are the same place - a link needs two different sites');
   }
 
-  const opticInput = o.optics || {};
   const fallbackOptic = o.optic || DEFAULTS.optic;
+  // The optic pair is the one nested block this function reads, so a shape it cannot read is
+  // refused by name rather than read as "no opinion" - see `assertOpticPair`.
+  assertOpticPair(o.optics, fallbackOptic);
+  const opticInput = o.optics || {};
   const opticA = modelOf(opticInput.a !== undefined ? opticInput.a : (o.opticA || fallbackOptic));
   const opticB = modelOf(opticInput.b !== undefined ? opticInput.b : (o.opticB || fallbackOptic));
   if (!opticA) throw new TypeError('optics.a is required (the optic at site A)');
