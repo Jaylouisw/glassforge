@@ -180,7 +180,8 @@ POST /api/design/link
     protection?: "diverse" (default) | "single",
     direction?: "down" (default) | "up",
     thirdParty?: [{ provider, lengthM, lossDb, leg?: "a"|"b"|"both", cost?, reference? }],
-    fibres?, cable?, ladder?, connectors?, splices?, marginDb?, maxSnapM?, joinToleranceM? }
+    fibres?, cable?, ladder?, connectors?, splices?, splicesPerJoint?, closure?, marginDb?,
+    maxSnapM?, joinToleranceM? }
   → { ok, mode: "link", technology, routeMethod, network, sites, protection, legs, paths, runs,
       diversity, thirdParty, bom, verdict, upstreamVerdict, reasons, warnings, notes }
 ```
@@ -228,6 +229,16 @@ the EX launches its floor into the LX receiver's -3 dBm overload point: a 5 dB p
 option - and is what each leg's budget charges; `legs[].splices` is the crew's count, that number times
 `splicesPerJoint` (default `fibres`), and `bom.splices` sums it. A 24-fibre leg through one joint is one
 splice event and 24 splices to perform.
+`closure` is the model the BOM orders at every interior joint, and it was the one option this endpoint
+**echoed instead of read**: `{"closure":"mufa-inline-99"}` answered `200`, `ok: true`, with a part
+nobody makes in `bom.closures.model`, and a 48-fibre leg through one joint billed a 24-splice mufa in
+silence. A model the closure catalogue does not have is now a `400` naming the models that exist; a
+closure too small for the splices made in it — `splicesPerJoint`, one joint's worth — is a `warnings`
+entry instead of a refusal, naming the inline closures that hold them (`closure "mufa-inline-24" would
+carry 48 splices, capacity 24 … fosc-600c-inline-216 (216)`), because the plant reports the same
+overrun as a note and the larger closure is a substitution, not a redesign. A leg with no interior
+joint buys no closure and is never challenged: 2 splices in a 24-splice mufa is silent.
+
 `ladder` is the list of cable models a leg is bought from, and it is checked before anything is
 routed: a bare model name, or a model the cable catalogue does not have, is a `400` naming `ladder`
 and its position, never a silent fall back to the default ladder. The ladder is the BOM, and the

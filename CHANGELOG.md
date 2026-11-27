@@ -37,6 +37,12 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **The site-to-site link looks up the `closure` it orders instead of echoing it.** `closure:
+  "mufa-inline-99"` answered `ok` with a part the catalogue does not have, and a 48-fibre leg through
+  one joint billed a 24-splice mufa with nothing said. An unknown model is now a `400` naming the
+  closures that exist; a closure that cannot hold `splicesPerJoint` is a warning naming the inline
+  closures that do (`fosc-600c-inline-216` at 48), matching the plant's capacity note rather than
+  refusing a circuit whose glass is fine. A leg with no joint buys no closure and is not warned about.
 - **A near-miss option on the site-to-site link is refused by name, not silently defaulted.**
   `link.options` checked the *values* of the knobs it read and none of the *names*, so it was the one
   entry point with no key list at all — and the one whose answer is a circuit's purchase order.

@@ -302,6 +302,56 @@ function cableForFibres(cable, fibres, registry) {
 }
 
 /**
+ * The closure the BOM orders, looked up and sized.
+ *
+ * `closure` was the one option this module echoed instead of read: `opts.closure` went straight into
+ * `bom.closures.model`, so `closure: 'mufa-inline-99'` answered `ok` with a part nobody can buy, and
+ * a 48-fibre leg through one joint billed a 24-splice mufa with nothing said. Every other part on the
+ * order is resolved first - the optic by `budget.pointToPoint`, the cable by `cableForSpan` /
+ * `cableForFibres` - and an unknown model there names the ones that exist. The plant agrees: an
+ * unknown closure on a node is a `validate` error.
+ *
+ * Capacity is a warning, not a refusal, and that is deliberate: the plant reports the same overrun as
+ * a note (`engine/network.js`, `splicesAtClosure`), the optic still carries the light, and the joint
+ * can be built with a larger closure - so the link names the ones that hold `splicesPerJoint` and
+ * leaves the choice with the caller, rather than refusing a circuit whose glass is fine.
+ */
+const INLINE_CLOSURE_TYPES = ['inline', 'mufa'];
+
+function closureForLink(model, splicesPerClosure, registry) {
+  let spec;
+  try {
+    spec = registry.get('closure', model);
+  } catch (e) {
+    const known = registry.all('closure').map(function (c) { return c.model; }).sort();
+    throw new Error('the link design reads "closure" as a model the closure catalogue carries, and "' +
+      model + '" is not one' + (known.length
+        ? ' - closure models: ' + known.join(', ')
+        : ' - the closure catalogue is empty'));
+  }
+  if (!isNum(spec.spliceCapacity) || splicesPerClosure <= spec.spliceCapacity) {
+    return { spec: spec, warning: null };
+  }
+  // Only a closure that joins cable in line is an answer to an inline joint; a cabinet, a NAP or a
+  // splitter box has the capacity but is the wrong product to bury in a duct at a straight-through
+  // splice, so naming one would send the caller to a part that does not fit the job.
+  const fits = registry.all('closure').filter(function (c) {
+    return INLINE_CLOSURE_TYPES.indexOf(c.type) !== -1 && isNum(c.spliceCapacity) &&
+      c.spliceCapacity >= splicesPerClosure;
+  }).sort(function (a, b) {
+    return a.spliceCapacity - b.spliceCapacity || (a.model < b.model ? -1 : a.model > b.model ? 1 : 0);
+  });
+  return {
+    spec: spec,
+    warning: 'closure "' + model + '" would carry ' + splicesPerClosure + ' splices, capacity ' +
+      spec.spliceCapacity + ' - a joint splices every strand the cable carries, so this order names a ' +
+      'closure that cannot hold its own joint' + (fits.length
+        ? '; inline closures that would: ' + fits.map(function (c) { return c.model + ' (' + c.spliceCapacity + ')'; }).join(', ')
+        : '; no inline closure in the catalogue holds ' + splicesPerClosure + ' splices')
+  };
+}
+
+/**
  * The joints both legs pass through, as one clause: `both legs pass through 2 shared joint nodes
  * (51.500000,-0.099000; 51.500000,-0.098000): one failure in any of those chambers takes out both
  * legs`.
@@ -737,6 +787,15 @@ function design(input, registry) {
     warnings.push('protection was requested but the legs are not diverse: ' + sentence);
   }
 
+  // ---- the closure the BOM orders -------------------------------------------------
+  // Resolved once, after routing: a leg with no interior joint buys no closure, so a small default
+  // there is not a defect and must not be warned about. A splice event that melds nothing (`splices`
+  // given as 0) makes no splices, so capacity is not the question at that joint either.
+  const jointCount = sum(legs, function (leg) { return leg.joints.length; });
+  const splicesPerClosure = legs.some(function (leg) { return leg.spliceEvents > 0; }) ? opts.splicesPerJoint : 0;
+  const closureChoice = closureForLink(opts.closure, splicesPerClosure, registry);
+  if (jointCount > 0 && closureChoice.warning) warnings.push(closureChoice.warning);
+
   // ---- bill of materials --------------------------------------------------------
   const bomSpans = legs.filter(function (leg) { return leg.ownM > 0; }).map(function (leg) {
     return {
@@ -764,8 +823,8 @@ function design(input, registry) {
     drums: sum(byCable, function (row) { return row.drums; }),
     splices: sum(legs, function (leg) { return leg.splices; }),
     closures: {
-      model: opts.closure,
-      count: sum(legs, function (leg) { return leg.joints.length; })
+      model: closureChoice.spec.model,
+      count: jointCount
     },
     connectors: { model: budget.DEFAULT_CONNECTOR_MODEL, count: opts.connectors * legs.length },
     thirdParty: thirdParty,
