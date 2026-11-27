@@ -57,21 +57,27 @@ It returns every candidate with its metrics and the reason it lost, the winner's
 `rationale` quoting the numbers the ranking used. That request, run against this build, returns:
 
 ```
-Chosen: Active Ethernet over a shared cable tree, 1 Gb/s 1G-LX-10KM: 3 ONT(s), 343.5 m of cable
-        (3404 fibre-metres), 0 splitter(s), 3 closure(s), worst headroom 6.98 dB.
-Rejected PON 1:8 with 1 splitter site(s): feasible but needs 414.1 m of cable and 3411.6
+Chosen: PON 1:8 with 1 splitter site(s): 3 ONT(s), 413.1 m of cable (3399.6 fibre-metres),
+        1 splitter(s), 3 closure(s), worst headroom 21.53 dB, 3 of 3 failing upstream.
+Rejected PON 1:16 with 1 splitter site(s): feasible but needs 413.1 m of cable and 3399.6
         fibre-metres (1x)
+Rejected Active Ethernet over a shared cable tree, 1 Gb/s 1G-LX-10KM: feasible but needs 343.5 m
+        of cable and 3404 fibre-metres (1x)
 Rejected Active Ethernet, one cable per customer, 1 Gb/s 1G-LX-10KM: feasible but needs 814.5 m
         of cable and 5030 fibre-metres (1.48x)
-Rejected Active Ethernet over a shared cable tree, 10 Gb/s PLUS-10G-LR-10KM: feasible but needs
-        343.5 m of cable and 3404 fibre-metres (1x)
 5 further ratio/optic variant(s) scored worse or were infeasible; every one is in the candidate
         table with its numbers.
 ```
 
-Three addresses do not justify a splitter, so the winner here is active Ethernet over a shared tree;
-give it a few hundred addresses and the PON candidates start winning. Every number above is that
-same request — nothing in this sample is illustrative.
+Three addresses barely justify a splitter: the PON wins by 4.4 fibre-metres — 3399.6 against 3404 —
+although it lays 413.1 m of cable to the active tree's 343.5 m, because a shared feeder carries one fibre
+per house where the active tree carries a pair to each. The chosen line also says `3 of 3 failing
+upstream`, which is the return link being budgeted rather than a stale sample: Casa 1's ONT launches at
++0.5 dBm into an 11.52 dB ODN and lands at -11.02 dBm, about a decibel past the C+ OLT's -12 dBm upstream
+overload point, so the budget's reason names the 6 dB inline pad that clears it. A candidate is refused
+and ranked on its downstream verdict; the upstream verdict is reported beside it, which is the open
+decision in [#6](https://github.com/jaylouisw/glassforge/issues/6). Every number above is that same
+request — nothing in this sample is illustrative.
 
 Supply a street or duct network and the runs are **routed along it**; without one they are
 straight-line × `routeFactor` (default 1.2). Every response says which it used (`routeMethod`), and
