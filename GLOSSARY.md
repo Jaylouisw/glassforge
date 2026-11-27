@@ -118,6 +118,13 @@ in metres and naming every shared segment, plus the **shared joints**: interior 
 through (`sharedNodes`, by coordinate). Edge-disjoint legs can still meet in one chamber, and 0 m shared
 with a shared joint is not a diverse pair - `achieved` requires an empty joint list. A third-party
 segment is a leased circuit: it carries a stated length and loss, and stays out of the cable-to-buy.
+`method` says how the pair was found: the edge-disjoint pair, the fewest-shared-metres pair, or
+`coincident` — **Coincident pair**, below.
+
+**Coincident pair** — both sites snap to one node of the network: two buildings across a street whose
+drops land in the same chamber. There is no duct run between them, so the link has **one** leg
+(`routedM: 0`, `ownM` the two drops), `diversity.method` is `"coincident"`, `legs` is 1 and `achieved`
+is false. The chamber is the joint the two drops splice in, so the cable is the two drops, bought once.
 
 ## Links and circuits
 
@@ -125,10 +132,10 @@ segment is a leased circuit: it carries a stated length and loss, and stays out 
 end, no splitter and no ONT. Deliberately not a plant: two paths between the same pair of nodes is a
 cycle, and a plant is a tree. The response says `mode: "link"`.
 
-**Leg** — one of the circuit's two routes between the sites, `legs[].id` `"a"` or `"b"` (labelled
+**Leg** — one of the circuit's routes between the sites, `legs[].id` `"a"` or `"b"` (labelled
 `A-leg` / `B-leg`). Each leg is budgeted on its own with `budget.pointToPoint`, so a circuit whose legs
 are asymmetric gets two verdicts, never an average. A leased segment is assigned to a leg with
-`leg: "a" | "b" | "both"`.
+`leg: "a" | "b" | "both"`. A coincident pair has one leg, `"a"`.
 
 **Attached lease** — a third-party segment whose leg the circuit actually built (`attached: true`).
 Only an attached lease is charged to a leg's budget, counted in `lengthM` and in `thirdParty.totalM`,

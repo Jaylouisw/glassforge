@@ -204,8 +204,14 @@ A site-to-site link has two sites, an optic at each end, and (normally) two legs
 duct. It is deliberately **not** modelled as a plant: two paths between the same pair of nodes is a
 cycle, and §1 says a plant is a tree with one head-end. `link.design` returns a circuit instead:
 
-- **both legs are measured on the supplied graph** (`street.diversePaths`), never by a straight line
+- **every leg is measured on the supplied graph** (`street.diversePaths`), never by a straight line
   while a graph is present, and each leg keeps its street geometry as `route`;
+- **a coincident pair has one leg.** When both sites snap to the same node of the graph — two buildings
+  across one street, their drops landing in the same chamber - there is no duct between them to route,
+  so `street.diversePaths` is not called (its refusal of two identical points is a guard on its own
+  API, not a verdict on this link). The design is `legs: [{ "id": "a" }]` with `routedM: 0`,
+  `diversity.method: "coincident"` and `achieved: false`; the chamber is the joint, so the two drops
+  splice there (`splices: 2`, one closure) and `ownM` is the two drops;
 - **the pair is the minimum-cost edge-disjoint pair** the graph allows (Suurballe), and when the graph
   allows none, the second leg is the path that shares the fewest metres — with every shared segment
   reported and its metres, because "diverse except 180 m at the building entry" is the true answer;
@@ -223,5 +229,6 @@ cycle, and §1 says a plant is a tree with one head-end. `link.design` returns a
   leased loss that is missing is an error, not a zero — §8 applies to rented fibre exactly as it
   applies to bought fibre.
 
-A cable is bought per leg, because a protected circuit is two fibre paths. Nothing here changes the
-PON or active-tree paths: they share `computeOdn`, so a loss is computed once, in one place.
+A cable is bought for every leg the design built, because a protected circuit is two fibre paths; a
+coincident pair built one leg, and is quoted one cable. Nothing here changes the PON or active-tree
+paths: they share `computeOdn`, so a loss is computed once, in one place.

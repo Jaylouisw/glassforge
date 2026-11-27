@@ -44,7 +44,7 @@ and the checks, and a PNG of the drawing at a stated scale.
   while the path paid for all of it. `losDb` and `lenghtM` were refused, but by symptom ("lossDb must
   be a non-negative number") rather than by the key that was typed. Measured on a 1.2 km
   `g652d-loose-12` + 1:8 + C+ design with one 900 m / 4 dB lease: ODN **14.964 dB**, `leasedLengthM`
-  **900**, identical under all four spellings. A `THIRD_PARTY_FIELDS` list (`provider`, `lengthM`,
+  **900**, identical for `{ leg: 'b' }` and `{ legs: 'b' }`, which is what makes it hard to spot. A `THIRD_PARTY_FIELDS` list (`provider`, `lengthM`,
   `lossDb`, plus `cost` and `reference`, which a segment lifted from a `/api/design/link` body
   carries) is now checked with the same narrow `assertKnownFields` rule as the rest of the budget, and
   `leg`/`legs` are refused by name — "a budget is one ODN path, not a circuit with legs … Drop the
@@ -52,6 +52,20 @@ and the checks, and a PNG of the drawing at a stated scale.
   Tests: `budget-design-fields` (+2 cases: the scope and the three key typos with `cost`/`reference`
   still reading, and the same refusal through `pointToPoint`).
 
+- **A leased segment scoped with a near-miss key is refused, not put on both legs.** `leg` is the key
+  that decides which leg's budget pays for leased glass, and the segment block was the one nested shape
+  beside `optics` read with value guards only - a value guard cannot see a key spelled wrong. Measured
+  on the two-leg grid fixture with 600 m / 6 dB of leased loss: `{ leg: 'b' }` charged the A-leg 0 dB
+  (rx -5.41 dBm, `ok`), while `{ legs: 'b' }` charged **both** legs 6 dB (A-leg rx **-11.41 dBm**,
+  `marginal`) and the diversity sentence read "diverse except a 600 m leased segment (CityFibre)
+  carried on both legs" - a circuit budgeted over fibre it never rides, a pad for glass the light does
+  not enter, and a protected pair reported as not diverse. `{ lenghtM }`, `{ losDb }` and
+  `{ providor }` answered the same way: a required-field sentence that named the symptom, not the key.
+  `THIRD_PARTY_FIELDS` (six keys) is now checked with the same narrow `assertKnownFields` rule the
+  budgets, the link's options, the `optics` pair and the BOM use, so the refusal names the field and
+  the segment (`the leased segment thirdParty[0] does not read the field "legs" - did you mean
+  "leg"?`). A caller's own bookkeeping key on a segment still passes. Tests: `link-design` (+1 case:
+  the scope typo, the three key typos, and `reference`/`notes` still reading).
 - **A swapped adjacent pair is a near miss: one keystroke is one edit.** The shared matcher
   (`designFields.suggestField`, `engine/design-fields.ts`) measured a typo with plain Levenshtein, so
   a transposition counted as a deletion plus an insertion — two edits — and was not a near miss at
