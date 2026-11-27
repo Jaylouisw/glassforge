@@ -6,10 +6,10 @@
 // `isNum(x) ? x : default` fallback, and every one of them moves a length or a crew count in the
 // optimistic direction when it is ignored:
 //
-//   routeFactor: '1.6'      fell back to 1.2. The 8-house estate below designed at 707.3 m of route
-//                           where 1.6 gives 939.8 m - 232 m of duct absent from the plan.
-//   overlengthPct: '10'     fell back to 3%. The same estate quoted 707.3 m of design length where
-//                           10% gives 755.4 m.
+//   routeFactor: '1.6'      fell back to 1.2. The 8-house estate below designed at 706.3 m of route
+//                           where 1.6 gives 938.8 m - 232 m of duct absent from the plan.
+//   overlengthPct: '10'     fell back to 3%. The same estate quoted 706.3 m of design length where
+//                           10% gives 754.3 m.
 //   technology: 'PON'       matched neither branch, so every candidate list was empty and the answer
 //                           was "no candidate topology could be built" - a typo blamed on the estate.
 //   splicesPerJoint: '2'    (link) fell back to the fibre count: a 24-fibre joint billed as 24
@@ -47,17 +47,20 @@ test('a route factor below 1 is refused, because a route is never shorter than t
 });
 
 test('the same estate at routeFactor 1.6 is 232 m longer than the default plan', function () {
-  // Straight-line routing x the factor, then contracted between branch points: 707.3 m at the 1.2
-  // default, 939.8 m at 1.6. Pinned so a silently-defaulted factor has to disagree with the geometry.
-  close(design({}).best.metrics.designM, 707.3, 0.2, 'design length at routeFactor 1.2');
-  close(design({ routeFactor: 1.6 }).best.metrics.designM, 939.8, 0.2, 'design length at routeFactor 1.6');
+  // Straight-line routing x the factor, then contracted between branch points: 706.3 m at the 1.2
+  // default, 938.8 m at 1.6. Pinned so a silently-defaulted factor has to disagree with the geometry.
+  // 1 m lower than the 707.3 m this used to pin, and the difference is the splitter site's stub span:
+  // the site is a demand point, so the tree's first edge measured 0 m and was priced as a 1 m run (#39).
+  // It is one closure, not a run, so no cable is bought for it.
+  close(design({}).best.metrics.designM, 706.3, 0.2, 'design length at routeFactor 1.2');
+  close(design({ routeFactor: 1.6 }).best.metrics.designM, 938.8, 0.2, 'design length at routeFactor 1.6');
 });
 
 test('an overlength that arrives as text is refused, and a number is used', function () {
   throws(function () { design({ overlengthPct: '10' }); }, 'overlengthPct', 'a text overlength');
-  // 707.3 x 1.10 / 1.03 = 755.4: the design length carries the overlength, so the fallback to 3%
+  // 706.3 x 1.10 / 1.03 = 754.3: the design length carries the overlength, so the fallback to 3%
   // hid 48.1 m of cable on a 690 m estate.
-  close(design({ overlengthPct: 10 }).best.metrics.designM, 755.4, 0.2, 'design length at 10% overlength');
+  close(design({ overlengthPct: 10 }).best.metrics.designM, 754.3, 0.2, 'design length at 10% overlength');
 });
 
 test('a snap radius or join tolerance that arrives as text is refused', function () {
@@ -80,7 +83,7 @@ test('an absent option is still absent - the documented default applies and is r
   // The guard fires on a *present* value only: omitting the knobs is how every existing caller works.
   const plain = design({});
   assert.strictEqual(plain.best.feasible, true, JSON.stringify(plain.best.warnings));
-  close(plain.best.metrics.designM, 707.3, 0.2, 'default design length');
+  close(plain.best.metrics.designM, 706.3, 0.2, 'default design length');
 });
 
 test('a ladder that arrives as one model name is refused, not read as the default ladder', function () {

@@ -4,7 +4,7 @@
 // #157 gave the top-level knobs that treatment (routeFactor, overlengthPct, maxSnapM, technology,
 // ladder) because each one measures the plan. pon and active are merged in with Object.assign, so a
 // shape the design cannot read is not reported - it is *replaced*, and the plant is then built from
-// parts nobody asked for. Measured on this estate (8 houses, 707.3 m of design length at the default,
+// parts nobody asked for. Measured on this estate (8 houses, 706.3 m of design length at the default,
 // one 1:8 splitter site):
 //
 //   pon: 'gpon'                      merged no key at all; the 1:8/16/32 default search ranked a
@@ -88,17 +88,19 @@ test('an empty ratio list is refused, and the refusal names the default it repla
 
 test('a drop limit that is negative or arrives as text is refused', function () {
   // maxDropM -5 put every house in its own 1:1 cluster - 8 splitter sites and 557.9 m of design
-  // length, ranked above the 707.3 m shared tree because the metric is what is bought.
+  // length, ranked above the 706.3 m shared tree because the metric is what is bought.
   const negative = throws(function () { design({ pon: { maxDropM: -5 } }); }, 'maxDropM', 'a negative drop limit');
   assert.ok(negative instanceof TypeError, 'a TypeError, because the caller asked for it');
   throws(function () { design({ pon: { maxDropM: '500' } }); }, 'maxDropM', 'a text drop limit');
 });
 
 test('a pon block the design does read still designs the same plant', function () {
-  // Nothing above changes a legitimate run: the same 707.3 m, one splitter site, and the splitter
+  // Nothing above changes a legitimate run: the same 706.3 m, one splitter site, and the splitter
   // parts are still bought from the ratio list the caller named.
-  close(design({}).best.metrics.designM, 707.3, 0.2, 'design length at the default ratios');
-  close(design({ pon: { ratios: [8], maxDropM: 500 } }).best.metrics.designM, 707.3, 0.2, 'design length at 1:8');
+  // 1 m less than the 707.3 m these pinned before: the splitter site's stub span measured 0 m and is
+  // not bought as a cable run any more (#39).
+  close(design({}).best.metrics.designM, 706.3, 0.2, 'design length at the default ratios');
+  close(design({ pon: { ratios: [8], maxDropM: 500 } }).best.metrics.designM, 706.3, 0.2, 'design length at 1:8');
   assert.ok(design({ pon: { ratios: [32] } }).best.label.indexOf('1:32') !== -1,
     'a ratio the caller named is the ratio that is built: ' + design({ pon: { ratios: [32] } }).best.label);
 });

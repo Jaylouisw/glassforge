@@ -506,6 +506,15 @@ function cableForDistribution(requiredFibres, ladder, registry) {
 const DROP_CABLE_MAX_M = 300;
 
 /**
+ * Two ends closer than this are one point, and a span between them is not a cable run.
+ *
+ * The root of a splitter's distribution tree can land on a demand point - `clusterCentre` picks the
+ * cluster's `members[0]`, so the first branch closure is at the splitter site exactly. That edge is a
+ * tree edge for connectivity and nothing else: no drum is pulled between the two ends of one closure.
+ */
+const COINCIDENT_M = 0.5;
+
+/**
  * The cable for a span that carries `fibres` over `lengthM`.
  *
  * Two fibres over 1.2 km is not a drop: it is a two-fibre cable run, and designing it as drop cable
@@ -689,6 +698,10 @@ function euclidTree(rootPoint, points, factor) {
       // A cluster's medoid sits exactly on the splitter site, so its tree edge measures 0 m - which is
       // not a span this model accepts. One metre is the shortest drop that can physically exist.
       lengthM: Math.max(1, round(edge.lengthM, 1)),
+      // The clamp hides the 0 m, and a cable chosen for a 1 m "run" of 15 fibres is a whole 24-fibre
+      // drum bought to span the inside of one closure (#39). So the edge remembers that its two ends
+      // are the same point, and the plant builder contracts it instead of pricing a cable for nothing.
+      coincident: edge.lengthM < COINCIDENT_M,
       route: [{ lat: a.lat, lon: a.lon }, { lat: b.lat, lon: b.lon }],
       terminals: weights.totals.get(side.child) || 0
     };
@@ -778,8 +791,22 @@ function emitTerminalTree(plant, tree, cfg, registry) {
   const idOf = new Map();
   idOf.set(tree.rootId, cfg.rootPlantId);
 
+  // A root edge whose ends are the same point is the splitter's own closure, not a run: the
+  // distribution leaves the box the splitter sits in, exactly like the 1 m splitter tail. Contracted
+  // it means the branch closure is not built as a second box and no cable is bought between them -
+  // 1 m of 15-fibre cable used to buy a 24-fibre drum, charged to every PON candidate (#39).
+  const contracted = new Set();
+  if (cfg.contractCoincidentRoot) {
+    for (const edge of tree.edges) {
+      if (edge.from === tree.rootId && edge.coincident) contracted.add(edge.to);
+    }
+  }
+
   for (const node of tree.nodes) {
-    if (node.isRoot) continue;
+    if (node.isRoot || contracted.has(node.key)) {
+      if (!node.isRoot) idOf.set(node.key, cfg.rootPlantId);
+      continue;
+    }
     if (node.degree >= 2 || node.attachTerminals.length) {
       const id = cfg.prefix + 'c-' + node.key;
       plant.nodes.push({
@@ -821,6 +848,7 @@ function emitTerminalTree(plant, tree, cfg, registry) {
   }
 
   for (const edge of tree.edges) {
+    if (edge.from === tree.rootId && contracted.has(edge.to)) continue;
     const fibres = Math.max(cfg.minFibres, edge.terminals * cfg.fibresPerTerminal);
     const cable = cableForSpan(fibres, edge.lengthM, cfg.ladder, registry);
     const bundles = Math.max(1, Math.ceil(fibres / cable.fiberCount));
@@ -1045,6 +1073,8 @@ function buildPon(demand, opts, registry, ratio, graph) {
       distribution: true,
       purpose: 'distribution',
       dropPurpose: 'drop',
+      // The splitter site is a demand point, so the tree's first edge is often 0 m: one closure, no run.
+      contractCoincidentRoot: true,
       ladder: opts.ladder
     }, registry);
   });

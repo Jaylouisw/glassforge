@@ -63,7 +63,7 @@ function estate(n) {
   return points;
 }
 
-// 2.9 km south of the first house: ODN 12.41 dB downstream and 12.89 dB upstream, so every ONT is `ok`
+// 2.9 km south of the first house: ODN 12.31 dB downstream and 12.79 dB upstream, so every ONT is `ok`
 // in both directions and only the launch-window band is left to say - 3 dB downstream, 5 dB upstream.
 const NEAR = { lat: 51.474, lon: -0.1006, name: 'PoP' };
 const synthesised = engine.design.synthesise(estate(12), {
@@ -191,7 +191,10 @@ async function main() {
     // figure because 5 dB is the size that binds. No `fail` sentence here to carry it instead.
     assert.ok(band[0].indexOf('the OLT receiver') !== -1,
       'the report still sizes the pad from the downstream band alone: ' + band[0]);
-    assert.ok(band[0].indexOf('6 x 5 dB') !== -1 && band[0].indexOf('the downstream direction needs') !== -1,
+    // The upstream pad each ONT needs is ceil(17 - its upstream ODN): the ONTs past 13 dB need 4 dB and
+    // the rest 5. 0.10 dB less ODN at every ONT (the splitter site's contracted stub, #39) moved three
+    // of them across 13 dB, so the mixture was 6 x 5 dB + 6 x 4 dB and is now 9 x 5 dB + 3 x 4 dB.
+    assert.ok(band[0].indexOf('(9 x 5 dB, 3 x 4 dB)') !== -1 && band[0].indexOf('the downstream direction needs') !== -1,
       'the sizes that bind are the upstream ones, and the downstream ask is named beside them: ' + band[0]);
   });
 
