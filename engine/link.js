@@ -582,8 +582,38 @@ function design(input, registry) {
 
   let routedLegs = [];
   let diversity = null;
+  // Set when both sites attach to one vertex of the graph - two buildings across one street, whose
+  // drops land in the same chamber. There is no duct run between them, so there is no pair of legs to
+  // draw and `street.diversePaths` is right to refuse two identical points (it is a programming guard
+  // on its own API, not a verdict on this link). Left unhandled, that guard surfaced as a refusal of
+  // the DEFAULT request - `protection` is `diverse` unless the caller says otherwise - blaming a
+  // caller whose two sites are 66 m apart: `a link needs two different points on the network`. The
+  // link is buildable and has a one-leg answer: 0 m of duct, Site A's drop, the chamber, Site B's
+  // drop. The chamber is a splice, so it is a joint, and one chamber both drops land in is the reason
+  // the circuit is not protected - stated, not thrown.
+  let coincidentAt = null;
   if (graph) {
-    if (opts.protection === 'diverse') {
+    if (snaps.a.nodeId === snaps.b.nodeId) {
+      coincidentAt = graph.nodes.get(snaps.a.nodeId);
+      routedLegs = [{
+        nodes: [snaps.a.nodeId],
+        edges: [],
+        lengthM: 0,
+        route: [{ lat: coincidentAt.lat, lon: coincidentAt.lon }]
+      }];
+      context.method = 'coincident';
+      diversity = {
+        requested: opts.protection,
+        method: 'coincident',
+        disjoint: false,
+        shared: [],
+        sharedM: 0,
+        sharedNodes: []
+      };
+      notes.push('Both sites attach to the same node on the duct graph (' + latLon(coincidentAt) +
+        '): there is no duct between them, so the leg is the drop from Site A and the drop from ' +
+        'Site B, spliced in that chamber, and no pair of legs can be drawn.');
+    } else if (opts.protection === 'diverse') {
       const routed = street.diversePaths(graph, snaps.a.nodeId, snaps.b.nodeId);
       if (!routed) {
         return refusal(opts, context, 'the duct/street graph does not connect ' + opts.sites.a.name +
@@ -634,7 +664,12 @@ function design(input, registry) {
     const ownM = round(routed.lengthM + spurM, 2);
     const leased = opts.thirdParty.filter(function (seg) { return seg.leg === 'both' || seg.leg === id; });
     const leasedM = round(sum(leased, function (seg) { return seg.lengthM; }), 2);
-    const joints = graph ? jointNodes(graph, routed.nodes) : [];
+    // The chamber both drops meet in is a joint whatever the graph's degrees say: an interior vertex
+    // is a joint because cable runs through it, and this one is where A's drop is spliced to B's.
+    const joints = coincidentAt
+      ? [{ nodeId: snaps.a.nodeId, lat: coincidentAt.lat, lon: coincidentAt.lon,
+          degree: (graph.adjacency.get(snaps.a.nodeId) || []).length }]
+      : (graph ? jointNodes(graph, routed.nodes) : []);
     // The drawn leg covers the cable the leg buys. `routed.route` is the duct geometry between the two
     // snap points; the site drops (`spurA`, `spurB`) are measured into `ownM` and paid for by the BOM,
     // so leaving them out of the route drew a circuit that ended at a manhole 44.5 m from the building
@@ -757,7 +792,10 @@ function design(input, registry) {
 
   let sentence;
   if (legs.length < 2) {
-    sentence = diversity.method === 'straight-line'
+    sentence = diversity.method === 'coincident'
+      ? 'both sites attach to the same node on the network (' + latLon(coincidentAt) + '): the two ' +
+        'site drops meet in one chamber, so there is no duct run between them and nothing to protect'
+      : diversity.method === 'straight-line'
       ? 'one straight-line leg: without a graph no protected pair can be drawn'
       : 'one leg only: the graph offers a single route between the sites, so the circuit is unprotected';
   } else if (achieved) {
