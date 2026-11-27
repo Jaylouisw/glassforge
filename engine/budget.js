@@ -198,6 +198,28 @@ function connectorCountOf(input) {
 }
 
 /**
+ * A design's list of plant - its spans, its splitters - or a refusal naming the value it got.
+ *
+ * `design.spans || []` read a present-but-unusable list as an empty one: `null`, `0`, `false` and
+ * `''` are all falsy, so they became "no cable" and the ODN loss the verdict is computed on came out
+ * lower than the plant the caller named. Measured on the baseline design in
+ * `test/budget-odn-counts.test.js` with `spans: null`: 0 m of fibre, ODN 23.3 dB and `verdict: ok`,
+ * where the plant it names is `fail` - 0.294 dB outside the GPON B+ class budget. A verdict computed
+ * on a cable that was dropped is worse than a refusal. `{}` and `"x"` were already refused; every
+ * present value is refused the same way now, and an absent key stays the empty plant it describes.
+ */
+function listField(design, name, what) {
+  const value = design[name];
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) {
+    throw new TypeError('design.' + name + ' must be an array of ' + what + 's and got ' +
+      showValue(value) + ' - a list the budget cannot read is refused rather than read as no ' + what +
+      ', which would delete the loss it names from the ODN');
+  }
+  return value;
+}
+
+/**
  * A splice entry's own `lossDb`, when it states one instead of taking the model's rated loss.
  *
  * `lossDb: -5` used to be used as-is, so a splice list could *gain* 5 dB, and `lossDb: "0.1"` fell back
@@ -224,8 +246,7 @@ function computeOdn(design, wavelength, registry) {
   const breakdown = [];
 
   // --- fibre ---------------------------------------------------------------------
-  const spans = design.spans || [];
-  if (!Array.isArray(spans)) throw new TypeError('design.spans must be an array');
+  const spans = listField(design, 'spans', 'span');
   let fibreDb = 0;
   let fibreLengthM = 0;
   spans.forEach(function (span, i) {
@@ -286,8 +307,7 @@ function computeOdn(design, wavelength, registry) {
   // --- splitters -----------------------------------------------------------------
   let splitterLossDb = 0;
   let cascadeRatio = 1;
-  const splitters = design.splitters || [];
-  if (!Array.isArray(splitters)) throw new TypeError('design.splitters must be an array');
+  const splitters = listField(design, 'splitters', 'splitter');
   splitters.forEach(function (s, i) {
     if (!s || !s.model) throw new TypeError('design.splitters[' + i + '].model is required');
     const part = registry.get('splitter', s.model);
