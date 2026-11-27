@@ -156,6 +156,20 @@ a 12-per-tube loose tube - two cables of different tube sizes spliced at one clo
 each, which is what the crew reads off the two trays. A span naming a cable the catalogue does not hold
 falls back to the standard twelve rather than hiding the strand from the sheet.
 
+A span with `bundles > 1` numbers its strands **continuously across the bundle** — 1…`fibersPerCable ×
+bundles` — but a tray is per cable, so `network.spliceTable` scopes each row to the cable the strand is
+in. Every row carries `cable` (1-based within the bundle), `strandInCable` (1-based within that cable)
+and a cable-qualified `label`: strand 18 of `2 x g652d-loose-12` is `cable: 2`, `strandInCable: 6`,
+bare `address: 'T01-F06'` and `label: 'C02/T01-F06'`. `address` stays the bare tray label because
+`fiber.parseAddress` and the ledger read it; `label` is what the printed schedule shows, and on a
+single-cable span the two are equal. An index past `fibersPerCable × bundles` is refused by name
+(`strand index 25 is outside a 2 x 12-fibre bundle (24 fibres)`) rather than labelled cable 3 of 2. An
+unknown cable model reports `cable: null` — the figure stays missing rather than guessing cable 1 — and
+the row keeps the standard-twelve tray. `fiber.bundleAddressFor` is the one function the closure
+sheet, the splitter tail and the web thread diagram all call, and the printed schedule shows the row's
+`label`; `test/strand-bundle-address.test.js` is the sheet and `test/print-bundled-address.test.js` the
+printed page.
+
 `spans[].strands` lists the strand indices **in use** on that span. The ledger reports used, spare and
 utilisation per span, and an overbooked span is **refused**, not coloured: 14 strands assigned to a
 12-fibre cable is a real drum somebody cannot splice, so `network.validate` returns it as an error

@@ -424,7 +424,8 @@ GET /print/project/:id      → text/html: the plan, the cable to buy, the splic
 This is the page a crew takes to site. It carries the drawing with a **scale bar and its `1 px = … m`
 figure**, the validation errors and warnings as they stand, the cable-to-buy table (per model and per
 span), and a splice schedule for every closure and splitter: each strand on each touching cable, the
-engine's TIA-598 address and colour, and how it is terminated — the strand it is spliced to at a
+engine's TIA-598 address and colour (cable-qualified, `C02/T01-F06`, on a bundled span — SPEC §6), and
+how it is terminated — the strand it is spliced to at a
 closure, `parked` when it arrives on one cable and leaves on none, or `splitter input` / `splitter
 port P<n>` at a splitter, whose rows are never spliced across the split. The browser's own **Print → Save as PDF** is the PDF path; nothing is
 rendered into a PDF on the server and no library is loaded.
