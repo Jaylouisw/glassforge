@@ -663,7 +663,14 @@ async function handle(req, res, ctx) {
     const buf = await readBody(req, MAX_UPLOAD_BYTES);
     const type = String(req.headers['content-type'] || '');
     const isKmz = /kmz/.test(type) || (buf.length > 4 && buf.readUInt32LE(0) === 0x04034b50);
-    const isJson = /json/.test(type);
+    const text = buf.toString('utf8');
+    // The JSON form is documented, and the header is not what makes a body JSON: "curl -d" labels it
+    // application/x-www-form-urlencoded and a bare fetch body has no type at all. Read only behind a
+    // "...json" header, those bytes went to the KML parser and were refused as "not a KML document" -
+    // naming the reader rather than the body. The first non-space byte is unambiguous: KML opens with
+    // "<", a zip with "PK", and the two documented JSON shapes with "{" or "[".
+    const looksJson = !isKmz && /^[\s\uFEFF]*[{[]/.test(text);
+    const isJson = /json/.test(type) || looksJson;
     let input;
     if (isKmz) {
       // A zip we cannot read - no central directory, or no .kml inside it - is the uploader's file,
@@ -677,11 +684,11 @@ async function handle(req, res, ctx) {
       }
     } else if (isJson) {
       try {
-        input = JSON.parse(buf.toString('utf8'));
+        input = JSON.parse(text);
       } catch (err) {
         return fail(req, res, 400, 'invalid JSON body: ' + err.message);
       }
-    } else input = buf.toString('utf8');
+    } else input = text;
 
     let graph;
     try {

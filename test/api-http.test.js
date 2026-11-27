@@ -434,6 +434,27 @@ async function main() {
     assert.ok(Array.isArray(importedNetwork.body.edges[0].coords));
   });
 
+  // The JSON form is one of the bodies docs/API.md accepts from this endpoint, and the header is not
+  // what makes it JSON: `curl -d` labels the same body application/x-www-form-urlencoded, and a bare
+  // fetch body has no type at all. Read only behind a `...json` header, the bytes went to the KML
+  // parser and came back `not a KML document: no <kml> root element` - a refusal that named the wrong
+  // thing for a body the docs accept. The body is sniffed now: KML starts with `<`, a zip with `PK`.
+  const unlabelledJson = await request('POST', '/api/import/network', streetJson, { 'Content-Type': 'text/plain' });
+  const formJson = await request('POST', '/api/import/network', streetJson, { 'Content-Type': 'application/x-www-form-urlencoded' });
+  test('a JSON street network is read from the body, not from a Content-Type the docs never require', function () {
+    assert.strictEqual(unlabelledJson.status, 200, JSON.stringify(unlabelledJson.body));
+    assert.strictEqual(unlabelledJson.body.stats.edges, importedNetwork.body.stats.edges);
+    assert.strictEqual(formJson.status, 200, JSON.stringify(formJson.body));
+    assert.strictEqual(formJson.body.stats.edges, importedNetwork.body.stats.edges);
+  });
+
+  const brokenJson = await request('POST', '/api/import/network', Buffer.from('{ "edges": [ '), { 'Content-Type': 'text/plain' });
+  test('a JSON body that will not parse names JSON, not the KML parser', function () {
+    assert.strictEqual(brokenJson.status, 400, JSON.stringify(brokenJson.body));
+    assert.ok(/JSON/.test(brokenJson.body.error), brokenJson.body.error);
+    assert.ok(!/KML/i.test(brokenJson.body.error), brokenJson.body.error);
+  });
+
   const routedDesign = await request('POST', '/api/design/synthesise', {
     demand: 'label,lat,lon\nA,51.5004,-0.0998\nB,51.5008,-0.0998',
     headEnd: { lat: 51.5, lon: -0.1010, name: 'PoP' },
