@@ -196,7 +196,7 @@ fifty-first edit is the one that becomes permanent. The server persists projects
   string order (`g652d-loose-144` sorts before `g652d-loose-24`), then `, ...` when the catalogue holds
   more. Run against this build, `registry.get('cable', 'nope-9000')` answers `unknown cable model
   "nope-9000" - known models: g652d-loose-12, g652d-loose-144, g652d-loose-24, g652d-loose-48,
-  g652d-loose-72, g652d-loose-96, g652d-ribbon-216, g652d-ribbon-288, ...` — the tail is the
+  g652d-loose-72, g652d-loose-96, g652d-ribbon-144, g652d-ribbon-216, ...` — the tail is the
   catalogue's, so it moves when a cable is added. An empty catalogue for that kind says so instead.
 - A split ratio beyond the OLT's `maxSplitRatio` → **error**.
 - A span with no measured length → **error** at BOM time.
