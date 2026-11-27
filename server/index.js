@@ -1080,7 +1080,9 @@ function printPage(req, res, project, registry) {
         (point.ratio ? ' 1:' + point.ratio : '') + ', ' +
         point.spans.length + ' cable(s), ' + point.rows.length + ' strand(s))</span></h3>');
       out.push(tableHtml(['Span', 'Strand', 'Address', 'Colour', 'Joints / port'], point.rows.map(function (row) {
-        return [row.span, { text: String(row.strand), cls: 'num' }, row.address,
+        // `label` is the cable-qualified tray address (`C02/T01-F06` on a bundled span); it equals
+        // `address` on a single-cable span, so the sheet reads the same as before there.
+        return [row.span, { text: String(row.strand), cls: 'num' }, row.label,
           { html: '<span class="swatch" style="background:' + escapeHtml(row.hex) + '"></span>' + escapeHtml(row.colour) },
           spliceTarget(row, point)];
       })));
