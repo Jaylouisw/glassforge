@@ -142,6 +142,26 @@ function indexOfAny(header, names) {
 }
 
 /**
+ * Is this record a comment, or a row?
+ *
+ * A record is a row when it carries fields - a delimiter-separated cell - and a comment only when it
+ * is one bare `# ...` sentence. The filter used to drop every record whose first character was `#`,
+ * and the label column is the first column: an address written the way a street writes it,
+ * `#12 Calle 3,51.5,-0.1`, disappeared without a `rejected` entry. Measured on this importer, that
+ * file of two houses parsed to `points: 1, rejected: 0` - one house short, with no sentence saying so,
+ * which is the silence `demand.js` exists to refuse. The cost of the rule is the other side of the
+ * same promise: a note that contains a comma is a row with no coordinates, and it is *rejected by
+ * name* rather than swallowed.
+ *
+ * The delimiter is not known yet when the filter runs (the header names it), so every separator a
+ * header may use counts as a field.
+ */
+function isCommentLine(line) {
+  if (line.charAt(0) !== '#') return false;
+  return line.indexOf(',') === -1 && line.indexOf(';') === -1 && line.indexOf('	') === -1;
+}
+
+/**
  * Parse CSV text.
  *
  * A header is read when it names a latitude and a longitude column. Without one, the first row is
@@ -156,7 +176,7 @@ function parseCsv(text, opts) {
   const records = splitRecords(raw) || raw.split('\n');
   const lines = records
     .map(function (l) { return l.trim(); })
-    .filter(function (l) { return l && l.charAt(0) !== '#'; });
+    .filter(function (l) { return l && !isCommentLine(l); });
 
   if (!lines.length) throw new Error('the demand list is empty');
 
