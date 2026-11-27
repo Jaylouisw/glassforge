@@ -13,10 +13,15 @@ Read `docs/SPEC.md` for the model and `GLOSSARY.md` for the vocabulary before ch
 - **Two technologies, one loss model.** The root node type picks the budget: `olt` → PON, `headend` →
   active point-to-point. The passive loss is shared code, so the two verdicts cannot drift.
 - **`main` is PR-only.** Branch → pull request → green CI → squash merge. Nobody commits to `main`.
-  Branch protection blocks direct pushes and requires the `Test (18/20/22)`, `Server smoke test` and
-  `Docker build` checks, so a red or pending run really does block a merge here. That is a change from
-  the Forgejo instance, where the runner appended `(push)`/`(pull_request)` to every context name and
-  status gating had to stay off.
+  Branch protection requires five check contexts on `main` — `Test (Node 18)`, `Test (Node 20)`,
+  `Test (Node 22)`, `Server smoke test`, `Docker build` — and refuses force pushes and deletions, so a
+  red or pending run blocks a merge. Quote those names as they are: a required check is matched by its
+  context string, and `Test (18/20/22)` matches no job in `ci.yml`, so a rule written with it waits on a
+  run that never reports. Protection does not itself require a pull request
+  (`required_pull_request_reviews` is `null`) and leaves admins exempt (`enforce_admins` is off), so
+  PR-only is the contributor's habit on top of the gate rather than a lock on the owner's account.
+  That is a change from the Forgejo instance, where the runner appended `(push)`/`(pull_request)` to
+  every context name and status gating had to stay off.
 - **TypeScript for new modules, and never `any`.** New code is written `.ts`; legacy `.js` migrates as it
   is touched (`allowJs` is off, so a `.ts` module reaches a `.js` one with `require()` plus a local
   interface). The emitted `.js` is committed — build before you push, or CI fails on
