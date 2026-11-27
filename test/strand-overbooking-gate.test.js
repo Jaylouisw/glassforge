@@ -71,7 +71,14 @@ test('a span whose cable the catalogue lacks is refused for the model, not blame
   // not call the span overbooked. The unknown model is already an error; one contradiction, one
   // sentence - a second "overbooked" line would send the caller to count strands for a typo.
   const result = engine.network.validate(plant(range(13), { cable: 'not-a-cable' }), registry);
-  assert.deepStrictEqual(result.errors, ['span "s1" uses unknown cable model "not-a-cable"']);
+  // This used to assert exactly 'span "s1" uses unknown cable model "not-a-cable"' - one sentence,
+  // and no remedy in it. SPEC §8 wants an unknown model named with the models that do exist, so the
+  // header is asserted and the catalogue tail separately; test/plant-validation.test.js pins the
+  // full shape and the plain-string order.
+  assert.strictEqual(result.errors.length, 1, JSON.stringify(result.errors));
+  assert.ok(result.errors[0].indexOf('span "s1" uses unknown cable model "not-a-cable" - known models: ') === 0,
+    result.errors[0]);
+  assert.ok(result.errors[0].indexOf('g652d-loose-12') !== -1, result.errors[0]);
 });
 
 done();

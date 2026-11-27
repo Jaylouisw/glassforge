@@ -722,7 +722,12 @@ function validate(plant, registry) {
       if (!node.model) {
         if (node.type !== 'closure') errors.push(node.type + ' node "' + node.id + '" has no model');
       } else if (!allowed.some(function (k) { return registry.has(k, node.model); })) {
-        const message = 'node "' + node.id + '" uses unknown ' + allowed.join('/') + ' model "' + node.model + '"';
+        // The remedy is the catalogue, not just the verdict: this sentence is what `/ops`, `PUT`,
+        // the project's own `errors` and the printed plan show, and it used to name no model at all
+        // while `registry.get` named eight for the same fact (SPEC §8). An `ont` accepts an ONT or a
+        // transceiver, so both catalogues are offered - the message already says "ont/transceiver".
+        const message = 'node "' + node.id + '" uses unknown ' + allowed.join('/') + ' model "' + node.model + '"' +
+          registry.knownModelsTail(allowed);
         if (node.type === 'closure') warnings.push(message);
         else errors.push(message);
       }
@@ -770,7 +775,9 @@ function validate(plant, registry) {
     if (!ids.has(span.to)) errors.push('span "' + span.id + '" ends at unknown node "' + span.to + '"');
     if (span.from === span.to) errors.push('span "' + span.id + '" connects a node to itself');
     if (!span.cable) errors.push('span "' + span.id + '" has no cable model');
-    else if (!registry.has('cable', span.cable)) errors.push('span "' + span.id + '" uses unknown cable model "' + span.cable + '"');
+    else if (!registry.has('cable', span.cable)) {
+      errors.push('span "' + span.id + '" uses unknown cable model "' + span.cable + '"' + registry.knownModelsTail('cable'));
+    }
     if (!isNum(span.lengthM) || span.lengthM <= 0) errors.push('span "' + span.id + '" has no measured length');
     if (span.lengthM > 20000) warnings.push('span "' + span.id + '" is over 20 km - is the length in metres?');
     if (!isSpanCount(span.splices)) {

@@ -98,7 +98,13 @@ async function main() {
     assert.ok(badCableOp.body.error.indexOf('unknown cable model') !== -1, badCableOp.body.error);
     assert.ok(badCableOp.body.error.indexOf('g652d-loose-999') !== -1, badCableOp.body.error);
     assert.ok(badCableOp.body.error.indexOf('"s3"') !== -1, 'the message should name the offending span: ' + badCableOp.body.error);
-    assert.deepStrictEqual(badCableOp.body.errors, ['span "s3" uses unknown cable model "g652d-loose-999"']);
+    // The sentence used to end at the model the catalogue lacks. SPEC §8: an unknown part model names
+    // the models that do exist, so the header is pinned here and the catalogue tail asserted present
+    // (test/plant-validation.test.js owns the full shape and its plain-string order).
+    assert.strictEqual(badCableOp.body.errors.length, 1, JSON.stringify(badCableOp.body.errors));
+    assert.ok(badCableOp.body.errors[0].indexOf('span "s3" uses unknown cable model "g652d-loose-999" - known models: ') === 0,
+      badCableOp.body.errors[0]);
+    assert.ok(badCableOp.body.errors[0].indexOf('g652d-loose-12') !== -1, badCableOp.body.errors[0]);
   });
 
   test('a refused edit answers with diagnostics, not with a project that looks saved', function () {
@@ -127,7 +133,10 @@ async function main() {
   test('PUT refuses the same plant, so ops and PUT now agree on what may be saved', function () {
     assert.strictEqual(putSamePlant.status, 400, brief(putSamePlant));
     assert.strictEqual(putSamePlant.body.error, 'the design does not validate');
-    assert.deepStrictEqual(putSamePlant.body.errors, ['span "s3" uses unknown cable model "g652d-loose-999"']);
+    // Same sentence and same remedy as the op above, so the two write gates cannot drift apart.
+    assert.strictEqual(putSamePlant.body.errors.length, 1, JSON.stringify(putSamePlant.body.errors));
+    assert.ok(putSamePlant.body.errors[0].indexOf('span "s3" uses unknown cable model "g652d-loose-999" - known models: ') === 0,
+      putSamePlant.body.errors[0]);
   });
 
   // ------------------------------------------------------------------ a valid op still lands
@@ -273,7 +282,15 @@ async function main() {
     assert.strictEqual(badModel.status, 400, brief(badModel));
     assert.ok(badModel.body.error.indexOf('"n2"') !== -1, badModel.body.error);
     assert.ok(badModel.body.error.indexOf('unknown splitter model') !== -1, badModel.body.error);
-    assert.deepStrictEqual(badModel.body.errors, ['node "n2" uses unknown splitter model "plc-1x99-sca"']);
+    // It used to stop at the model: 'node "n2" uses unknown splitter model "plc-1x99-sca"'. The
+    // catalogue tail is the remedy, and a splitter's list is its own (SPEC §8).
+    assert.strictEqual(badModel.body.errors.length, 1, JSON.stringify(badModel.body.errors));
+    assert.ok(badModel.body.errors[0].indexOf('node "n2" uses unknown splitter model "plc-1x99-sca" - known models: ') === 0,
+      badModel.body.errors[0]);
+    // Eight of thirteen, then ", ...": plc-1x8-sca sorts past the cut, so the list is checked on a
+    // rung that is inside it rather than on the model the caller wanted.
+    assert.ok(badModel.body.errors[0].indexOf('plc-1x2-sca') !== -1, badModel.body.errors[0]);
+    assert.ok(badModel.body.errors[0].indexOf(', ...') !== -1, 'the catalogue holds more than eight: ' + badModel.body.errors[0]);
   });
 
 

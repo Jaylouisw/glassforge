@@ -511,7 +511,9 @@ async function handle(req, res, ctx) {
         const unpriceable = (project.spans || []).map(function (span) {
           if (!span) return null;
           if (span.cable && !registry.has('cable', span.cable)) {
-            return 'span "' + span.id + '" uses unknown cable model "' + span.cable + '"';
+            // The validator's sentence, remedy and all: a hand-edited file's typo is answered with the
+            // models the catalogue does have, not only the name it did not find (SPEC §8).
+            return 'span "' + span.id + '" uses unknown cable model "' + span.cable + '"' + registry.knownModelsTail('cable');
           }
           // A length that is absent, zero or not a number is the other file-edited state the BOM
           // refuses. Cable is looked up first, as `billOfMaterials` does, so a span wrong twice names

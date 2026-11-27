@@ -240,4 +240,66 @@ test('a strands value that is not a list is refused, naming the span and the val
     'absent still means the span carries nothing, which is a legitimate spare cable');
 });
 
+test('an unknown part model names the models that exist (SPEC §8)', function () {
+  // The plant validator is where a planner meets the refusal: `/ops`, `PUT`, the project's own
+  // `errors` and the printed plan all print it. It used to say only
+  //   span "s1" uses unknown cable model "g652d-loose-99"
+  // - no remedy - while `registry.get` for the same fact named the catalogue. SPEC §8 says an unknown
+  // part model is an error "naming the models that do exist, up to eight of them in plain string
+  // order ... then `, ...` when the catalogue holds more", so both paths say it the same way.
+  const cables = registry.all('cable').map(function (c) { return c.model; }).sort();
+  assert.ok(cables.length > 8, 'this catalogue shows the truncation, got ' + cables.length + ' cables');
+  const tail = cables.slice(0, 8).join(', ') + ', ...';
+
+  const p = base();
+  p.spans[0].cable = 'g652d-loose-99';
+  const cableError = engine.network.validate(p, registry).errors.filter(function (e) {
+    return e.indexOf('unknown cable model') !== -1;
+  })[0];
+  assert.strictEqual(cableError, 'span "s1" uses unknown cable model "g652d-loose-99" - known models: ' + tail);
+
+  // Plain string order, not natural order: SPEC §8's own example is that 144 sorts before 24.
+  // g652d-loose-144 < g652d-loose-24 < g652d-loose-48 as strings; a `localeCompare` would not.
+  assert.ok(cableError.indexOf('g652d-loose-144, g652d-loose-24') !== -1,
+    'the list is in plain string order, got: ' + cableError);
+
+  const q = base();
+  q.nodes[1].model = 'plc-1x99-sca';
+  const splitterError = engine.network.validate(q, registry).errors.filter(function (e) {
+    return e.indexOf('unknown splitter model') !== -1;
+  })[0];
+  const splitters = registry.all('splitter').map(function (s) { return s.model; }).sort();
+  assert.strictEqual(splitterError,
+    'node "n2" uses unknown splitter model "plc-1x99-sca" - known models: ' + splitters.slice(0, 8).join(', ') +
+    (splitters.length > 8 ? ', ...' : ''));
+
+  // An `ont` node accepts an ONT or a transceiver model, so the list it is offered is both
+  // catalogues, sorted together - the message already says "ont/transceiver".
+  const r = base();
+  r.nodes[2].model = 'nope-9000';
+  const ontError = engine.network.validate(r, registry).errors.filter(function (e) {
+    return e.indexOf('unknown ont/transceiver model') !== -1;
+  })[0];
+  const both = Array.from(new Set(
+    registry.all('ont').map(function (o) { return o.model; })
+      .concat(registry.all('transceiver').map(function (t) { return t.model; }))
+  )).sort();
+  assert.strictEqual(ontError,
+    'node "n3" uses unknown ont/transceiver model "nope-9000" - known models: ' + both.slice(0, 8).join(', ') + ', ...');
+  assert.ok(ontError.indexOf('gpon-ont-1ge') !== -1, 'an ONT model is named: ' + ontError);
+
+  // A closure warns rather than errors, and the warning carries the same remedy.
+  const v = base();
+  v.nodes.splice(1, 0, { id: 'n5', type: 'closure', model: 'mystery-box' });
+  v.spans = [
+    { id: 's1', from: 'n1', to: 'n5', cable: 'g652d-loose-12', lengthM: 500 },
+    { id: 's2', from: 'n5', to: 'n2', cable: 'g652d-loose-12', lengthM: 400 },
+    { id: 's3', from: 'n2', to: 'n3', cable: 'g657a2-drop-1', lengthM: 40 }
+  ];
+  const warning = engine.network.validate(v, registry).warnings.filter(function (w) {
+    return w.indexOf('unknown closure model') !== -1;
+  })[0];
+  assert.ok(warning.indexOf(' - known models: ') !== -1, warning);
+});
+
 done();
