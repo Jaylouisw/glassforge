@@ -16,6 +16,7 @@ const registry = parts.createRegistry();
 const budget = engine.budget;
 const LR = { model: 'qsfp28-50g-lr-10km' };
 const ER = { model: 'qsfp28-50g-er-40km' };
+const FR = { model: 'qsfp28-50g-fr-2km' };
 
 function link(headEnd, cpe, lengthM, connectors, txDbm) {
   return budget.pointToPoint({
@@ -153,6 +154,55 @@ test('the 50G rows are refused against 25G and 100G optics on speed', function (
   }
   assert.ok(threw, 'a 50G optic into a 25G optic must be refused');
   assert.ok(String(threw.message).indexOf('different rates') !== -1, threw.message);
+});
+
+test('the FR row is the 2 km rung, and its 4.0 dB budget cannot read ok at the default margin', function () {
+  // 802.3cd Tables 139-6/139-7, 50GBASE-FR: -4.1..+3.0 dBm launch, -8.1..+3.0 dBm receive, 2 km,
+  // one 26.5625 GBd PAM4 carrier in the same 1304.5-1317.5 nm window as LR. The D2.1 ballot moved
+  // the launch floor and the receive minimum together (-3.6/-7.6 -> -4.1/-8.1), so the 4.0 dB a
+  // link may spend did not move with them; Huawei’s 50G PAM4 white paper and AscentOptics’
+  // SFP-50SM31-02C print the published pair.
+  const fr = registry.get('transceiver', 'qsfp28-50g-fr-2km');
+  assert.strictEqual(fr.speedMbps, 50000, 'a 50G PAM4 rung');
+  assert.strictEqual(fr.wavelengthNm, 1310, 'the window the cables publish attenuation for');
+  assert.strictEqual(fr.reachM, 2000, 'FR is the 2 km rung');
+  assert.strictEqual(fr.txPowerDbmMin, -4.1, 'average launch MIN is -4.1 dBm');
+  assert.strictEqual(fr.txPowerDbmMax, 3, 'average launch MAX is +3.0 dBm');
+  assert.strictEqual(fr.rxSensitivityDbm, -8.1, 'average receive MIN is -8.1 dBm');
+  assert.strictEqual(fr.rxOverloadDbm, 3, 'average receive MAX is +3.0 dBm');
+  // -4.1 - (-8.1) = 4.0, the class channel insertion loss; the printed 7.6 dB power budget carries
+  // a 3.6 dB TDECQ allowance on top, which the engine does not spend
+  assert.strictEqual(fr.txPowerDbmMin - fr.rxSensitivityDbm, 4, 'the class is 4 dB');
+  assert.ok(fr.notes.indexOf('replace the row with the module actually purchased') !== -1, fr.notes);
+
+  // 2 km bare: 0.7 dB of fibre leaves 3.3 dB - over the 3 dB margin, under the 5 dB ok line
+  const bare = link(FR, FR, 2000);
+  close(bare.odnLossDb, 0.7, 0.001, '2 km x 0.35 dB/km');
+  close(bare.rxPowerDbm, -4.8, 0.001, '-4.1 - 0.7');
+  close(bare.headroomDb, 3.3, 0.001, '-4.8 against -8.1');
+  assert.strictEqual(bare.verdict, 'marginal');
+
+  // one patch-panel pair (0.6 dB) drops it under the margin, and the refusal names sensitivity
+  const patched = link(FR, FR, 2000, 2);
+  close(patched.odnLossDb, 1.3, 0.001, '0.7 dB of fibre + two SC/APC matings at 0.3 dB');
+  close(patched.headroomDb, 2.7, 0.001, '1.3 dB of ODN against a 4.0 dB budget');
+  assert.strictEqual(patched.verdict, 'fail');
+  assert.ok(patched.reasons.join(' ').indexOf('-8.1 dBm') !== -1, patched.reasons);
+
+  // ok needs margin + 2 = 5 dB and the class offers 4.0 at zero loss, so no FR link is ok by default
+  assert.strictEqual(link(FR, FR, 0).verdict, 'marginal', 'even back-to-back');
+  const relaxed = budget.pointToPoint({ headEnd: FR, cpe: FR,
+    spans: [{ cable: 'g652d-loose-12', lengthM: 2000 }], connectors: { model: 'sc-apc', count: 0 },
+    splices: 0, marginDb: 1 }, registry);
+  assert.strictEqual(relaxed.verdict, 'ok', 'only a deliberate 1 dB margin makes 2 km ok');
+
+  // reach binds before the budget: 2100 m still has headroom and is refused by name
+  const past = link(FR, FR, 2100);
+  assert.strictEqual(past.verdict, 'fail');
+  assert.ok(past.reasons.join(' ').indexOf('reaches 2000') !== -1, past.reasons);
+
+  // launch ceiling equals the receive maximum, so FR is not an overload row the way ER is
+  assert.strictEqual(bare.attenuator, null, 'FR needs no pad');
 });
 
 done();
