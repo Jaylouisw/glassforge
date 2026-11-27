@@ -4,6 +4,11 @@ Issues and pull requests live on GitHub, in this repository. The project spent a
 self-hosted Forgejo instance and came back; that instance still exists as an archive, but nothing is
 filed, reviewed or merged there any more.
 
+Numbers did not survive the move. The Forgejo tracker reached #259; this repository's issues
+start at #1, so a note citing a Forgejo number points at nothing here - or, once the count passes
+it, at a different issue. A migrated issue names its old number in the body (`Migrated from the
+Forgejo tracker (glassforge#185)`), and a reference written in the docs uses the GitHub number.
+
 - Repository: `https://github.com/jaylouisw/glassforge`
 - Issues: `https://github.com/jaylouisw/glassforge/issues`
 - Pull requests: `https://github.com/jaylouisw/glassforge/pulls`

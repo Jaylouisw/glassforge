@@ -184,14 +184,14 @@ wavelengths and refusing beats reading a typo as `"down"`.
 `pointToPoint` call with `direction: "up"`, always the B → A direction whatever `direction` asked for,
 and the same object as `budget` when the caller asked for `"up"` - with its own `upstreamVerdict`;
 the top-level `upstreamVerdict` is the worst of the legs, and it is `null` on a refusal, which routed
-nothing and so measured neither direction. The half not asked for is **warned about, not gated**:
-a failing `upstream` adds `A-leg: fails upstream over the same path - <reasons>`, naming the one pad
+nothing and so measured neither direction. The half not asked for is **warned about, not gated**: a
+failing `upstream` adds `A-leg: fails upstream over the same path - <reasons>`, naming the one pad
 to buy when both directions ask for one, but `verdict` and `ok` stay the direction the caller asked
 for - the same treatment auto-design gives `upstreamVerdict` / `metrics.upstreamFailOnts`, and
-whether an upstream failure should refuse a circuit is open in #185/#111. A mixed pair is not
-symmetric: `sfp-1g-lx-10km` at A and `sfp-1g-ex-40km` at B over a 3.0 km duct read `ok` downstream at
--12.65 dBm and `fail` upstream at -2.65 dBm, because the EX launches its floor into the LX receiver's
--3 dBm overload point: a 5 dB pad, not more reach.
+whether an upstream failure should refuse a circuit is open in #6 (the upstream verdict) / #5 (the
+launch-window verdict). A mixed pair is not symmetric: `sfp-1g-lx-10km` at A and `sfp-1g-ex-40km` at
+B over a 3.0 km duct read `ok` downstream at -12.65 dBm and `fail` upstream at -2.65 dBm, because
+the EX launches its floor into the LX receiver's -3 dBm overload point: a 5 dB pad, not more reach.
 `legs[].routedM` is the graph measurement,
 `legs[].ownM` adds both site drops (the cable to buy) and `legs[].lengthM` adds leased segments.
 `legs[].spliceEvents` is what the light crosses - one splice per joint on the leg, or the `splices`
