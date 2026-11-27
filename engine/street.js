@@ -34,6 +34,7 @@ const VERTEX_PRECISION = 6;        // ~0.11 m: two vertices this close are the s
 const DEFAULT_JOIN_M = 1.5;        // KML lines from different drawings rarely share exact endpoints
 const DEFAULT_MAX_SNAP_M = 250;    // farther than this from any street, a property is not connected
 const CROSSING_EPS_M = 0.05;       // shallower than this off the other line is a graze
+const TWIN_EPS_DEG = 1e-6;         // ~0.11 m: a second copy of a drawing, not a second alignment
 
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 function round(n, places) {
@@ -141,6 +142,38 @@ class Graph {
     return id;
   }
 
+  /**
+   * The same polyline drawn twice, in either direction.
+   *
+   * An import routinely carries one duct more than once: a road drawn whole and again as the halves
+   * Google Earth writes when it splits it, or the same line in two exports merged into one file.
+   * Planarising the whole line at the shared vertex then re-creates the halves that are already
+   * there, so the graph holds one trench two or three times over.
+   *
+   * Routing survives that (every copy has the same length) but the **protected-pair** search does
+   * not: Suurballe will happily put one leg on each copy and report `disjoint: true, sharedM: 0`
+   * for two legs that are the identical route - a site-to-site link whose diversity is a drawing
+   * artefact. Measured on this engine before the collapse: a straight duct drawn whole plus its two
+   * halves, with one real alternative round the north, answered two legs of 692.21 m each as
+   * disjoint, and the north route was never considered.
+   *
+   * The tolerance is a centimetre, not `joinToleranceM`: two vertices this close are the same place,
+   * but two *alignments* a metre apart between the same junctions (a ring road) are two ducts and
+   * must stay two, because that is the diversity a planner is paying for.
+   */
+  _sameDrawing(p, q) {
+    if (p.length !== q.length) return false;
+    const eps = TWIN_EPS_DEG;
+    function near(one, other) {
+      return Math.abs(one.lat - other.lat) < eps && Math.abs(one.lon - other.lon) < eps;
+    }
+    let forward = true;
+    for (let i = 0; i < p.length; i++) if (!near(p[i], q[i])) { forward = false; break; }
+    if (forward) return true;
+    for (let i = 0; i < p.length; i++) if (!near(p[i], q[p.length - 1 - i])) return false;
+    return true;
+  }
+
   addEdge(aId, bId, geometry) {
     if (aId === bId) return null;
     const a = this.nodes.get(aId);
@@ -148,6 +181,13 @@ class Graph {
     const points = geometry && geometry.length >= 2 ? geometry : [a, b];
     const lengthM = geo.pathLengthM(points);
     if (!(lengthM > 0)) return null;
+    // One duct, drawn twice, is one duct. Adding the copy gives the diversity search a second
+    // trench on the same alignment - see `_sameDrawing`.
+    for (const entry of this.adjacency.get(aId) || []) {
+      if (entry.to !== bId) continue;
+      const twin = this.edges.get(entry.edgeId);
+      if (twin && this._sameDrawing(points, twin.geometry)) return twin;
+    }
     const id = 'e' + this.nextEdge++;
     const edge = { id: id, a: aId, b: bId, lengthM: lengthM, geometry: points };
     this.edges.set(id, edge);
