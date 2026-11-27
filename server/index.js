@@ -738,7 +738,11 @@ async function handle(req, res, ctx) {
   }
 
   if (pathname.startsWith('/api/')) return fail(req, res, 404, 'no such endpoint: ' + pathname);
-  if (method !== 'GET' && method !== 'HEAD') return fail(req, res, 405, 'method not allowed');
+  // docs/API.md promises every 405 names the path and carries `Allow`. The plan page and the static
+  // files are read-only surfaces outside `/api`, and this fallthrough answered a bare
+  // `method not allowed`: a script that POSTed a plan learned neither the path nor the method to
+  // send instead. A GET to a file that is not there is still a 404 - Allow is about the method.
+  if (method !== 'GET' && method !== 'HEAD') return methodNotAllowed(req, res, pathname, ['GET', 'HEAD']);
   if (pathname.indexOf('/print/project/') === 0) {
     const id = pathname.slice('/print/project/'.length);
     let project;

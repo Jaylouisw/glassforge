@@ -1047,6 +1047,21 @@ async function main() {
     assert.ok(String(unknownAction.body.error).indexOf('no such endpoint') !== -1);
   });
 
+  // docs/API.md: "A 405 names the path and the methods it does answer, and carries them in Allow."
+  // The print page and the static files are read-only surfaces outside /api, and the fallthrough
+  // answered a bare `method not allowed` - no path, no `Allow` - which is the one 405 a caller
+  // cannot correct itself from. A script that POSTed a plan was told nothing it could act on.
+  const postPrint = await request('POST', '/print/project/' + emptyProject.body.id);
+  const postRoot = await request('POST', '/');
+  test('a write to the read-only plan and static surfaces is a 405 naming the path and Allow', function () {
+    for (const pair of [{ res: postPrint, path: '/print/project/' + emptyProject.body.id }, { res: postRoot, path: '/' }]) {
+      assert.strictEqual(pair.res.status, 405, 'POST ' + pair.path + ' answered ' + pair.res.status);
+      assert.strictEqual(pair.res.headers.allow, 'GET, HEAD');
+      assert.ok(String(pair.res.body && pair.res.body.error).indexOf(pair.path) !== -1,
+        'the refusal must name the path, got: ' + JSON.stringify(pair.res.body));
+    }
+  });
+
   const headParts = await request('HEAD', '/api/parts');
   test('HEAD follows GET on an endpoint that has one', function () {
     assert.strictEqual(headParts.status, 200);
