@@ -105,7 +105,9 @@ against, instead of a PON class.
 }
 ```
 
-- `speedMbps` 1000 / 10000 / 25000 / 100000; `wavelengthNm` in [1260, 1675]; `reachM` up to 200 km.
+- `speedMbps` any positive whole number up to 1,600,000 Mb/s, so 40G, 200G and 800G rows are as
+  valid as 1G; the catalogue ships 1000, 10000, 25000, 40000, 50000, 100000, 200000, 400000 and
+  800000 today. `wavelengthNm` in [1260, 1675]; `reachM` up to 200 km.
 - The link budget is `txPowerDbmMin − rxSensitivityDbm` (10GBASE-LR: 6.2 dB), and reach is checked
   separately. Sensitivity must be below overload.
 - Both ends must agree on speed and wavelength, or `budget.pointToPoint` refuses the pair.
