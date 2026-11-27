@@ -84,6 +84,19 @@ objective has to see it. `metrics.designM` and `metrics.drums` stay as the lengt
 and `metrics.costBreakdown: { cable, splices, closures, splitters, total }` reports the terms, so the
 ranked number can be checked by hand.
 
+`costs` is read as a **complete** price list, so a term it leaves unsaid is refused by name rather
+than charged as zero. `synthesise` collects the cable models every candidate builds with and whichever
+of `splice`, `closure` and `splitter` it actually builds, and answers a `400` naming what is missing:
+a 12-house estate whose cable prices are complete but which leaves the labour terms out is refused
+with `costs.closure, costs.splice and costs.splitter are not priced, and a design here builds them - a
+money objective that charges an unsaid term as 0 quotes a total short of what the design costs, so
+price the term or write 0 to say it costs nothing; omit costs to rank by fibre-metres`, and an
+unlisted cable is `costs.cablePerM has no price for g657a2-drop-1, g657a2-drop-2 …`. Writing `0` is how
+a caller says a term is free — it is a figure the ranking can use — and a term no candidate builds
+needs no price at all: `technology: "active"` with no `splitter` entry answers `200`, while the same
+costs at `technology: "pon"` is the `costs.splitter is not priced` refusal. A total that is short a
+term is a total nobody can spend.
+
 ## How each topology is built
 
 ### PON
