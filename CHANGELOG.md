@@ -37,6 +37,21 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A near-miss option on the bill of materials is refused, not silently dropped.** `cableToBuy` has
+  refused a near miss of the nine options it reads since #192 because its answer is a purchase order,
+  but `billOfMaterials` read five of the same options through value guards only and then handed them to
+  `cableToBuy` in a fresh object with every key spelled correctly - so the guard one layer down could
+  never see the caller's typo. Measured on `main` at `c3ebcc3`, one 1000 m span of `g652d-loose-12` with
+  two splices (`{}` → `designM` 1090): `{"overlengthpct": 10}` bought 1090 m, the 3% default, 70 m of
+  the named slack short; `{"minimumPurchase": 5000}` bought 2000 m, one drum against a 5000 m supplier
+  floor; `{"spliceReserves": 5}` dropped both 30 m reserves. The BOM now refuses a near miss by name in
+  metres (`the bill of materials does not read the option "drumm" - did you mean "drumM"?`), with the
+  same narrow rule and the same bookkeeping keys passing through. Also pinned, not changed: a cable's
+  own `drumM` wins over a caller's (`cable.drumM || o.drumM`) - buying 500 m drums of a 288-fibre ribbon
+  is a product nobody sells - so `drumM` is accepted as the fallback for a cable that states none.
+  Tests: `length-and-bom` (+2 cases; the runner printed 72 suites / 653). A single adjacent
+  transposition (`{"overlenghtPct": 10}`) is still not caught by the shared matcher, which counts it as
+  two edits; that gap is filed separately because it changes the budget, link and design refusals too.
 - **A design option spelled one case off is refused by name, not replaced by its default.** The
   budget design object, the site-to-site link and the cable calculation have refused a near miss
   since #137/#157/#192; the design's own top-level options were the last list read without a key

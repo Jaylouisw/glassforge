@@ -214,6 +214,55 @@ test('the BOM refuses a minimum that is not a number, even with no spans', funct
   }, 'minimumPurchaseM');
 });
 
+// The BOM reads five of the options the cable page does, and it used to hand them to `cableToBuy` in a
+// fresh object with every key spelled correctly - so the guard one layer down never saw the caller's
+// typo. Measured on `main` at c3ebcc3, one 1000 m span of g652d-loose-12 with two splices
+// (`{}` -> designM 1090 = 1000 + 3% + 2 x 30):
+//   `{"overlengthpct": 10}`      bought 1090 m - the 3% default, 70 m of the named slack missing;
+//   `{"minimumPurchase": 5000}`  bought 2000 m - one drum against a 5000 m supplier floor;
+//   `{"spliceReserves": 5}`      dropped both 30 m reserves, 60 m short.
+// The answer is a purchase order, so a near miss is refused by name here too, in metres rather than in
+// loss: the refusal says the BOM does not read the option, not the field.
+test('a BOM option the calculation does not read is refused, not silently dropped', function () {
+  const plant = {
+    nodes: [{ id: 'n1', type: 'olt', model: 'gpon-c-plus-8' }, { id: 'n2', type: 'ont', model: 'gpon-ont-1ge' }],
+    spans: [{ id: 's1', from: 'n1', to: 'n2', cable: 'g652d-loose-12', lengthM: 1000, splices: 2 }]
+  };
+  // The fixture is the measured one: 1000 + 30 (3%) + 2 x 30 = 1090 m.
+  assert.strictEqual(length.billOfMaterials(plant, registry, {}).byCable[0].designM, 1090);
+  throws(function () { length.billOfMaterials(plant, registry, { overlengthpct: 10 }); },
+    'did you mean "overlengthPct"', 'overlengthpct');
+  throws(function () { length.billOfMaterials(plant, registry, { minimumPurchase: 5000 }); },
+    'did you mean "minimumPurchaseM"', 'minimumPurchase');
+  throws(function () { length.billOfMaterials(plant, registry, { spliceReserves: 5 }); },
+    'did you mean "spliceReserveM"', 'spliceReserves');
+  throws(function () { length.billOfMaterials(plant, registry, { closureReserve: 5 }); },
+    'did you mean "closureReserveM"', 'closureReserve');
+  throws(function () { length.billOfMaterials(plant, registry, { drumm: 500 }); },
+    'did you mean "drumM"', 'drumm');
+  // Narrow, as everywhere else: a key that is not near a field the BOM reads is the caller's own
+  // bookkeeping and still passes, and the correctly spelled option still applies.
+  const bom = length.billOfMaterials(plant, registry, { name: 'Feeder A', note: 'pulled 2026-11' });
+  assert.strictEqual(bom.byCable[0].designM, 1090, 'a bookkeeping key must not change the number');
+  assert.strictEqual(length.billOfMaterials(plant, registry, { overlengthPct: 10 }).byCable[0].designM, 1160,
+    '1000 + 10% (100) + 2 x 30 = 1160 m');
+});
+
+test('the cable decides the drum, and a caller drumM is only a fallback', function () {
+  // `cable.drumM || o.drumM`: the drum is a property of the cable, because buying 500 m drums of a
+  // 288-fibre ribbon is a product nobody sells. Every cable in this catalogue states one, so a
+  // caller's `drumM` cannot override it - that precedence is deliberate and pinned here rather than
+  // quietly flipped, because flipping it would let a body restate a drum the cable forbids.
+  const plant = {
+    nodes: [{ id: 'n1', type: 'olt', model: 'gpon-c-plus-8' }, { id: 'n2', type: 'ont', model: 'gpon-ont-1ge' }],
+    spans: [{ id: 's1', from: 'n1', to: 'n2', cable: 'g652d-loose-12', lengthM: 1000 }]
+  };
+  const bom = length.billOfMaterials(plant, registry, { overlengthPct: 0, drumM: 500 });
+  assert.strictEqual(bom.byCable[0].drumM, 2000, 'the cable states a 2000 m drum');
+  assert.strictEqual(bom.byCable[0].drums, 1, 'one 2000 m drum, not four 500 m ones');
+  assert.strictEqual(bom.byCable[0].purchaseM, 2000);
+});
+
 test('a span that needs two cables buys both of them', function () {
   // 160 customer fibres do not fit one 144-fibre cable, so auto-design marks the span `bundles: 2`.
   // Two 1200 m cables is 2400 m of cable; +3% overlength = 2472 m, which is two 2000 m drums
