@@ -371,4 +371,88 @@ test('a design option spelled one case off is refused, not silently defaulted', 
     'unrelated keys still pass through');
 });
 
+// A leased (third-party) segment is the one nested shape the budget reads, and `leg` is the key a
+// *link* design uses to decide which leg's budget pays for the glass. A budget is one ODN path, so a
+// leg has nothing to scope - but the segment was read with value guards only, so `{ leg: 'b' }` and
+// `{ legs: 'b' }` both answered `200` with the scope silently absent, and `losDb`/`lenghtM` were
+// refused by symptom ("lossDb must be a non-negative number") rather than by the key that was typed.
+// Same rule as `engine/link.js` (PR #58) applied one surface down: a key the budget does not read is
+// not a setting.
+//
+// 1.2 km g652d-loose-12 @ 1490 nm: 1.2 x 0.22 = 0.264; 2 splices x 0.10 = 0.20;
+// plc-1x8-sca 9.03 + 1.47 = 10.50; one lease 4.00  ->  ODN 14.964 dB.
+function leased(thirdParty) {
+  return {
+    olt: { model: 'gpon-c-plus-8' },
+    ont: { model: 'gpon-ont-1ge' },
+    spans: [{ cable: 'g652d-loose-12', lengthM: 1200 }],
+    splices: 2,
+    splitters: [{ model: 'plc-1x8-sca' }],
+    thirdParty: thirdParty
+  };
+}
+
+test('a leased segment scoped at the budget is refused, because a budget is one path', function () {
+  const plain = budget.opticalBudget(leased([{ provider: 'CityFibre', lengthM: 900, lossDb: 4 }]), registry);
+  close(plain.odnLossDb, 14.964, 0.001, '0.264 fibre + 0.20 splices + 10.50 splitter + 4.00 lease');
+  assert.strictEqual(plain.leasedLengthM, 900);
+  assert.strictEqual(plain.verdict, 'ok');
+
+  // `leg` scopes a lease to one leg of a circuit; here the whole path pays for it either way, so the
+  // key is refused with the reason instead of being answered as if it were absent.
+  const leg = throws(function () {
+    budget.opticalBudget(leased([{ provider: 'CityFibre', lengthM: 900, lossDb: 4, leg: 'b' }]), registry);
+  }, 'design.thirdParty[0]', 'a leg scope on a budgeted lease');
+  assert.ok(leg.message.indexOf('"leg"') !== -1, leg.message);
+  assert.ok(leg.message.indexOf('one ODN path') !== -1, 'the refusal says why a scope has no meaning here: ' + leg.message);
+
+  // The plural is not a scope either, and it is not near a field the budget reads - so it is refused by
+  // the same sentence rather than skipped as bookkeeping.
+  const legs = throws(function () {
+    budget.opticalBudget(leased([{ provider: 'CityFibre', lengthM: 900, lossDb: 4, legs: 'b' }]), registry);
+  }, '"legs"', 'a pluralised scope on a budgeted lease');
+  assert.ok(legs.message.indexOf('one ODN path') !== -1, legs.message);
+
+  // The three keys a segment cannot be read without, spelled one edit off. Each has to name the key
+  // that was meant - the caller is one keystroke from a budget that charges the lease they wrote down.
+  const slips = [
+    [{ provider: 'CityFibre', lenghtM: 900, lossDb: 4 }, 'lengthM'],
+    [{ provider: 'CityFibre', lengthM: 900, losDb: 4 }, 'lossDb'],
+    [{ providor: 'CityFibre', lengthM: 900, lossDb: 4 }, 'provider']
+  ];
+  slips.forEach(function (pair) {
+    const err = throws(function () { budget.opticalBudget(leased([pair[0]]), registry); },
+      'did you mean "' + pair[1] + '"', 'a typo in ' + pair[1]);
+    assert.ok(err.message.indexOf('thirdParty[0]') !== -1, 'the refusal names the segment: ' + err.message);
+  });
+
+  // What still reads: a segment lifted from a link request carries `cost` and `reference`, neither of
+  // which moves a budget, and a caller's own bookkeeping key is not a typo.
+  const withMeta = budget.opticalBudget(leased([
+    { provider: 'CityFibre', lengthM: 900, lossDb: 4, cost: 1200, reference: 'CF-123', notes: 'quote 17' }
+  ]), registry);
+  close(withMeta.odnLossDb, 14.964, 0.001, 'the same leased loss, still on the path');
+  assert.strictEqual(withMeta.leasedLengthM, 900);
+});
+
+test('the active budget refuses a leg scope on a leased segment too', function () {
+  // `computeOdn` is shared, so `pointToPoint` reads the same segment shape and refuses the same key.
+  const active = function (thirdParty) {
+    return budget.pointToPoint({
+      headEnd: { model: 'sfp-plus-10g-lr-10km' },
+      cpe: { model: 'sfp-plus-10g-lr-10km' },
+      spans: [{ cable: 'g652d-loose-12', lengthM: 1200 }],
+      splices: 0,
+      thirdParty: thirdParty
+    }, registry);
+  };
+  // 2 dB of leased loss, because 4 dB on this optic leaves 1.78 dB of headroom against the 3 dB
+  // margin - a `fail` that is about the circuit's reach, not the segment's keys, and this case is
+  // about the keys.
+  assert.ok(active([{ provider: 'CityFibre', lengthM: 900, lossDb: 2 }]).ok, 'a plain lease budgets');
+  throws(function () {
+    active([{ provider: 'CityFibre', lengthM: 900, lossDb: 4, legs: 'b' }]);
+  }, '"legs"', 'a pluralised scope in the active budget');
+});
+
 done();

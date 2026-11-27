@@ -37,6 +37,21 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A leased segment scoped at the budget is refused, not silently charged to the whole path.**
+  `leg` decides which leg's budget pays for leased glass on a link; a budget is one ODN path, and
+  `computeOdn` read the segment through value guards only, so `{ leg: 'b' }` and `{ legs: 'b' }` both
+  answered `200` with the scope absent — the caller believed the lease was on one leg of a circuit
+  while the path paid for all of it. `losDb` and `lenghtM` were refused, but by symptom ("lossDb must
+  be a non-negative number") rather than by the key that was typed. Measured on a 1.2 km
+  `g652d-loose-12` + 1:8 + C+ design with one 900 m / 4 dB lease: ODN **14.964 dB**, `leasedLengthM`
+  **900**, identical for `{ leg: 'b' }` and `{ legs: 'b' }`, which is what makes it hard to spot. A `THIRD_PARTY_FIELDS` list (`provider`, `lengthM`,
+  `lossDb`, plus `cost` and `reference`, which a segment lifted from a `/api/design/link` body
+  carries) is now checked with the same narrow `assertKnownFields` rule as the rest of the budget, and
+  `leg`/`legs` are refused by name — "a budget is one ODN path, not a circuit with legs … Drop the
+  key; the link design is where a segment is scoped to a leg." A caller's own `notes` still passes.
+  Tests: `budget-design-fields` (+2 cases: the scope and the three key typos with `cost`/`reference`
+  still reading, and the same refusal through `pointToPoint`).
+
 - **A leased segment scoped with a near-miss key is refused, not put on both legs.** `leg` is the key
   that decides which leg's budget pays for leased glass, and the segment block was the one nested shape
   beside `optics` read with value guards only - a value guard cannot see a key spelled wrong. Measured

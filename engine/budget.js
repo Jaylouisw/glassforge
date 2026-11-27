@@ -96,6 +96,20 @@ const ACTIVE_DESIGN_FIELDS = ['direction', 'wavelength', 'headEnd', 'cpe', 'span
 const PROJECT_BUDGET_FIELDS = ['ontId', 'direction', 'wavelength', 'spliceModel', 'connectorModel',
   'marginDb', 'allowanceDb', 'txDbm'];
 
+/**
+ * The keys a leased segment is measured through at the budget, and the two a caller may carry in from
+ * a link request. A near miss of one is refused, for the reason `design-fields.ts` states: a key the
+ * engine does not read is not a setting, and on a segment it is the worst kind - the lease silently
+ * leaves the path it was written on.
+ *
+ * `leg` is deliberately **not** listed. A link scopes a lease to one leg of a circuit; a budget is one
+ * ODN path, so the key has nothing to scope. Reading it as absent is what the budget used to do, which
+ * told a caller their lease was on one leg when the whole path paid for it - so it is refused by name
+ * below rather than ignored. `cost` and `reference` are listed because a segment lifted from a
+ * `/api/design/link` body carries them and neither moves a budget.
+ */
+const THIRD_PARTY_FIELDS = ['provider', 'lengthM', 'lossDb', 'cost', 'reference'];
+
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 function round(n, places) {
   const f = Math.pow(10, places === undefined ? 2 : places);
@@ -294,6 +308,24 @@ function computeOdn(design, wavelength, registry) {
   thirdPartyInput.forEach(function (segment, i) {
     const where = 'design.thirdParty[' + i + ']';
     if (!segment || typeof segment !== 'object') throw new TypeError(where + ' must be an object');
+    // Before the values are read: a key this engine cannot read is the cause, and "lengthM must be a
+    // non-negative number" is only the symptom of one the caller never spelled. A caller's own
+    // bookkeeping key still passes - only a near miss of a field the segment is read through is a
+    // refusal.
+    designFields.assertKnownFields(segment, THIRD_PARTY_FIELDS, 'the leased segment ' + where, {
+      noun: 'field',
+      consequence: 'A key the budget does not read is not a setting: a misspelt length or loss is a ' +
+        'segment it cannot read, so the lease is missing from the path it was written on.'
+    });
+    // A budget is one ODN path, so there are no legs here to scope and `leg`/`legs` are refused with
+    // the reason instead of being answered as if absent - the caller who sent one believes the lease
+    // is on a single leg, and on this surface the whole path pays for it.
+    if (segment.leg !== undefined || segment.legs !== undefined) {
+      const key = segment.leg !== undefined ? 'leg' : 'legs';
+      throw new TypeError(where + ' carries "' + key + '" - a budget is one ODN path, not a circuit ' +
+        'with legs, so a leased segment is charged to the whole path and a leg scope cannot be read. ' +
+        'Drop the key; the link design is where a segment is scoped to a leg.');
+    }
     if (!segment.provider) throw new TypeError(where + '.provider is required - a leased segment names who owns it');
     if (!isNum(segment.lengthM) || segment.lengthM < 0) {
       throw new TypeError(where + '.lengthM must be a non-negative number (the stated length of the leased segment)');
