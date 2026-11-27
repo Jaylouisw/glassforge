@@ -1,0 +1,18 @@
+{
+  "kind": "splitter",
+  "model": "plc-1x2-sca-conn",
+  "vendor": "generic",
+  "label": "PLC 1x2 SC/APC connectorised cassette",
+  "ratio": 2,
+  "splitLossDb": 3.01,
+  "excessLossDb": 0.59,
+  "termination": "connectorised",
+  "technology": "plc",
+  "notes": "The connectorised form of plc-1x2-sca: the same 1:2 PLC chip shipped in a cassette with SC/APC adapters instead of a bare input pigtail to splice. The chip figures are that row's, unchanged: 3.01 dB ideal split (10*log10(2)) plus 0.59 dB excess = 3.6 dB without connectors, inside ITU-T G.671's insertion-loss requirement for a 1x2 branching component on a normal-reach span (WR1) of 2.8 dB min / 3.9 dB max - the citation covers the branching component, not the cassette's adapters. Both chip numbers are typical values, the excess being the difference between the observed total and the ideal split, not a figure from a vendor sheet. What the termination changes is what is charged at the splitter's input: `termination: \"connectorised\"` bills two SC/APC matings (the catalogue's own sc-apc row, 2 x 0.3 = 0.6 dB) where the spliced cassette bills one fusion splice (fusion, 0.1 dB), so this row reads 0.5 dB more ODN than the same chip spliced - the \"about 0.5 dB more per splitter\" plc-1x2-sca's notes promise, which no row delivered until now. Why this row exists: 1:4, 1:8, 1:16, 1:32 and 1:64 each have a connectorised twin and 1:2 was the only ratio below the 1:128 module without one, so a 1:2-then-1:64 shelf - the 128-way two-stage architecture - had to budget its first stage as a spliced chip, understating that ODN by 0.5 dB, or name a product nobody sells. The trap when replacing this row: a cassette sheet that prints 'insertion loss <= 4.2 dB, SC/APC' has already counted its own connectors - compare that figure against 3.01 + 0.59 + 0.6 = 4.2 dB and leave excessLossDb alone; raising it for the connectors charges them twice. buildPon resolves a splitter as 'plc-1x' + ratio + '-sca', so auto-design never picks this row - it is for a plant drawn by hand, or a splitter shelf whose cassettes arrive pre-terminated. Replace with the bought cassette's datasheet.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.671/en",
+  "tags": [
+    "plc",
+    "1x2",
+    "connectorised"
+  ]
+}
