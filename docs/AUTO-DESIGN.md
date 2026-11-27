@@ -35,6 +35,11 @@ refused with `node "n-headend" uses unknown transceiver model "10G-LR-10KM"`.
 
 Each candidate is reported whether it wins or not, with its numbers and the reason it was refused.
 
+`demand` in the answer is that parse, not the points: `{ points, rejected, duplicates, meta, bbox }`,
+with each refused row's 1-based input line, reason and text — so the rows a design was built from sit
+beside the design rather than in a second call — and `headEnd` is the site it was given. The shape and
+the refusal are in [API.md](API.md#auto-design).
+
 ## In the UI
 
 The same request is the **Auto-design** panel in `web/`: paste the list into the demand box, type the

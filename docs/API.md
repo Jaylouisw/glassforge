@@ -97,7 +97,8 @@ POST /api/design/synthesise
     pon?: { ratios, olt, ont, maxDropM },
     active?: { headEndOptic, cpeOptic, optics: [{ headEndOptic, cpeOptic }] },
     costs?, applyToProject? }
-  → { ok, objective, routeMethod, technology, best, candidates, plant, runs, rationale, notes, applied? }
+  → { ok, demand, headEnd, objective, routeMethod, technology, best, candidates, plant, runs,
+      rationale, notes, applied? }
 
 POST /api/import/network
   body: KML text, a KMZ buffer, or { edges: [{ coords }] }
@@ -109,11 +110,18 @@ POST /api/import/demand
 ```
 
 `demand` is CSV text or an array of `{ label?, address?, lat, lon }`. Rows without coordinates are
-refused by row number — geocoding is off by default. `network` switches the router from the
-straight-line factor to a street/duct graph; `/api/import/network` builds that graph and hands it back
-so the caller can preview it (and send it as `network` unchanged). `applyToProject` replaces the project's plant in
-one operation (one undo step) *after* validating it; without it, the design is returned and nothing is
-written. Candidates that fail are returned with `feasible: false` and their reasons, never dropped. Every
+refused by row number — geocoding is off by default — and the answer carries that parse beside the
+design: `demand` is `{ points, rejected, duplicates, meta, bbox }`, the same summary
+`POST /api/import/demand` returns, with every refused row as `{ row, reason, text }` and `row` the
+1-based line of the input, header included. A file whose lines 3 and 4 are missing a cell still answers a
+design for the one point that parsed (`demand.points: 1`) with both refusals named; one
+where nothing parsed is a `400 no usable demand points: 2 row(s) rejected (latitude or longitude
+is empty)`, never an empty plant. `headEnd` is the site the request named, echoed unchanged.
+`network` switches the router from the straight-line factor to a street/duct graph;
+`/api/import/network` builds that graph and hands it back so the caller can preview it (and send it as
+`network` unchanged). `applyToProject` replaces the project's plant in one operation (one undo step)
+*after* validating it; without it, the design is returned and nothing is written. Candidates that fail
+are returned with `feasible: false` and their reasons, never dropped. Every
 candidate carries `budgets`, one row per ONT (`{ ont, name, verdict, marginalReason, headroomDb,
 rxPowerDbm, launchWindowPad, upstreamVerdict, upstreamRxPowerDbm, error }`), and `metrics.marginalOnts`
 counts the ONTs that pass only marginally; the chosen design's `warnings` names the tightest one once for
