@@ -1,10 +1,11 @@
 # Contributing to Glassforge
 
 Development happens on GitHub at
-[jaylouisw/glassforge](https://github.com/jaylouisw/glassforge). Issues and pull requests
-there are the only tracker — there is no GitHub tracker, and no GitHub mirror to keep in step. Push a
-branch with `bash scripts/push-branch.sh <branch>`; it is the only push recipe that works on this
-forge.
+[jaylouisw/glassforge](https://github.com/jaylouisw/glassforge). Issues and pull requests there are
+the only tracker: the project spent a few weeks on a self-hosted forge and came back, and that instance
+is a read-only archive nothing is filed, reviewed or merged on. Push a branch with
+`bash scripts/push-branch.sh <branch>` — it names the destination, refuses `main` and prints the
+compare URL — or by hand with `git push -q origin HEAD:refs/heads/<branch>`.
 
 ```bash
 git clone https://github.com/jaylouisw/glassforge.git
