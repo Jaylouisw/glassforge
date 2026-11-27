@@ -301,4 +301,44 @@ test('a slip on each of the eight project-budget keys is refused with the real n
   });
 });
 
+// The design's own top-level options were the last list still read with no key guard, so a case slip
+// on any of them was not a mistake the design reported - it was simply not a key, and the default ran.
+// Measured on `main`, 12 houses on a 0.8 km diagonal: `{ "marginDb": 40 }` refuses the estate (no
+// feasible candidate), while `{ "margindb": 40 }` answers `ok: true` with the 3 dB default and a
+// winner whose worst headroom is 3.56 dB - a plant the caller's own reserve rejects, offered as the
+// design. `{ "overlengthpct": 10 }` quotes the 3% BOM: `designM` 1955.2 m where `{ "overlengthPct":
+// 10 }` is 2088.1 m, 132.9 m of cable short on a purchase order. Same defect the budget, the link and
+// the cable calculation already refuse by name; the answer here is a plant and its BOM, so it is the
+// one place the omission costs most.
+test('a design option spelled one case off is refused, not silently defaulted', function () {
+  const demand = 'lat,lon\n' + [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    .map(function (i) { return (51.5 + 0.004 * i).toFixed(4) + ',' + (-0.1 - 0.004 * i).toFixed(4); })
+    .join('\n');
+  const opts = { headEnd: { lat: 51.5, lon: -0.1 } };
+  // The baseline: the reserve the caller meant leaves nothing standing.
+  assert.strictEqual(engine.design.synthesise(demand, Object.assign({ marginDb: 40 }, opts), registry).ok, false,
+    'a 40 dB reserve refuses the estate');
+  const marginTypo = throws(function () {
+    engine.design.synthesise(demand, Object.assign({ margindb: 40 }, opts), registry);
+  }, 'margindb', 'a case slip on marginDb');
+  assert.ok(marginTypo.message.indexOf('did you mean "marginDb"') !== -1, marginTypo.message);
+  // The two knobs that move what is bought, each a case slip of the field it meant.
+  throws(function () {
+    engine.design.synthesise(demand, Object.assign({ overlengthpct: 10 }, opts), registry);
+  }, 'overlengthPct', 'a case slip on overlengthPct');
+  throws(function () {
+    engine.design.synthesise(demand, Object.assign({ routefactor: 2 }, opts), registry);
+  }, 'routeFactor', 'a case slip on routeFactor');
+  throws(function () {
+    engine.design.synthesise(demand, Object.assign({ headend: { lat: 51.5, lon: -0.1 } }, opts), registry);
+  }, 'headEnd', 'a case slip on headEnd');
+  // A one-letter edit: the ladder decides what is bought, so the slip must not fall to the default.
+  throws(function () {
+    engine.design.synthesise(demand, Object.assign({ ladderr: ['g652d-loose-12'] }, opts), registry);
+  }, 'ladder', 'a one-letter edit on ladder');
+  // The guard is narrow, and a caller's own bookkeeping is not a spelling of a knob.
+  assert.ok(engine.design.synthesise(demand, Object.assign({ jobRef: 'A-17', note: 'site 4' }, opts), registry).candidates.length > 0,
+    'unrelated keys still pass through');
+});
+
 done();

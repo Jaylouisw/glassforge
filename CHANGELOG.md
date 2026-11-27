@@ -37,6 +37,20 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A design option spelled one case off is refused by name, not replaced by its default.** The
+  budget design object, the site-to-site link and the cable calculation have refused a near miss
+  since #137/#157/#192; the design's own top-level options were the last list read without a key
+  guard, and `/api/design/synthesise` made it worse by forwarding a whitelist of named keys - a key it
+  did not copy never reached the engine at all. Measured on a 12-house estate: `{"marginDb": 40}`
+  refuses it (no feasible candidate), while `{"margindb": 40}` answered `ok: true` at the 3 dB default
+  with a winner whose worst headroom was 3.56 dB - the typo bought the design the caller's reserve
+  exists to reject. `{"overlengthpct": 10}` quoted `designM` 1955.2 m, the 3% default, where
+  `{"overlengthPct": 10}` is 2088.1 m. `design.options` now checks the key list (case slip, plural,
+  prefix, one letter edit) and the handler hands over the caller's body minus `demand` and
+  `applyToProject`, so a knob added to the design cannot be forgotten at the wire. Tests:
+  `budget-design-fields` (one case: the 40 dB baseline refuses, four slips are named, unrelated
+  bookkeeping keys still pass) and `api-http` (one case: 200 with `marginDb: 40` and `ok: false`,
+  400 naming `"margindb"`).
 - **The Auto tab's candidate table shows the number it ranked by, and the upstream direction it
   counts.** The table was a hand-written header in `web/app.js` and a hand-written cell list beside
   it, so it could only show the figures somebody remembered to add: `metrics.cost` was missing
