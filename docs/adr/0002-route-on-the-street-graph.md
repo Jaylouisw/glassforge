@@ -19,7 +19,8 @@ When a street/duct network is supplied, every length is measured by walking that
 4. run Dijkstra from the root, take the union of the shortest paths, prune it back to a tree.
 
 Straight-line distance survives only as the fallback for the case where no network was supplied, and then
-`routeMethod` says `straight-line xN`. A property that cannot be reached is refused by address.
+`routeMethod` says `straight-line x<routeFactor>` — `straight-line x1.2` at the default 1.2, the
+factor itself rather than a literal `N`. A property that cannot be reached is refused by address.
 
 `dijkstra(graph, rootId)` (in `engine/street.js`) takes no options: it returns the shortest-path tree
 from the root, deterministic on ties. A second, diverse leg is not a re-costed Dijkstra from the same

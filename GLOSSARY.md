@@ -105,9 +105,11 @@ the geometry carries no level.
 edge, then transversal crossings. Until a graph is planarised, a road drawn across another is a second
 component and everything on it is "not on the street network".
 
-**routeMethod** — how a run's length was measured: `street-graph` when it walked the geometry,
-`straight-line xN` when no network was supplied. A street-routed design never reports a straight line
-without saying so.
+**routeMethod** — how a run's length was measured: `street-graph (N edges, X km)` when it
+walked the geometry, `straight-line x<routeFactor>` when no network was supplied (`straight-line x1.2`
+at the default factor, `straight-line x1.35` at 1.35 — the number is the factor, not the letter `N`). A
+street-routed design never reports a straight line without saying so, and every `runs[]` entry carries
+the same string as its own `method`.
 
 **Route factor** — the multiplier applied to straight-line distance when there is no geometry to walk.
 
