@@ -411,6 +411,32 @@ async function main() {
     assert.ok(bundleBom.body.error.indexOf('span "s1" has an invalid bundles count "1.5"') !== -1, bundleBom.body.error);
   });
 
+  // ------------------------------------------------------------------ a span with no measured length
+  // `billOfMaterials` refuses a span whose length is missing, zero or not a number - "span s1 has no
+  // measured length" - because a BOM is the number someone spends money against. The write gate
+  // already refuses such an edit, but a file edited by hand never met the gate, and /bom used to let
+  // the engine's sentence escape through the 500 path: "internal error", i.e. the server blamed for
+  // the file's field. Same answer as the splices and bundles counts above - a 400 naming the span.
+  const lengthId = (await request('POST', '/api/projects', { name: 'No length' })).body.id;
+  await build(lengthId, validPlant);
+  const lengthPath = path.join(dataRoot, 'projects', lengthId + '.json');
+  const lengthFile = JSON.parse(fs.readFileSync(lengthPath, 'utf8'));
+  lengthFile.spans[0].lengthM = 0;
+  fs.writeFileSync(lengthPath, JSON.stringify(lengthFile));
+  const zeroBom = await request('GET', '/api/projects/' + lengthId + '/bom');
+  test('a span with no measured length makes the BOM a 400 naming the span, not a 500', function () {
+    assert.strictEqual(zeroBom.status, 400, brief(zeroBom));
+    assert.ok(zeroBom.body.error.indexOf('span "s1" has no measured length') !== -1, zeroBom.body.error);
+  });
+
+  delete lengthFile.spans[0].lengthM;
+  fs.writeFileSync(lengthPath, JSON.stringify(lengthFile));
+  const absentBom = await request('GET', '/api/projects/' + lengthId + '/bom');
+  test('an absent length is the same refusal - absent is not zero, and neither is a purchase', function () {
+    assert.strictEqual(absentBom.status, 400, brief(absentBom));
+    assert.ok(absentBom.body.error.indexOf('span "s1" has no measured length') !== -1, absentBom.body.error);
+  });
+
   // ------------------------------------------------------------------ a name that is not a string
   // `rename` ran `String(name).trim()`, so `{ name: {} }` renamed the project to "[object Object]"
   // - the exact sentence `#129` added the create/PUT refusal for, reached through the one write that

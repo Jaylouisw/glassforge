@@ -493,6 +493,12 @@ async function handle(req, res, ctx) {
           if (span.cable && !registry.has('cable', span.cable)) {
             return 'span "' + span.id + '" uses unknown cable model "' + span.cable + '"';
           }
+          // A length that is absent, zero or not a number is the other file-edited state the BOM
+          // refuses. Cable is looked up first, as `billOfMaterials` does, so a span wrong twice names
+          // the cable - the fault a reader can act on without opening the file.
+          if (!(typeof span.lengthM === 'number' && isFinite(span.lengthM) && span.lengthM > 0)) {
+            return 'span "' + span.id + '" has no measured length - measure the route before building a BOM';
+          }
           if (!engine.network.isSpanCount(span.splices)) {
             return 'span "' + span.id + '" has an invalid splices count "' + String(span.splices) + '"';
           }
