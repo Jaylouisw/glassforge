@@ -47,6 +47,30 @@ const DEFAULTS = {
 const OPTION_FIELDS = ['routeM', 'overlengthPct', 'splices', 'spliceReserveM', 'closures',
   'closureReserveM', 'dropReserveM', 'drumM', 'minimumPurchaseM'];
 
+/**
+ * The five options `billOfMaterials` reads for itself - and the wording its refusal uses.
+ *
+ * Same rule, one layer up. The BOM used to hand these five to `cableToBuy` in a fresh object with
+ * every key spelled correctly, so the guard there could never see the caller's typo: measured on
+ * `main` at c3ebcc3, one 1000 m span of g652d-loose-12 with two splices answered `designM` 1090 (the
+ * 3% default) for `{"overlengthpct": 10}`, bought 2000 m for `{"minimumPurchase": 5000}`, and
+ * dropped both 30 m reserves for `{"spliceReserves": 5}`. `drumM` is accepted although a cable that
+ * states its own drum wins (`cable.drumM || o.drumM`): it is the fallback for a cable that states
+ * none, which is a live path, not an option the BOM ignores.
+ *
+ * A single adjacent transposition (`{"overlenghtPct": 10}`) is still dropped: the shared matcher
+ * counts one swap as two edits. That is the matcher's rule, not this list's, and changing it moves
+ * the budget, link and design refusals too - filed separately rather than widened here.
+ */
+const BOM_OPTION_FIELDS = ['overlengthPct', 'spliceReserveM', 'closureReserveM', 'drumM',
+  'minimumPurchaseM'];
+
+const PURCHASE_NEAR_MISS = {
+  noun: 'option',
+  consequence: 'A term the calculation ignores buys cable without the metres it names, so a near ' +
+    'miss is refused rather than skipped.'
+};
+
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 function round(n, places) {
   const f = Math.pow(10, places === undefined ? 1 : places);
@@ -101,11 +125,7 @@ function cableToBuy(opts) {
   const o = opts || {};
   // Before the route is read, because a typo is the cause and "routeM is required" would be the
   // symptom: a caller who sent `routeKM` has a route, just not in a unit this reads.
-  designFields.assertKnownFields(o, OPTION_FIELDS, 'the cable calculation', {
-    noun: 'option',
-    consequence: 'A term the calculation ignores buys cable without the metres it names, so a near ' +
-      'miss is refused rather than skipped.'
-  });
+  designFields.assertKnownFields(o, OPTION_FIELDS, 'the cable calculation', PURCHASE_NEAR_MISS);
   if (!isNum(o.routeM) || o.routeM < 0) throw new TypeError('routeM is required and must be a non-negative number');
 
   const overlengthPct = nonNegative(o.overlengthPct, 'overlengthPct', DEFAULTS.overlengthPct);
@@ -213,6 +233,10 @@ function cableToBuyForRoute(points, opts) {
  */
 function billOfMaterials(plant, registry, opts) {
   const o = opts || {};
+  // Before the plant is read, because a typo is the cause and "needs a plant with spans" would be the
+  // symptom: the caller who sent `minimumPurchase` has a plant, just a purchase below the floor they
+  // named. Same narrow rule and same words as the cable page, since both answers are a purchase order.
+  designFields.assertKnownFields(o, BOM_OPTION_FIELDS, 'the bill of materials', PURCHASE_NEAR_MISS);
   if (!plant || !Array.isArray(plant.spans)) throw new TypeError('billOfMaterials needs a plant with spans');
   // Resolved once, here, so a plant with no spans still refuses a minimum that is not a number
   // instead of quietly returning an empty BOM that never looked at it.
