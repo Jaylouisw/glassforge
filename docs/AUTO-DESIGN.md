@@ -176,7 +176,11 @@ KML / KMZ / { edges }  →  graph (vertices merged within 1.5 m; T-junctions and
   `"2 address(es) are not on the street network or not reachable along it: d7, d19"`. Connecting it
   with a straight line would be the one number in the design nobody could defend.
 - **The head-end must be on the network too.** A PoP 2 km from the nearest street is a data problem,
-  and it is reported as one rather than snapped from afar.
+  and it is reported as one rather than snapped from afar. Its own gap to the street is cable like
+  anybody's: every edge leaving the head end carries the measured `spurM` and its route starts at the
+  head-end coordinate, because the head end is the one site with no drop span to carry the gap. A
+  splitter site is not charged the same way - it is a house in the demand list, and its drop already
+  pays for its gap.
 
 ### straight-line
 

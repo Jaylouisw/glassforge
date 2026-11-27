@@ -701,13 +701,46 @@ function euclidTree(rootPoint, points, factor) {
 }
 
 /**
+ * Charge the head end's own distance to the street to the cable that leaves it.
+ *
+ * `street.snap` measures the gap from a site to the point where it joins the network, and for a
+ * customer that gap is bought as the drop span. The head end is not in the demand list, so nothing
+ * bought its gap: measured on a PoP 66.7 m behind the pavement, every span out of `n-headend` was
+ * billed 66.7 m less than the route drawn between the head-end node and the same street vertex - the
+ * drawing said 101 m and the bill of materials said 35 m for the same cable. `engine/link.js` charges
+ * both sites' drops for exactly this reason, and the street rule is the same one: a site is not on the
+ * centreline, and the gap is a real length.
+ *
+ * Every edge leaving the root is its own cable (a bundle of them when the fibres need it) and each one
+ * crosses the gap, so each one is longer by the whole gap; the head-end coordinate becomes the first
+ * point of its route. Mutates the tree `street.routedTree` just returned, which is a fresh object.
+ */
+function attachHeadEnd(routed, root, rootSnap) {
+  if (!(rootSnap.spurM > 0)) return;
+  let rootEdges = 0;
+  for (const edge of routed.edges) {
+    if (edge.from !== routed.rootId) continue;
+    edge.lengthM = round(edge.lengthM + rootSnap.spurM, 2);
+    edge.route = [{ lat: root.lat, lon: root.lon }].concat(edge.route);
+    rootEdges++;
+  }
+  routed.totalM = round(routed.totalM + rootSnap.spurM * rootEdges, 2);
+}
+
+/**
  * The street provider: snap every terminal, then take the union of shortest paths from the root.
  *
  * Anything the graph cannot reach comes back in `unresolved` rather than being connected by a straight
  * line: an address two kilometres from the nearest street is a design problem, and the caller turns it
  * into an infeasible candidate with that reason.
+ *
+ * `rootIsHeadEnd` charges the root's own gap to the cable that leaves it. A customer's gap is emitted
+ * as a drop span from `spurs`; the head end is the one terminal that is not in the demand list, so
+ * nothing used to charge its gap and the first span was billed shorter than the route drawn between
+ * the head-end node and the street. A splitter site is *not* a head end: it is a house in the demand
+ * list, and its drop span already carries its gap.
  */
-function streetTree(graph, root, points, opts) {
+function streetTree(graph, root, points, opts, rootIsHeadEnd) {
   const rootSnap = street.snap(graph, root, { maxSnapM: opts.maxSnapM });
   if (!rootSnap) throw new Error('the head-end is more than ' + opts.maxSnapM + ' m from the street network');
 
@@ -722,6 +755,7 @@ function streetTree(graph, root, points, opts) {
   }
 
   const routed = street.routedTree(graph, rootSnap.nodeId, terminals, {});
+  if (rootIsHeadEnd) attachHeadEnd(routed, root, rootSnap);
   const treeNodes = routed.nodes.map(function (node) {
     return {
       key: node.key,
@@ -924,7 +958,7 @@ function buildActiveTree(demand, opts, registry, optic, graph) {
   const active = Object.assign({}, opts.active, optic);
   const plant = { name: 'Active tree', nodes: [headEndNode(opts, 'active', active.headEndOptic)], spans: [] };
   const tree = graph
-    ? streetTree(graph, opts.headEnd, demand.points, opts)
+    ? streetTree(graph, opts.headEnd, demand.points, opts, true)
     : euclidTree(opts.headEnd, demand.points, opts.routeFactor);
 
   emitTerminalTree(plant, tree, {
@@ -967,14 +1001,20 @@ function buildActiveHomeRun(demand, opts, registry, optic, graph) {
         id: 'n-ont-' + point.id, type: 'ont', model: active.cpeOptic,
         name: point.label, lat: point.lat, lon: point.lon
       });
-      const lengthM = Math.max(1, round(path.lengthM + snapped.spurM, 1));
+      // Every customer on this topology has their own cable out of the exchange, so each one crosses
+      // the head end's own gap to the street - it is the one site whose gap no drop span carries.
+      const rootGapM = rootSnap.spurM;
+      const lengthM = Math.max(1, round(path.lengthM + rootGapM + snapped.spurM, 1));
+      const route = (rootGapM > 0
+        ? [{ lat: opts.headEnd.lat, lon: opts.headEnd.lon }]
+        : []).concat(path.route, [{ lat: point.lat, lon: point.lon }]);
       plant.spans.push({
         id: 's-' + (i + 1), from: 'n-headend', to: 'n-ont-' + point.id,
         // The drop/ladder rule is `cableForSpan`'s. Restating it here as a magic 300 and a hard-coded
         // model ignored the caller's ladder, so a design could be billed for a cable it excluded.
         cable: cableForSpan(2, lengthM, opts.ladder, registry).model,
         lengthM: lengthM, strands: [1, 2], purpose: 'home-run', feedsOnts: 1,
-        route: path.route.concat([{ lat: point.lat, lon: point.lon }])
+        route: route
       });
     });
   } else {
@@ -1019,7 +1059,7 @@ function buildPon(demand, opts, registry, ratio, graph) {
 
   // Feeder: head-end to a closure at every splitter site, each splitter on a 1 m tail.
   const feeder = graph
-    ? streetTree(graph, opts.headEnd, sitePoints, opts)
+    ? streetTree(graph, opts.headEnd, sitePoints, opts, true)
     : euclidTree(opts.headEnd, sitePoints, factor);
   // A site that cannot be reached means the *houses it serves* cannot be served, so report those:
   // telling a planner "site-2 is unresolved" when they typed forty addresses names the wrong thing.
