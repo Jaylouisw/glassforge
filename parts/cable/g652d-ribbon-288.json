@@ -10,13 +10,13 @@
   "use": [
     "feeder"
   ],
-  "drumM": 1000,
+  "drumM": 2000,
   "attenuationDbPerKm": {
     "1310": 0.35,
     "1490": 0.22,
     "1550": 0.21
   },
-  "notes": "Ribbon construction, not loose tube: 24 ribbons of 12 fibres, one ribbon per tube position, which is why \"tube\" means ribbon number on site. Attenuation here is typical installed performance, not a G.652.D limit: 0.35 dB/km at 1310 nm sits under the recommendation's 0.40 dB/km maximum (1310-1625 nm), and 0.21 dB/km at 1550 nm under its 0.30 dB/km maximum (1530-1565 nm). 1490 nm is a typical, interpolated value: no ITU-T recommendation publishes a 1490 nm attenuation figure of its own (G.652.D's 0.40 dB/km maximum spans 1310-1625 nm but is not a 1490 nm specification), so 0.22 dB/km bridges the two published windows and is not a citation. Replace all three with the bought cable's test report for a construction-grade budget.",
+  "notes": "Ribbon construction, not loose tube: 24 ribbons of 12 fibres, one ribbon per tube position, which is why \"tube\" means ribbon number on site. Attenuation here is typical installed performance, not a G.652.D limit: 0.35 dB/km at 1310 nm sits under the recommendation's 0.40 dB/km maximum (1310-1625 nm), and 0.21 dB/km at 1550 nm under its 0.30 dB/km maximum (1530-1565 nm). 1490 nm is a typical, interpolated value: no ITU-T recommendation publishes a 1490 nm attenuation figure of its own (G.652.D's 0.40 dB/km maximum spans 1310-1625 nm but is not a 1490 nm specification), so 0.22 dB/km bridges the two published windows and is not a citation. Replace all three with the bought cable's test report for a construction-grade budget. drumM is 2,000 m, and it is a put-up rather than a guess: Prysmian's Sirocco sheet (GB00_Sirocco, the 12-288F outdoor microduct family) publishes 'Standard delivery length is 2 km, maximum 6 km', its FusionLink FlexRibbon ribbon sheet (TS08019, 144/288F) publishes 'Standard Delivery Length: 4 km, other delivery lengths available upon agreement', and a 288F multi-tube duct cable lists a standard put-up of 2,000 m. This row carried 1,000 m until 2026-11-27 with no source, and 1 km is the one drum length in the feeder ladder that no maker publishes for this cable: two ribbon spans through a cabinet (900 m + 400 m) bought two 1 km reels where one 2 km drum covers the 1,339 m the BOM designs, so the reel count - and the joints that follow it - were doubled on every 288F run. The row keeps the 2 km floor rather than the ribbon sheet's 4 km so a 3 km run is not quoted a whole 4 km drum; the reel actually ordered wins, and set drumM to it.",
   "sourceUrl": "https://www.itu.int/rec/T-REC-G.652/en",
   "tags": [
     "generic",
