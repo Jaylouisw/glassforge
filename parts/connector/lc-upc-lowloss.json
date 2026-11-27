@@ -1,0 +1,19 @@
+{
+  "kind": "connector",
+  "model": "lc-upc-lowloss",
+  "vendor": "generic",
+  "label": "LC/UPC connector pair (grade B, low loss)",
+  "lossDb": 0.15,
+  "maxLossDb": 0.25,
+  "notes": "0.15 dB is a typical loss for a mated grade-B LC/UPC pair; 0.25 dB is the ceiling the grade sets. Both are grade figures, not one vendor's test report: IEC 61753-1:2007 Table A.12 - reprinted as Table 9-1 of ITU-T L.36 (01/2015), where these figures are taken from - grades random-mated single-mode connectors B at 0.12 dB mean and 0.25 dB max for more than 97% of samples, C at 0.25 dB mean and 0.50 dB max. A grade is a class limit on a mated pair, not a ferrule geometry: an LC/UPC pair is graded by the same table as the LC/APC and SC/APC rows this catalogue already sells at grade B, so 0.15 sits between grade B's 0.12 mean and its 0.25 maximum exactly as it does there. Why this row exists: every active-side rung in this catalogue declares `polish: \"upc\"` - the whole 1G/10G/25G/40G/50G/100G/200G/400G/800G ladder is UPC duplex LC or MPO/APC - so the links the site-to-site feature is built for are UPC, and grade B was only sold for APC (sc-apc-lowloss, lc-apc-lowloss). A data-centre or DC-to-DC run that contracted graded patch cords therefore had no row to name and was budgeted at grade C. What it buys, measured through budget.pointToPoint on two SFP+ 10GBASE-LR optics: two grade-C LC/UPC matings charge 2 x 0.25 = 0.50 dB and two of these charge 0.30 dB, so the saving is 0.10 dB per mating and 0.20 dB across the pair, against sc-apc's 0.30 dB per mating for anyone who was defaulting to APC on a UPC optic. The saving is a verdict on a long line rather than a rounding: 10GBASE-LR is a 6.2 dB budget, so at 8.0 km of G.652.D (8.0 x 0.35 = 2.80 dB of fibre) the grade-C pair budgets 3.30 dB and fails at 2.90 dB of headroom against the 3 dB margin, while this row budgets 3.10 dB and reads marginal - the marginal/fail boundary moves from about 7.7 km to about 8.3 km on the same glass. Polish is not interchangeable: LC/UPC will not mate with LC/APC, and mixing them loses several dB and can damage both endfaces, so a plant specified to this row must be UPC throughout - which is exactly what the optics declare. No figure already budgeted moves: sc-apc stays the default connector model, this row is chosen with connectors: { model: 'lc-upc-lowloss', count } and the engine charges it per mating; engine/link.js still charges sc-apc at both ends of an active link and takes no connector model, so the row is reachable through budget.pointToPoint and the design API today, and wiring it into link design is an engine change. Replace 0.15 with the measured loss of the patch cords actually bought - 0.25 is a maximum and 0.15 a typical, not a contract.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.36/en",
+  "tags": [
+    "connector",
+    "lc",
+    "upc",
+    "low-loss",
+    "grade-b",
+    "datacentre"
+  ],
+  "polish": "upc"
+}

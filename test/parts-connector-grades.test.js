@@ -6,12 +6,18 @@
 // to name, and the LC row that did exist was credited with a mean it is not sold to. This suite holds
 // the two new rows to the published grade and drives the engine for the fractions they buy, because a
 // note that says "0.6 dB across four matings" is a claim until a budget prints it.
+//
+// The UPC rungs followed the same argument one polish later: every optic in the catalogue declares
+// upc, so the site-to-site plant this engine is built for is UPC, and grade B was sold only in APC -
+// a graded LC/UPC or SC/UPC run had no row to name and was budgeted at grade C. Those rows are held
+// to the same table and driven through budget.pointToPoint, where an active link is actually costed.
 const { test, assert, close, done } = require('./harness');
 const engine = require('../engine');
 
 const registry = engine.createRegistry();
 const parts = engine.parts;
 const network = engine.network;
+const budget = engine.budget;
 
 // OLT - 500 m feeder - connectorised 1:8 - 40 m drop - ONT. designForOnt charges two end matings plus
 // two for a connectorised splitter, so this path carries four matings on every run below.
@@ -39,12 +45,20 @@ function connectorLine(result) {
   return lines[0];
 }
 
+// Model -> the ferrule that row must be. The UPC rows are graded by the same table as the APC ones -
+// a grade is a class limit on a mated pair, not a ferrule geometry - and the check stays per-row: a
+// grade-B row that came back APC would let a UPC plant budget a mating that cannot plug into its optic.
+const GRADE_B_POLISH = {
+  'sc-apc-lowloss': 'apc', 'lc-apc-lowloss': 'apc',
+  'sc-upc-lowloss': 'upc', 'lc-upc-lowloss': 'upc'
+};
+
 test('the grade-B rows validate and stop at grade B\'s ceiling, not at a vendor tolerance', function () {
-  for (const model of ['sc-apc-lowloss', 'lc-apc-lowloss']) {
+  for (const model of Object.keys(GRADE_B_POLISH)) {
     const row = registry.get('connector', model);
     const check = parts.validateSpec(row);
     assert.ok(check.ok, model + ' validates: ' + check.errors.join('; '));
-    assert.strictEqual(row.polish, 'apc', model + ' is an APC ferrule: a UPC one will not mate with it');
+    assert.strictEqual(row.polish, GRADE_B_POLISH[model], model + ' has the wrong ferrule for its row');
     // 0.25 dB is the published grade-B maximum for >97% of random mated samples; 0.15 is the typical
     // charged, sitting between grade B's 0.12 dB mean and that 0.25 ceiling.
     assert.strictEqual(row.maxLossDb, 0.25, model + ' ceiling is IEC 61753-1 grade B');
@@ -71,6 +85,35 @@ test('a grade-B LC pair takes 0.10 dB off every mating, four tenths over the pat
   // 4 x (0.25 - 0.15) = 0.4 dB.
   close(connectorLine(standard).db, 4 * 0.25, 0.001, 'four lc-apc matings');
   close(standard.odnLossDb - graded.odnLossDb, 0.4, 0.001, 'ODN delta over four matings');
+});
+
+test('the grade-B UPC rows are the ones an active link can name', function () {
+  // Every optic in the catalogue declares upc except the MPO/APC ones, so a site-to-site run is a
+  // UPC plant: engine/link.js still charges sc-apc at both ends and takes no connector model, so
+  // the row is reached through budget.pointToPoint, which is where these numbers are driven.
+  // 10GBASE-LR is a 6.2 dB budget and 8.0 km of G.652.D at 0.35 dB/km is 2.800 dB of fibre.
+  function active(lenM, model) {
+    return budget.pointToPoint({
+      headEnd: { model: 'sfp-plus-10g-lr-10km' },
+      cpe: { model: 'sfp-plus-10g-lr-10km' },
+      spans: [{ lengthM: lenM, cable: 'g652d-loose-24' }],
+      connectors: { model: model, count: 2 },
+      marginDb: 3
+    }, registry);
+  }
+  // lc-upc 0.25 x 2 = 0.50; grade B 0.15 x 2 = 0.30 -> 0.20 dB. sc-upc 0.30 x 2 = 0.60 -> 0.30 dB.
+  close(active(10000, 'lc-upc').odnLossDb - active(10000, 'lc-upc-lowloss').odnLossDb, 0.2, 0.001,
+    'two lc-upc matings save 0.20 dB at grade B');
+  close(active(10000, 'sc-upc').odnLossDb - active(10000, 'sc-upc-lowloss').odnLossDb, 0.3, 0.001,
+    'two sc-upc matings save 0.30 dB at grade B');
+  // 2.800 + 0.50 = 3.30 -> 6.2 - 3.30 = 2.90 dB of headroom, under the 3 dB margin. 2.800 + 0.30
+  // = 3.10 -> 3.10 dB, which clears it: the row is a verdict, not a rounding.
+  close(active(8000, 'lc-upc').odnLossDb, 3.30, 0.001, 'fibre 2.8 + two 0.25 matings');
+  close(active(8000, 'lc-upc').headroomDb, 2.90, 0.01, '6.2 - 3.30');
+  assert.strictEqual(active(8000, 'lc-upc').verdict, 'fail', 'grade C at 8.0 km is under the margin');
+  close(active(8000, 'lc-upc-lowloss').odnLossDb, 3.10, 0.001, 'fibre 2.8 + two 0.15 matings');
+  assert.strictEqual(active(8000, 'lc-upc-lowloss').verdict, 'marginal',
+    'grade B buys the 0.2 dB that clears the 3 dB margin');
 });
 
 test('the graded rows are a verdict on a real line, not a rounding', function () {
@@ -122,7 +165,7 @@ test('nothing already budgeted moved: sc-apc is still the default connector', fu
 
 test('every connector charges no more than the ceiling it declares', function () {
   const rows = registry.all('connector');
-  assert.ok(rows.length >= 8, 'the catalogue has the standard and graded rows: ' + rows.length);
+  assert.ok(rows.length >= 10, 'the catalogue has the standard and graded rows: ' + rows.length);
   for (const row of rows) {
     assert.ok(row.lossDb <= row.maxLossDb,
       row.model + ' charges ' + row.lossDb + ' dB against its own ' + row.maxLossDb + ' dB ceiling');
