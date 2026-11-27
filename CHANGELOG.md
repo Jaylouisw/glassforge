@@ -37,6 +37,19 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A near-miss option on the bill of materials is refused, not silently dropped.** `billOfMaterials`
+  reads five options of its own (`overlengthPct`, `spliceReserveM`, `closureReserveM`, `drumM`,
+  `minimumPurchaseM`) and guarded none of them, while `cableToBuy` - the same calculation for one route
+  - has refused a near miss by name since #192 because its answer is a purchase order. Measured on
+  `main` at `c3ebcc3`, one 1000 m span of `g652d-loose-12` with two splices (`{}` answers `designM`
+  1090 = 1000 + 3% + 2 × 30): `{"overlengthpct": 10}` answered **1090** - the 3% default, 70 m of the
+  overlength the caller named missing from the order - `{"minimumPurchase": 5000}` bought one 2000 m
+  drum against a 5000 m supplier floor, and `{"spliceReserves": 5}` dropped both 30 m reserves. The
+  guard uses the budget's metres wording and stays narrow, so `name`/`note` bookkeeping still passes.
+  `drumM` is the fallback for a cable that states no drum of its own, and that precedence (the cable's
+  drum is what is bought) is now pinned by a test instead of being rediscovered on a purchase order.
+  Tests: `length-and-bom` adds 3 (the three refusals plus a passing bookkeeping key, the options that
+  are read reaching the order, the drum precedence).
 - **The Auto tab's candidate table shows the number it ranked by, and the upstream direction it
   counts.** The table was a hand-written header in `web/app.js` and a hand-written cell list beside
   it, so it could only show the figures somebody remembered to add: `metrics.cost` was missing

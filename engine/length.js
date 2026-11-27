@@ -207,6 +207,28 @@ function cableToBuyForRoute(points, opts) {
 }
 
 /**
+ * The five options a whole-plant calculation reads - and a near miss of one is refused by name.
+ *
+ * This is `cableToBuy`'s rule, missing one function up, where the answer is still a purchase order and
+ * the plant is bigger. Measured on a 1 km span of `g652d-loose-12` with two splices (`{}` answers
+ * `designM` 1090 = 1000 + 3% + 2 x 30):
+ *
+ *   `{"overlengthpct": 10}`     answered `designM` 1090 - the 3% default, so 70 m of the overlength
+ *                               the caller named was missing from the order;
+ *   `{"minimumPurchase": 5000}` bought one 2000 m drum against a 5000 m supplier floor;
+ *   `{"spliceReserves": 5}`     dropped both 30 m splice reserves, 60 m short.
+ *
+ * Two terms are deliberately not options here. `splices` and `closures` are read per span
+ * (`span.splices`, `span.closures`), so a count passed in the options is not this function's to read.
+ * `drumM` is only the fallback for a cable that states no drum of its own (`cable.drumM || o.drumM`):
+ * every cable in the catalogue states one, so the cable's drum is what is bought, and that precedence
+ * is pinned by a test rather than left to be rediscovered - a drum is a property of the cable, and
+ * 500 m drums of a 288-fibre ribbon is a product nobody can buy.
+ */
+const BOM_OPTION_FIELDS = ['overlengthPct', 'spliceReserveM', 'closureReserveM', 'drumM',
+  'minimumPurchaseM'];
+
+/**
  * Bill of materials for a whole plant: one cable line per span, reserves applied per span, then
  * aggregated per cable model and per drum. A span with no measured length is an error, not a zero:
  * the BOM is the number someone spends money against.
@@ -214,6 +236,13 @@ function cableToBuyForRoute(points, opts) {
 function billOfMaterials(plant, registry, opts) {
   const o = opts || {};
   if (!plant || !Array.isArray(plant.spans)) throw new TypeError('billOfMaterials needs a plant with spans');
+  // Before the minimum is read, because a typo is the cause and "minimumPurchaseM must be a number"
+  // would be the symptom: a caller who sent `minimumPurchase` has a floor, just not one this reads.
+  designFields.assertKnownFields(o, BOM_OPTION_FIELDS, 'the bill of materials', {
+    noun: 'option',
+    consequence: 'An option the bill of materials ignores buys cable without the metres it names, ' +
+      'so a near miss is refused rather than skipped.'
+  });
   // Resolved once, here, so a plant with no spans still refuses a minimum that is not a number
   // instead of quietly returning an empty BOM that never looked at it.
   const minimumPurchaseM = nonNegative(o.minimumPurchaseM, 'minimumPurchaseM', 0);

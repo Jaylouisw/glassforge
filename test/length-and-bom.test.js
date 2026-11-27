@@ -119,6 +119,55 @@ test('the BOM aggregates per cable model across spans', function () {
   close(bom.byCable[0].spareM, 817, 0.01, 'spare on site');
 });
 
+// The whole-plant calculation read five options and guarded none of them, so a case slip bought cable
+// without the metres it named - the same defect `cableToBuy` has refused since #192, one function up.
+// Measured before this guard on a 1 km span of g652d-loose-12 with two splices (`{}` = 1090 m):
+//   `{"overlengthpct": 10}` answered designM 1090, the 3% default, 70 m short;
+//   `{"minimumPurchase": 5000}` bought one 2000 m drum against a 5000 m floor;
+//   `{"spliceReserves": 5}` dropped both 30 m splice reserves.
+const ONE_KM = {
+  nodes: [
+    { id: 'n1', type: 'olt', model: 'gpon-c-plus-8' },
+    { id: 'n2', type: 'ont', model: 'gpon-ont-1ge' }
+  ],
+  spans: [{ id: 's1', from: 'n1', to: 'n2', cable: 'g652d-loose-12', lengthM: 1000, splices: 2 }]
+};
+
+test('a near miss on a bill-of-materials option is refused, not skipped', function () {
+  throws(function () { length.billOfMaterials(ONE_KM, registry, { overlengthpct: 10 }); },
+    'did you mean "overlengthPct"', 'overlengthpct');
+  throws(function () { length.billOfMaterials(ONE_KM, registry, { minimumPurchase: 5000 }); },
+    'did you mean "minimumPurchaseM"', 'minimumPurchase');
+  throws(function () { length.billOfMaterials(ONE_KM, registry, { spliceReserves: 5 }); },
+    'did you mean "spliceReserveM"', 'spliceReserves');
+  // Narrow, as everywhere else: a key that is not near a term the calculation reads still passes, so
+  // a caller's own bookkeeping (`name`, `note`) is not a typo.
+  close(length.billOfMaterials(ONE_KM, registry, { note: 'MO-4471' }).byCable[0].designM, 1090, 0.01,
+    'a bookkeeping key must not change the order');
+});
+
+test('the options the BOM does read are the ones the purchase uses', function () {
+  // 1000 m + 10% + 2 x 30 = 1160; the 3% default the typo used to buy was 1090.
+  close(length.billOfMaterials(ONE_KM, registry, { overlengthPct: 10 }).byCable[0].designM, 1160, 0.01,
+    'overlengthPct reaches the design length');
+  // A supplier floor is a floor on the purchase, never on the design length: 1090 m of design against
+  // 5000 m is three 2000 m drums (6000 m), and the design length stays 1090.
+  const floor = length.billOfMaterials(ONE_KM, registry, { minimumPurchaseM: 5000 }).byCable[0];
+  assert.strictEqual(floor.designM, 1090);
+  assert.strictEqual(floor.purchaseM, 6000, 'three drums clear the floor');
+});
+
+test('a drum is the cable own, not the caller fallback', function () {
+  // `drumM` on the options is the fallback for a cable that states no drum (`cable.drumM || o.drumM`),
+  // and every catalogue cable states one - so 500 m drums are not bought for a 2000 m drum cable, and
+  // that precedence is a product rule (a 288-fibre ribbon does not come on a 500 m drum), not an
+  // accident. Pinned here so a future change to it is a decision, not a surprise on a purchase order.
+  const bom = length.billOfMaterials(ONE_KM, registry, { drumM: 500 }).byCable[0];
+  assert.strictEqual(bom.drumM, 2000, 'the cable states the drum');
+  assert.strictEqual(bom.drums, 1);
+  assert.strictEqual(bom.purchaseM, 2000);
+});
+
 test('a per-span line carries metres, never a drum count', function () {
   // Two short runs of the same cable. Rounding each span on its own buys a drum per span - the exact
   // bug the per-model round exists to prevent - and this line used to carry that second, contradictory
