@@ -379,13 +379,18 @@
     const splice = spliceFor(state.selected);
     if (!splice) { body.appendChild(el('p', { class: 'muted', text: 'Selected node is not a closure.' })); return; }
     // The strand address is a property of the cable it is in: a 24-per-tube ribbon's strand 25 is
-    // T02-F01, not T03-F01. The catalogue is already in `state.registry`, so read the geometry from
-    // there rather than assuming the standard's default of twelve (the same value the engine uses).
-    const perTubeOf = {};
+    // T02-F01, not T03-F01, and on a bundled span the index runs across every cable, so the row must
+    // also name which cable (`C02/T01-F06`). The catalogue is already in `state.registry`, so read the
+    // geometry from there rather than assuming the standard's default of twelve (what the engine does).
+    const geometry = {};
     const cables = (state.registry.parts && state.registry.parts.cable) || [];
     for (const span of splice.spans) {
       const cable = cables.find(function (c) { return c.model === span.cable; });
-      if (cable && typeof cable.fibersPerTube === 'number') perTubeOf[span.id] = cable.fibersPerTube;
+      geometry[span.id] = {
+        fibersPerTube: cable && typeof cable.fibersPerTube === 'number' ? cable.fibersPerTube : null,
+        fiberCount: cable && typeof cable.fiberCount === 'number' ? cable.fiberCount : null,
+        bundles: typeof span.bundles === 'number' && span.bundles > 1 ? span.bundles : 1
+      };
     }
     const card = el('div', { class: 'card' });
     card.appendChild(el('h3', { text: (splice.node.name || splice.node.id) + ' — thread diagram' }));
@@ -395,17 +400,21 @@
     ['Span', 'Strand', 'Address', 'Colour'].forEach(function (h) { head.appendChild(el('th', { text: h })); });
     table.appendChild(head);
     for (const row of splice.rows) {
-      const perTube = perTubeOf[row.span];
-      const addr = GFFiber.addressFor(row.index, perTube ? { fibersPerTube: perTube } : {});
+      const geo = geometry[row.span] || { fibersPerTube: null, fiberCount: null, bundles: 1 };
+      // A hand-edited project can list a strand its cable does not have; the engine's sheet skips it
+      // and so does the tab, rather than letting one bad entry blank the diagram.
+      if (geo.fiberCount && row.index > geo.fiberCount * geo.bundles) continue;
+      const at = GFFiber.bundleAddressFor(row.index, geo.fiberCount, geo.bundles,
+        geo.fibersPerTube ? { fibersPerTube: geo.fibersPerTube } : undefined);
       const tr = el('tr', {});
       tr.appendChild(el('td', { text: row.span }));
       tr.appendChild(el('td', { class: 'num', text: String(row.index) }));
-      tr.appendChild(el('td', { text: addr.label }));
+      tr.appendChild(el('td', { text: at.label }));
       const td = el('td', {});
       const sw = el('span', { class: 'swatch' });
-      sw.style.background = addr.fiberColor.hex;
+      sw.style.background = at.address.fiberColor.hex;
       td.appendChild(sw);
-      td.appendChild(el('span', { text: addr.fiberColor.name }));
+      td.appendChild(el('span', { text: at.address.fiberColor.name }));
       tr.appendChild(td);
       table.appendChild(tr);
     }

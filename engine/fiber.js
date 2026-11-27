@@ -79,6 +79,47 @@ function labelFor(tube, fiber, opts) {
   return prefix + pad + '-F' + String(fiber).padStart(2, '0');
 }
 
+/**
+ * A strand index on a span that runs `bundles` whole cables -> the cable it is in and the tray inside
+ * that cable.
+ *
+ * `spans[].strands` numbers fibres continuously across the bundle (SPEC §5/§6): on `2 x 12`, strand
+ * 13 is the first fibre of the second cable. `addressFor(index)` cannot say that - it reads the index
+ * as if it were inside one cable, so strand 18 of a one-tube 12-fibre loose tube printed `T02-F06`,
+ * a tube that exists in neither cable. The hand finds a fibre by opening a cable and reading a tray,
+ * so the cable dimension is as load-bearing as the tube one.
+ *
+ * Returns the bare tray `address` (the `addressFor` result, so `parseAddress` still resolves it) and
+ * `label`, which is cable-qualified (`C02/T01-F06`) whenever more than one cable runs the span and
+ * stays the bare address on a single-cable span. An unknown `fiberCount` leaves `cable` null rather
+ * than guessing: the missing figure stays missing, and the label stays bare. An index past the end of
+ * the bundle is refused by name - labelling it cable 3 of 2 is the bug this replaces.
+ */
+function bundleAddressFor(strandIndex, fiberCount, bundles, opts) {
+  const index = Number(strandIndex);
+  if (!Number.isInteger(index) || index < 1) {
+    throw new RangeError('strand index must be a positive integer, got ' + strandIndex);
+  }
+  const n = bundles === undefined || bundles === null ? 1 : Number(bundles);
+  if (!Number.isInteger(n) || n < 1) throw new RangeError('bundles must be a positive integer, got ' + bundles);
+  const per = fiberCount === undefined || fiberCount === null ? null : Number(fiberCount);
+  if (per !== null && (!Number.isInteger(per) || per < 1)) {
+    throw new RangeError('fiberCount must be a positive integer, got ' + fiberCount);
+  }
+  if (per === null) {
+    const bare = addressFor(index, opts);
+    return { index: index, cable: null, strandInCable: index, address: bare, label: bare.label };
+  }
+  if (index > per * n) {
+    throw new RangeError('strand index ' + index + ' is outside a ' + n + ' x ' + per + '-fibre bundle (' + per * n + ' fibres)');
+  }
+  const cable = Math.floor((index - 1) / per) + 1;
+  const strandInCable = ((index - 1) % per) + 1;
+  const address = addressFor(strandInCable, opts);
+  const label = n > 1 ? 'C' + String(cable).padStart(2, '0') + '/' + address.label : address.label;
+  return { index: index, cable: cable, strandInCable: strandInCable, address: address, label: label };
+}
+
 function tubeCount(fiberCount, opts) {
   const perTube = fibersPerTubeOf(opts);
   const n = Number(fiberCount);
@@ -142,6 +183,7 @@ const api = {
   isStandardColor: isStandardColor,
   tubeCount: tubeCount,
   addressFor: addressFor,
+  bundleAddressFor: bundleAddressFor,
   labelFor: labelFor,
   plan: plan,
   parseAddress: parseAddress,

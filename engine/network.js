@@ -959,16 +959,24 @@ function spliceTable(plant, registry) {
     Array.from(byStrand.keys()).sort(function (a, b) { return a - b; }).forEach(function (index) {
       const carriers = byStrand.get(index).slice().sort();
       carriers.forEach(function (spanId) {
+        const span = spanById.get(spanId);
         const others = carriers.filter(function (id) { return id !== spanId; });
         // Each row is the strand *in its own cable*: two cables of different tube sizes splice the same
         // strand index under two different addresses, which is exactly what the crew reads off the trays.
-        const address = fiber.addressFor(index, tubeOptions(spanById.get(spanId), registry));
+        // On a bundled span the index is continuous across the bundle but a tray is not, so the row also
+        // names the cable it is in and a cable-qualified `label` (`C02/T01-F06`); without it strand 18
+        // of a `2 x 12` span printed `T02-F06`, a tube neither cable has (gh#95).
+        const cap = spanFibreCapacity(span, registry);
+        const at = fiber.bundleAddressFor(index, cap.fiberCount, cap.bundles, tubeOptions(span, registry));
         rows.push({
           span: spanId,
           strand: index,
-          address: address.label,
-          colour: address.fiberColor.name,
-          hex: address.fiberColor.hex,
+          cable: at.cable,
+          strandInCable: at.strandInCable,
+          address: at.address.label,
+          label: at.label,
+          colour: at.address.fiberColor.name,
+          hex: at.address.fiberColor.hex,
           via: others.length ? 'splice' : 'parked',
           port: null,
           splicedTo: others
@@ -1045,14 +1053,19 @@ function splitterPoint(node, local, idOf, depth, registry) {
 
   for (const span of ordered) {
     const isInput = span === ordered[0];
+    const cap = spanFibreCapacity(span, registry);
     for (const index of carriedStrands(span, registry)) {
-      const address = fiber.addressFor(index, tubeOptions(span, registry));
+      // Same row shape as a closure: the cable the strand is in, then the tray inside that cable.
+      const at = fiber.bundleAddressFor(index, cap.fiberCount, cap.bundles, tubeOptions(span, registry));
       rows.push({
         span: idOf.get(span),
         strand: index,
-        address: address.label,
-        colour: address.fiberColor.name,
-        hex: address.fiberColor.hex,
+        cable: at.cable,
+        strandInCable: at.strandInCable,
+        address: at.address.label,
+        label: at.label,
+        colour: at.address.fiberColor.name,
+        hex: at.address.fiberColor.hex,
         via: isInput ? 'splitter-input' : 'splitter-port',
         port: isInput ? null : ++port,
         splicedTo: []
