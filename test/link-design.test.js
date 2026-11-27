@@ -126,6 +126,28 @@ test('a leased segment with no stated loss is refused, not assumed lossless', fu
   }, 'names who owns it');
 });
 
+test('a lease cost that arrived as text is refused, not reported as unpriced', function () {
+  // `cost` was copied with `isNum(seg.cost) ? seg.cost : null`, so a JSON form field that arrived as
+  // "50" was read as no price at all: the answer carried cost: null, costComplete: false and a
+  // costUnit saying the caller states cost in whatever unit it buys in - a stated 50 vanished from
+  // the lease's money with nothing said. A price the report cannot read is the same fault as a loss
+  // it cannot read: refused by name, not answered as absent.
+  const e = throws(function () {
+    gridLink({ thirdParty: [{ provider: 'CityFibre', lengthM: 300, lossDb: 0.6, cost: '50' }] });
+  }, 'thirdParty[0].cost', 'a cost that arrived as text');
+  assert.ok(e.message.indexOf('\"50\"') !== -1, 'the refusal quotes the value: ' + e.message);
+  throws(function () {
+    gridLink({ thirdParty: [{ provider: 'CityFibre', lengthM: 300, lossDb: 0.6, cost: -5 }] });
+  }, 'thirdParty[0].cost', 'a negative cost');
+  // 0 is a figure - the lease is free - so it is priced, and an absent cost is still unpriced.
+  const free = gridLink({ thirdParty: [{ provider: 'CityFibre', lengthM: 300, lossDb: 0.6, cost: 0 }] });
+  assert.strictEqual(free.bom.thirdParty.cost, 0, 'a 0-priced lease is priced at 0');
+  assert.strictEqual(free.bom.thirdParty.costComplete, true, '0 is a stated price, not an absent one');
+  const unstated = gridLink({ thirdParty: [{ provider: 'CityFibre', lengthM: 300, lossDb: 0.6 }] });
+  assert.strictEqual(unstated.bom.thirdParty.cost, null, 'no stated cost stays unpriced');
+  assert.strictEqual(unstated.bom.thirdParty.costComplete, false);
+});
+
 test('a route longer than the optic reaches is refused, naming the length and the reach', function () {
   const longNet = { edges: [{ id: 'trunk', coords: [p(51.0, -0.1), p(51.2, -0.1), p(51.45, -0.1)] }] };
   const r = link.design({

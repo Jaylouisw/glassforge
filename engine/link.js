@@ -329,6 +329,17 @@ function thirdPartySegments(input) {
     if (seg.leg !== undefined && seg.leg !== 'a' && seg.leg !== 'b' && seg.leg !== 'both') {
       throw new Error(where + '.leg must be "a", "b" or "both"');
     }
+    // `cost` is optional, but a present one has to be a figure. It was copied with
+    // `isNum(seg.cost) ? seg.cost : null`, so a form field that arrived as "50" read as no price at
+    // all: the answer carried `cost: null`, `costComplete: false` and a `costUnit` saying the caller
+    // stated none - a stated 50 disappeared from the lease's money with nothing said, and a negative
+    // one was summed into a credit nobody agreed to. Absent (or an explicit null) still means
+    // "unpriced", and 0 is a figure - the lease is free - not the absent case.
+    if (seg.cost !== undefined && seg.cost !== null && (!isNum(seg.cost) || seg.cost < 0)) {
+      throw new TypeError(where + '.cost must be a non-negative number (the stated cost of the leased ' +
+        'segment), got ' + JSON.stringify(seg.cost) + ' - a price the report cannot read is refused ' +
+        'rather than answered as unpriced, so a stated cost cannot vanish from the circuit');
+    }
     return {
       provider: seg.provider,
       lengthM: round(seg.lengthM, 2),
