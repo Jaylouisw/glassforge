@@ -1,0 +1,17 @@
+{
+  "kind": "connector",
+  "model": "lc-apc-lowloss",
+  "vendor": "generic",
+  "label": "LC/APC connector pair (grade B, low loss)",
+  "lossDb": 0.15,
+  "maxLossDb": 0.25,
+  "notes": "The small-form-factor twin of sc-apc-lowloss, and the same grade: 0.15 dB typical for a mated grade-B LC/APC pair, 0.25 dB the ceiling. IEC 61753-1:2007 Table A.12 (reprinted as ITU-T L.36 Table 9-1) grades random-mated single-mode connectors B: 0.12 dB mean and 0.25 dB max for more than 97% of samples, C: 0.25 dB mean and 0.50 dB max - a grade, not a connector type, so an LC and an SC pair meet the same numbers. Against lc-apc's 0.25 this row takes 0.10 dB off every mating, 0.4 dB across four matings, which is smaller than the SC pair's saving by exactly the 0.05 dB that row's more conservative typical carried. The row exists because lc-apc built its 0.25 dB typical on grade B's maximum, so a design that genuinely contracted graded LC patch cords had no row to name and was being budgeted as commodity grade C; lc-apc now says what it is - grade C mean - and this row is the grade-B contract. LC/APC is common on XG-PON and XGS-PON line cards and ODF panels, so it is the mating where 0.10 dB is least interchangeable with the wrong polish: LC/UPC and LC/APC do not mate without damage, and the engine budgets whichever connector row is named without ever comparing its polish to the optic's: `polish` is a catalogue field the validator constrains and parts-catalogue-claims pairs with the optics, not a check at budget time. Return loss for the APC ferrule (60 dB mated, grade 1) is not budgeted here. The engine charges one connector per mating and sc-apc remains the default: this row is selected with connectorModel or connectors: { model, count }. Replace with the measured loss of the patch cords you buy - 0.25 is a maximum, 0.15 a typical.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.36/en",
+  "tags": [
+    "connector",
+    "lc",
+    "low-loss",
+    "grade-b"
+  ],
+  "polish": "apc"
+}

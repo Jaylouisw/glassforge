@@ -1,0 +1,17 @@
+{
+  "kind": "connector",
+  "model": "sc-apc-lowloss",
+  "vendor": "generic",
+  "label": "SC/APC connector pair (grade B, low loss)",
+  "lossDb": 0.15,
+  "maxLossDb": 0.25,
+  "notes": "0.15 dB is a typical loss for a mated grade-B SC/APC pair; 0.25 dB is the ceiling the grade sets, not one vendor's test report. The grade is a class limit and it is the only reason this row exists beside sc-apc: IEC 61753-1:2007 Table A.12 - reprinted as Table 9-1 of ITU-T L.36 (01/2015), where these figures are taken from - grades random-mated single-mode connectors B: 0.12 dB mean and 0.25 dB max for more than 97% of samples, C: 0.25 dB mean and 0.50 dB max, D: 0.50 dB mean and 1.00 dB max, with grade A 'not defined yet' in the published table (the 0.07 / 0.15 A row in industry literature is a proposal, not the recommendation's figure). So 0.15 sits between grade B's 0.12 mean and its 0.25 maximum: a pair that passes the contract almost always beats the figure charged here, and one that misses it is a warranty claim rather than a design assumption. Charging 0.15 instead of sc-apc's 0.30 takes 0.15 dB off every mating - 0.6 dB across the four matings designForOnt charges a path whose one splitter is a connectorised cassette (two end matings, plus two for the cassette) - and that is a verdict, not a rounding: a class B+ line with a connectorised 1:32 and 24.0 km of feeder budgets 23.589 dB and 'marginal' (headroom 4.91 dB) on sc-apc against 22.989 dB and 'ok' (5.51 dB) on this row, and the same plant at 33.0 km moves from 'fail' (2.93 dB) to 'marginal' (3.53 dB). The ferrule grade on the purchase order is the only way to buy that back without laying less fibre. The trade is real in both directions: a grade-B pair costs more, and every pair on the path has to be grade B, because one grade-C patch cord in the chain caps the end-to-end figure. Polish is not interchangeable - an APC ferrule mated to a UPC one loses several dB and can damage both endfaces, so a plant specified to this row must be APC throughout - and the APC return loss (60 dB mated, return-loss grade 1) is a reflection specification the engine does not budget at all. The engine charges one connector per mating, so a single patched-through connection is 2 x 0.15 dB, and sc-apc stays the default connector model: this row is chosen with connectorModel or connectors: { model: 'sc-apc-lowloss', count } and no figure already budgeted moves. Replace with the loss measured on the patch cords you buy; a supplier's 0.25 dB is a maximum and 0.15 is a typical, not a contract.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.36/en",
+  "tags": [
+    "connector",
+    "sc",
+    "low-loss",
+    "grade-b"
+  ],
+  "polish": "apc"
+}
