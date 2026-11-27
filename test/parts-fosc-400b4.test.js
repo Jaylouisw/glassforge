@@ -96,7 +96,9 @@ test('a 48-splice joint is now offered this box before the 216-splice trunk clos
   const r = link.design({ sites: { a: A, b: B }, network: figureOfEight(), optics: ER, fibres: 48 }, registry);
   const warning = r.warnings.filter(function (w) { return w.indexOf('would carry 48 splices') !== -1; });
   assert.strictEqual(warning.length, 1, r.warnings.join(' | '));
-  // The fits list is ascending by capacity: 96, 216, 504. Before this row the first named was 216.
+  // The fits list is ascending by capacity: 48, 96, 216, 504. Before the B4 row the first named was
+  // 216; fosc-400a4-inline-48 is now the smallest answer to a 48-splice joint, and this row is still
+  // named ahead of the 216-splice trunk box.
   const named = warning[0].slice(warning[0].indexOf('inline closures that would:'));
   assert.ok(named.indexOf('fosc-400b4-inline-96 (96)') !== -1, 'must name the 96-splice box: ' + warning[0]);
   assert.ok(named.indexOf('fosc-400b4-inline-96') < named.indexOf('fosc-600c-inline-216'),
