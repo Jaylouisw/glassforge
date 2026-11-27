@@ -4,7 +4,7 @@
 // #111 and PR #118 taught `budget.opticalBudget` to say "the ONT is inside its overload point only at
 // the bottom of the OLT launch window" and every project surface to repeat it. Auto-design is the
 // surface that *proposes* a plan, and it computed each ONT's budget, read the verdict, and threw the
-// warnings away: the ordinary 12-house C+ estate below is 12 of 12 ONTs inside the band, 3.55 dB over
+// warnings away: the ordinary 12-house C+ estate below is 12 of 12 ONTs inside the band, 3.64 dB over
 // at the top of the launch window, and `synthesise` reported `feasible: true, warnings: []`. A plan
 // signed off on a link that only works while every line card lands cold is the failure #111 is about.
 //
@@ -27,11 +27,13 @@ function estate(n) {
   return points;
 }
 
-// 0.001 deg south of the first house: the C+ 1:8 design lands at ODN 11.46-11.97 dB, inside the
-// 11.0-15.0 dB band where a +3 dBm floor is clean (-8.68 dBm at House 1, 0.68 dB inside the -8 dBm
-// overload point) and a +7 dBm ceiling is not (-4.68 dBm, 3.32 dB over).
+// 0.001 deg south of the first house: the C+ 1:8 design lands at ODN 11.35-11.87 dB, inside the
+// 11.0-15.0 dB band where a +3 dBm floor is clean (-8.58 dBm at House 1, 0.58 dB inside the -8 dBm
+// overload point) and a +7 dBm ceiling is not (-4.58 dBm, 3.42 dB over at House 1 and 3.64 dB over
+// on the shortest path). (These figures are 0.10 dB lower than they were before gh#39: the splitter
+// site's own house no longer carries a closure splice for a 1 m span that was never a run.)
 const NEAR = { lat: 51.499, lon: -0.1006, name: 'PoP' };
-// 0.15 deg south: the same topology at ODN 15.83-16.34 dB, past the top of the band, so nothing to say.
+// 0.15 deg south: the same topology at ODN 15.73-16.24 dB, past the top of the band, so nothing to say.
 const FAR = { lat: 51.35, lon: -0.1006, name: 'PoP' };
 
 const near = engine.design.synthesise(estate(12), { headEnd: NEAR }, registry);
@@ -51,9 +53,9 @@ test('a synthesised design whose ONTs all sit in the blind zone reports it', fun
   const loud = bandWarnings(near.best);
   assert.strictEqual(loud.length, 1, JSON.stringify(near.best.warnings));
   assert.ok(loud[0].indexOf('12 of 12') !== -1, 'names how many ONTs the band covers: ' + loud[0]);
-  assert.ok(loud[0].indexOf('3.55 dB over at the 7 dBm') !== -1,
+  assert.ok(loud[0].indexOf('3.64 dB over at the 7 dBm') !== -1,
     'names the worst overshoot and the launch it happens at: ' + loud[0]);
-  assert.ok(loud[0].indexOf('4 dB of inline pad') !== -1, 'ceil(3.55) = 4, and the fix must be named: ' + loud[0]);
+  assert.ok(loud[0].indexOf('4 dB of inline pad') !== -1, 'ceil(3.64) = 4, and the fix must be named: ' + loud[0]);
 });
 
 test('the design report counts the band per ONT as well as saying it once', function () {

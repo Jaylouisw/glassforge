@@ -778,8 +778,26 @@ function emitTerminalTree(plant, tree, cfg, registry) {
   const idOf = new Map();
   idOf.set(tree.rootId, cfg.rootPlantId);
 
+  // A node sitting on the root's own coordinates is not a span away from it. A splitter site is a
+  // house (the cluster's medoid), so the tree rooted there owns the house it stands on, and the MST
+  // edge between the two measures 0 m. Emitted, the 1 m span floor turned that edge into a
+  // distribution span carrying the whole cluster's fibres, and the BOM bought a 24-fibre drum for the
+  // inside of one closure (gh#39). Contracted, the house hangs off the root like any other terminal
+  // and is served by its own drop - which is what `street.routedTree` already does with a terminal
+  // that snaps onto the root node.
+  const root = tree.nodes.filter(function (n) { return n.isRoot; })[0];
+  const onRoot = new Set();
+  for (const node of tree.nodes) {
+    if (!node.isRoot && root && node.lat === root.lat && node.lon === root.lon) onRoot.add(node.key);
+  }
+  // The feeder site the tree hangs from, for every node - a contracted node and a leaf both name it.
+  function plantIdOf(key) {
+    return onRoot.has(key) ? cfg.rootPlantId : idOf.get(key);
+  }
+
   for (const node of tree.nodes) {
     if (node.isRoot) continue;
+    if (onRoot.has(node.key)) { idOf.set(node.key, cfg.rootPlantId); continue; }
     if (node.degree >= 2 || node.attachTerminals.length) {
       const id = cfg.prefix + 'c-' + node.key;
       plant.nodes.push({
@@ -821,12 +839,17 @@ function emitTerminalTree(plant, tree, cfg, registry) {
   }
 
   for (const edge of tree.edges) {
+    const from = plantIdOf(edge.from);
+    const to = plantIdOf(edge.to);
+    // Both ends are the same place: the edge contracted onto the root is not a span, and charging it
+    // is what bought the 24-fibre drum (gh#39).
+    if (from === to) continue;
     const fibres = Math.max(cfg.minFibres, edge.terminals * cfg.fibresPerTerminal);
     const cable = cableForSpan(fibres, edge.lengthM, cfg.ladder, registry);
     const bundles = Math.max(1, Math.ceil(fibres / cable.fiberCount));
     plant.spans.push({
       id: cfg.prefix + 's-' + edge.from + '-' + edge.to,
-      from: idOf.get(edge.from), to: idOf.get(edge.to),
+      from: from, to: to,
       cable: cable.model,
       lengthM: edge.lengthM,
       strands: strandList(fibres, cable.fiberCount),

@@ -4,7 +4,7 @@
 // #157 gave the top-level knobs that treatment (routeFactor, overlengthPct, maxSnapM, technology,
 // ladder) because each one measures the plan. pon and active are merged in with Object.assign, so a
 // shape the design cannot read is not reported - it is *replaced*, and the plant is then built from
-// parts nobody asked for. Measured on this estate (8 houses, 707.3 m of design length at the default,
+// parts nobody asked for. Measured on this estate (8 houses, 706.3 m of design length at the default,
 // one 1:8 splitter site):
 //
 //   pon: 'gpon'                      merged no key at all; the 1:8/16/32 default search ranked a
@@ -95,10 +95,12 @@ test('a drop limit that is negative or arrives as text is refused', function () 
 });
 
 test('a pon block the design does read still designs the same plant', function () {
-  // Nothing above changes a legitimate run: the same 707.3 m, one splitter site, and the splitter
-  // parts are still bought from the ratio list the caller named.
-  close(design({}).best.metrics.designM, 707.3, 0.2, 'design length at the default ratios');
-  close(design({ pon: { ratios: [8], maxDropM: 500 } }).best.metrics.designM, 707.3, 0.2, 'design length at 1:8');
+  // Nothing above changes a legitimate run: the same 706.3 m, one splitter site, and the splitter
+  // parts are still bought from the ratio list the caller named. (706.3, not the 707.3 these two
+  // lines used to pin: gh#39 stopped charging a 1 m distribution span from a splitter site to the
+  // house it stands on, and this estate's first house is that medoid.)
+  close(design({}).best.metrics.designM, 706.3, 0.2, 'design length at the default ratios');
+  close(design({ pon: { ratios: [8], maxDropM: 500 } }).best.metrics.designM, 706.3, 0.2, 'design length at 1:8');
   assert.ok(design({ pon: { ratios: [32] } }).best.label.indexOf('1:32') !== -1,
     'a ratio the caller named is the ratio that is built: ' + design({ pon: { ratios: [32] } }).best.label);
 });

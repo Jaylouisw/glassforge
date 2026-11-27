@@ -191,7 +191,11 @@ async function main() {
     // figure because 5 dB is the size that binds. No `fail` sentence here to carry it instead.
     assert.ok(band[0].indexOf('the OLT receiver') !== -1,
       'the report still sizes the pad from the downstream band alone: ' + band[0]);
-    assert.ok(band[0].indexOf('6 x 5 dB') !== -1 && band[0].indexOf('the downstream direction needs') !== -1,
+    // The split across the 12 ONTs was 6 x 5 dB / 6 x 4 dB before gh#39 removed the 0.10 dB closure
+    // splice at the house the splitter stands on: three of those ONTs were a shade over 4 dB and now
+    // round to a 4 dB pad. The worst is still 4.45 dB, so 5 dB is still the size that binds.
+    assert.ok(band[0].indexOf('9 x 5 dB') !== -1 && band[0].indexOf('3 x 4 dB') !== -1 &&
+      band[0].indexOf('the downstream direction needs') !== -1,
       'the sizes that bind are the upstream ones, and the downstream ask is named beside them: ' + band[0]);
   });
 
