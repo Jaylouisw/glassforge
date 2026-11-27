@@ -30,7 +30,7 @@ test('the checker fails on a planted stale URL', function () {
   try {
     fs.writeFileSync(path.join(dir, 'README.md'),
       '# probe\n\nClone from ' + canonical.clone() + '\n\n[![CI](' + canonical.badge('ci.yml') + ')]\n');
-    fs.writeFileSync(path.join(dir, 'stale.md'), 'git clone https://github.com/Jaylouisw/glassforge.git\n');
+    fs.writeFileSync(path.join(dir, 'stale.md'), 'git clone https://git.jayw.uk/jaylouisw/glassforge.git\n');
     const result = check(dir);
     assert.strictEqual(result.ok, false, 'the planted URL was not caught');
     assert.ok(result.problems.some(function (p) { return p.file === 'stale.md' && p.code === 'E_STALE_REPO_URL'; }),
