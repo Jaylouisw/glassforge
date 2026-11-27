@@ -1,0 +1,18 @@
+{
+  "kind": "closure",
+  "model": "fosc-600c-inline-216",
+  "vendor": "CommScope",
+  "label": "FOSC 600-C in-line closure, 216 splices",
+  "type": "inline",
+  "ports": 4,
+  "spliceCapacity": 216,
+  "trays": 3,
+  "notes": "The 96-fibre and 144-fibre feeder joint. Figures are CommScope's FOSC 600 data sheet PA-317451.2-AE (05/16), table 'Tray (and splice) capacity of closures': 600 C In-line = 3 D trays (216 splices), 600 C Butt = 5 trays (360), against the 600 D In-line's 7 trays (504) the catalogue already carries. 216 is 3 trays x 72, and 72 is the D tray with six SM12 modules from the same sheet's tray ordering table. Capacity is a function of the tray ordered, not of the housing, so two caveats travel with the number. First, the ordering table also offers a 36-way D tray (six SM6 modules) and a 96-way tray: order the 36-way trays and this box holds 108 splices, order 96-way and it holds 288 - the row takes the 72-way standard tray so an order of standard trays is not over-subscribed on paper, the same convention fosc-600d-inline-504 follows. Second, ribbon is counted differently again: the same table gives the 600 C In-line 2 D-ribbon trays (576 ribbon splices), so a 288-fibre ribbon joint physically fits, but this model counts strands against spliceCapacity (engine/network.js), 288 is greater than 216, and a 288F ribbon cable through this row is refused by name - that refusal is correct for the row: the 288F trunk box stays fosc-600d-inline-504, and a 144F ribbon joint is what this one is for. Cable side, from the same sheet: cables up to 35 mm and 1728 fibres, up to 16 separate cable ports, and the 4 ports here are one 4-port gel block - the order code 8 ships two blocks and gives 8 ports. Why this row exists: the catalogue's in-line joints were 24 splices (mufa-inline-24) and 504 (fosc-600d-inline-504), and both 96F and 144F feeder cables are sold here, so a through-joint in either was flagged over-stuffed in the mufa ('would carry 144 splices, capacity 24', measured) and the only boxes that fit were a street cabinet - a different product, not a joint - or a 504-splice trunk closure sized for 288F. This one is the smallest in-line box that joints a 144F cable: measured through engine/network.js, the same 144F joint reads no capacity note here and one note in the mufa. Confirm the SKU, its tray type and its port blocks against the purchased closure's own datasheet before ordering - capacity, ports and tray type all move with the order code - and replace this row with the closure actually bought.",
+  "sourceUrl": "https://webresources.commscope.com/download/assets/Data+Sheet:+FOSC+600+Fiber+Optic+Splice+Closures/22bdfee03bd611f0b87efaa31792deb3",
+  "tags": [
+    "inline",
+    "feeder",
+    "joint",
+    "144"
+  ]
+}
