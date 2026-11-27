@@ -253,7 +253,10 @@ and a circuit that was built with one leg warns, naming the provider. The light 
 is not a purchase. A segment on `leg: "both"` that is attached is one lease used twice: `onBothLegs`
 says so and `totalM` counts it once. A site off the graph, a leg beyond the optic's reach or an overload
 is `ok: false` with a reason naming the leg; a body without two sites, or a leased segment
-with no `lossDb`, is a 400. See [AUTO-DESIGN.md](AUTO-DESIGN.md#site-to-site-links-dc-to-dc).
+with no `lossDb` or a `cost` that is not a non-negative number, is a 400. `cost` is optional and
+unitless; absent means unpriced (`cost: null`, `costComplete: false`), `0` is a stated price, and a
+present `cost` that arrived as text or negative is refused rather than read as unpriced.
+See [AUTO-DESIGN.md](AUTO-DESIGN.md#site-to-site-links-dc-to-dc).
 
 ## Design calculations
 
