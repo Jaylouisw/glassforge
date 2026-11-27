@@ -37,6 +37,18 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **The head end's own distance to the street is cable, not a free connection.** Auto-design snapped
+  the head-end site onto the street like any other site and then never charged the gap: the first span
+  left `n-headend` at its true coordinates but was billed the graph distance from the snapped vertex,
+  so the drawing was longer than the bill of materials. Measured on a PoP 66.7 m behind the pavement
+  with two houses on the street: each home-run span billed **34.6 m for a 101 m route** and `cableM`
+  read **103.8** where it is **237.2**; the active tree and the PON feeder were each 66.7 m short.
+  `engine/link.js` has charged both site drops since it landed - the head end is the one site with no
+  drop span to carry its gap. Every edge leaving the root now includes the gap (each is its own
+  cable), the head-end coordinate is the first point of that edge's route, and a splitter site is not
+  charged again because it is a house whose own drop already carries its gap. Tests:
+  `design-headend-spur` (5 cases: the measured gap, home-run x2, shared tree x1, PON feeder x1 with
+  the site not double-charged, and drawn route = billed length on every span of every candidate).
 - **The site-to-site link looks up the `closure` it orders instead of echoing it.** `closure:
   "mufa-inline-99"` answered `ok` with a part the catalogue does not have, and a 48-fibre leg through
   one joint billed a 24-splice mufa with nothing said. An unknown model is now a `400` naming the
