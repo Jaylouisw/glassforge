@@ -247,9 +247,12 @@ ODN loss**, and `txDbm` is the launch power to budget at (default: the transmitt
 `allowanceDb` is the one a planner reaches for on a project: it changes no plant, it makes the
 verdict account for slack the route has not spent — the result echoes `marginDb`, and `totalLossDb`
 carries the allowance (`odnLossDb` 11.86 + 2 for `{"allowanceDb":2}`). Measured on a project of one 1:8
-splitter and 3 km of `g652d-loose-12`: `{}` answers `totalLossDb` 11.86 with `headroomDb` 18.14,
-`{"allowanceDb":2}` answers 13.86 and 16.14, `{"spliceModel":"mechanical"}` adds 0.2 dB at the splitter's
-splice, and `{"connectorModel":"lc-apc"}` takes 0.05 dB off each of the two connectors.
+splitter and 3 km of `g652d-loose-12`: `{}` answers `totalLossDb` 11.86 with `headroomDb` 21.14,
+`{"allowanceDb":2}` answers 13.86 and 19.14, `{"spliceModel":"mechanical"}` adds 0.2 dB at the splitter's
+splice, and `{"connectorModel":"lc-apc"}` takes 0.05 dB off each of the two connectors. `headroomDb` is
+the receive power less the receiver's sensitivity (-8.86 - (-30) = 21.14), and `marginDb` is compared
+against it rather than subtracted from it: a 3 dB margin on that answer still leaves 21.14 dB of
+headroom, 18.14 dB of it spare, and the row reports the larger figure, not the net.
 `txDbm` is the same launch the design budget reads, and it moves the verdict because the overload point is judged at it:
 the same project's `{}` is -8.86 dBm at +3 dBm, inside the ONT's -8 dBm overload point, while
 `{"txDbm":7}` answers `rxPowerDbm` -4.86 and `fail` - 3.14 dB over that point, so `attenuator.padDb` is
