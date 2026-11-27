@@ -989,14 +989,17 @@ function diversePaths(graph, fromId, toId, opts) {
     }
   }
 
-  // No edge-disjoint pair exists. Take the cheapest path that shares the fewest metres with the first
-  // one: a shared edge costs more than the entire network, so the search avoids sharing before it
-  // shortens itself.
+  // No edge-disjoint pair exists. Take the path that shares the fewest metres with the first one,
+  // shortest first when two share equally: a shared metre costs more than the entire network, so
+  // the search avoids sharing before it shortens itself.
   let totalM = 0;
   for (const edge of graph.edges.values()) totalM += edge.lengthM;
   const weighted = allArcs(graph);
   for (const list of weighted.values()) {
-    for (const arc of list) if (usedByFirst.has(arc.edgeId)) arc.cost += totalM + 1;
+    // The penalty is carried by the metre, not by the arc. A flat penalty per shared arc
+    // minimised the *number* of shared ducts and then, among equal counts, the shorter leg - so
+    // one 226 m pair beat a 47 m longer pair sharing 193 m, and `sharedM` overstated the loss.
+    for (const arc of list) if (usedByFirst.has(arc.edgeId)) arc.cost = arc.cost * (totalM + 2);
   }
   const alternate = shortestArcs(graph, weighted, fromId, toId);
   if (!alternate) {
