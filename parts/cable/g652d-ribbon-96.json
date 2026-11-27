@@ -1,0 +1,25 @@
+{
+  "kind": "cable",
+  "model": "g652d-ribbon-96",
+  "vendor": "generic",
+  "label": "G.652.D ribbon 96F",
+  "fiberCount": 96,
+  "fibersPerTube": 12,
+  "construction": "ribbon",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Ribbon construction, not loose tube: eight ribbons of 12 fibres, one ribbon per tube position, which is the addressing g652d-ribbon-144 and g652d-ribbon-216 already assume. Why this rung exists: the ribbon ladder's smallest rung was 144, so a ribbon ladder resolved every span of 143 fibres or fewer to 144F - design.cableFor(96, ['g652d-ribbon-144','g652d-ribbon-216']) answers 144F, and a 48-fibre demand answers 144F too, three times the cable the span carries. 96F is a stocked ribbon size, not an invented one: Lightera/Prysmian's AccuRibbon DC ordering table names 96 among its standard fibre counts (24, 48, 72, 96, 120, 144, 216, 288, 432, 864) and prints a 96F dielectric build at 12.8 mm OD, and its core is specified as 'up to eighteen 12-fiber AccuRibbon units (12 to 216 fibers)', so 96F is eight of those units - the same family the 144 and 216 rows cite. Belden FDSR096R2 is 96F flexible ribbon in eight active subunits of 12F, the direct sibling of FDSR144R2. Attenuation here is typical installed performance, not a G.652.D limit: 0.35 dB/km at 1310 nm sits under the recommendation's 0.40 dB/km maximum (1310-1625 nm), and 0.21 dB/km at 1550 nm under its 0.30 dB/km maximum (1530-1565 nm). 1490 nm is a typical, interpolated value: no ITU-T recommendation publishes a 1490 nm attenuation figure of its own, and the cable sheets that do print one print a maximum, not this figure - Lightera's AccuRibbon DC sheet quotes 0.35/0.31/0.27/0.25 dB/km maximum at 1310/1385/1490/1550 nm for its AllWave ZWP option, so 0.22 dB/km at 1490 nm is a typical value under that ceiling and not a citation. Two 96F sheets print different maxima for the same fibre count because they are different jackets, and neither is this row: Belden FDSR096R2 prints 0.50 dB/km at 1300 and 1550 nm because it is an indoor/outdoor flexible-ribbon riser, while a duct build prints far less. Budgeting a duct trunk at the riser maximum prices the worst cable ever shipped out of the factory; for a budget that gets signed, take the as-built OTDR trace. Caveat that travels with the addressing: 96 fibres are built several ways and the strand labels follow this row's build. Nexans' GAHSQ 96/C4 is 96 fibres as 24 four-fibre ribbons in six slots, and Emcab's A-DQ4Y 96 (8x12) is eight 12-fibre ribbons in eight loose tubes rather than one ribbon per tube position - all three number the same 96 strands and label the tube differently. Read the construction sheet of the cable actually bought. drumM is 2,000 m rather than a longer reel: XCOM's GYTY 96F (8x12) sheet prints a standard drum length of 2,000 m +/- 5% with 3,000 m on request, Emcab's A-DQ4Y 96 build prints a 2,000 m blowing track, and the 144 and 216 ribbon rows keep the same floor so a 3 km run is quoted two 2 km drums rather than a whole 4 km reel it cannot pull in one go. The reel actually ordered wins; set drumM to it. This row is not in DEFAULT_LADDER (no ribbon row is), so it reaches a design through the ladder option or an engine change to the default ladder; the part alone does not re-rank existing designs. Replace all three attenuation figures with the bought cable's test report for a construction-grade budget.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.652/en",
+  "tags": [
+    "generic",
+    "g.652.d"
+  ]
+}
