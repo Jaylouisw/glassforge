@@ -13,10 +13,10 @@
  * the same mistake and gets a `200`.
  *
  * The refusal is deliberately narrow: it fires on a field that is a *near miss* of one the engine
- * does read - case difference, singular/plural, a prefix (`margin` for `marginDb`) or a one-letter
- * edit - and says which field was meant. Unrelated extra keys (`name`, `notes`, a caller's own
- * bookkeeping) are still ignored, because refusing those would make the budget unusable for a
- * caller who is not wrong. This module cannot be sure a word is a typo; it can be sure that
+ * does read - case difference, singular/plural, a prefix (`margin` for `marginDb`), a one-letter edit
+ * or a swapped adjacent pair (`marignDb` for `marginDb`) - and says which field was meant. Unrelated
+ * extra keys (`name`, `notes`, a caller's own bookkeeping) are still ignored, because refusing those
+ * would make the budget unusable for a caller who is not wrong. This module cannot be sure a word is a typo; it can be sure that
  * `splitter` is one.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -25,35 +25,53 @@ exports.assertKnownFields = assertKnownFields;
 exports.assertNumberField = assertNumberField;
 exports.assertChoiceField = assertChoiceField;
 exports.assertCableLadder = assertCableLadder;
-/** Damerau-free Levenshtein distance, iterative: enough for "one letter wrong" on short names. */
+/**
+ * Levenshtein distance with adjacent transpositions (optimal string alignment, Damerau), iterative.
+ *
+ * Plain Levenshtein counts a swapped pair as two edits - a deletion plus an insertion - so the typo a
+ * hand on a keyboard makes most often (`marignDb`, `overlenghtPct`, `thridParty`) was not a near miss
+ * at all, and the guard silently let the default run. One swap is one keystroke, so it is one edit
+ * here. Three rows are kept because the transposition step reads the row two back.
+ */
 function distance(a, b) {
     if (a === b)
         return 0;
-    const prev = new Array(b.length + 1);
-    const cur = new Array(b.length + 1);
-    for (let j = 0; j <= b.length; j++)
+    const m = b.length;
+    let twoBack = new Array(m + 1).fill(0);
+    let prev = new Array(m + 1);
+    let cur = new Array(m + 1);
+    for (let j = 0; j <= m; j++)
         prev[j] = j;
     for (let i = 1; i <= a.length; i++) {
         cur[0] = i;
         const ai = a.charAt(i - 1);
-        for (let j = 1; j <= b.length; j++) {
+        for (let j = 1; j <= m; j++) {
             const cost = ai === b.charAt(j - 1) ? 0 : 1;
             const del = prev[j] + 1;
             const ins = cur[j - 1] + 1;
             const sub = prev[j - 1] + cost;
-            cur[j] = Math.min(del, ins, sub);
+            let best = Math.min(del, ins, sub);
+            // `ab` -> `ba` is one transposition, not a deletion plus an insertion.
+            if (i > 1 && j > 1 && ai === b.charAt(j - 2) && a.charAt(i - 2) === b.charAt(j - 1)) {
+                const swap = twoBack[j - 2] + 1;
+                if (swap < best)
+                    best = swap;
+            }
+            cur[j] = best;
         }
-        for (let j = 0; j <= b.length; j++)
-            prev[j] = cur[j];
+        const recycled = twoBack;
+        twoBack = prev;
+        prev = cur;
+        cur = recycled;
     }
-    return prev[b.length];
+    return prev[m];
 }
 /**
  * The field the caller probably meant, or null when the key is not a near miss of any known field.
  *
  * Order of certainty: an exact case-insensitive match first (so the message can name the real
- * casing, `headEnd`), then singular/plural, then a prefix, then one edit. The shortest candidate
- * wins a tie, and ids break the remaining tie, so the suggestion is deterministic.
+ * casing, `headEnd`), then singular/plural, then a prefix, then one edit (a swap is one edit). The
+ * shortest candidate wins a tie, and ids break the remaining tie, so the suggestion is deterministic.
  */
 function suggestField(field, known) {
     const lower = field.toLowerCase();

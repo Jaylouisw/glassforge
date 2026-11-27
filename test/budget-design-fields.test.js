@@ -75,6 +75,31 @@ test('the active budget refuses a typo the same way', function () {
   throws(function () { budget.pointToPoint(typo, registry); }, 'spans', 'the plural');
 });
 
+// A swapped adjacent pair is one keystroke, and it is the typo a hand on a keyboard makes most often.
+// Plain Levenshtein counts it as a deletion plus an insertion - two edits - so `marignDb` was not a
+// near miss at all and the guard never fired. Measured on the long PON above: a 10 dB reserve is the
+// one that turns a `marginal` link into a refusal, so reading it as the 3 dB default answers a
+// verdict the caller did not ask for, with no warning (#25, #27). One swap is one edit now.
+test('a swapped pair is a near miss: `marignDb` is refused, naming `marginDb`', function () {
+  const err = throws(function () { budget.opticalBudget(longPon({ marignDb: 10 }), registry); },
+    'did you mean "marginDb"', 'a transposed reserve in the PON budget');
+  assert.ok(err.message.indexOf('"marignDb"') !== -1, err.message);
+  // The same one edit at the active entry point, and in the loss-naming field that is most often
+  // typed quickly: `thridParty` would drop every leased segment, and the loss it states, silently.
+  throws(function () {
+    budget.pointToPoint({ headEnd: { model: 'sfp-plus-10g-lr-10km' }, cpe: { model: 'sfp-plus-10g-lr-10km' },
+      marignDb: 10 }, registry);
+  }, 'did you mean "marginDb"', 'a transposed reserve in the active budget');
+  throws(function () { budget.opticalBudget(longPon({ thridParty: [] }), registry); },
+    'did you mean "thirdParty"', 'a transposed thirdParty');
+  // The matcher itself, so a future rewrite of the distance has one assertion that says what a swap
+  // costs: `marignDb` -> `marginDb` is one edit, and an unrelated word is still not a near miss.
+  const fields = require('../engine/design-fields');
+  assert.strictEqual(fields.suggestField('marignDb', ['marginDb']), 'marginDb', 'a swap is one edit');
+  assert.strictEqual(fields.suggestField('ontology', ['marginDb', 'spans']), null,
+    'a word that is not near a field is still ignored');
+});
+
 // The other half of "a field the budget does not read is refused": a field it *does* read, holding a
 // value it cannot use. `marginDb` and `allowanceDb` decide the verdict, so a value that is skipped or
 // read literally is a verdict the caller did not ask for - in the optimistic direction, every time.
@@ -336,6 +361,11 @@ test('a design option spelled one case off is refused, not silently defaulted', 
   throws(function () {
     engine.design.synthesise(demand, Object.assign({ ladderr: ['g652d-loose-12'] }, opts), registry);
   }, 'ladder', 'a one-letter edit on ladder');
+  // A swapped pair is one keystroke, not two: `overlenghtPct` quotes the 3% BOM where the caller
+  // asked for 10%, and the design's answer is a purchase order (#25, #27).
+  throws(function () {
+    engine.design.synthesise(demand, Object.assign({ overlenghtPct: 10 }, opts), registry);
+  }, 'did you mean "overlengthPct"', 'a swapped pair on overlengthPct');
   // The guard is narrow, and a caller's own bookkeeping is not a spelling of a knob.
   assert.ok(engine.design.synthesise(demand, Object.assign({ jobRef: 'A-17', note: 'site 4' }, opts), registry).candidates.length > 0,
     'unrelated keys still pass through');

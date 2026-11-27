@@ -54,6 +54,16 @@ test('an option the calculation does not read is refused, not skipped', function
   // A wrong unit is a near miss too: routeKM against routeM.
   throws(function () { length.cableToBuy({ routeM: 1000, routeKM: 1 }); },
     'did you mean "routeM"', 'routeKM');
+  // A swapped adjacent pair is one keystroke, not two edits. `overlenghtPct: 10` on 1000 m was
+  // answered with the 3% default, `designM` 1030 instead of 1100 - 70 m of the named slack missing
+  // from the order, and the order is why this guard exists (#25, #27).
+  throws(function () { length.cableToBuy({ routeM: 1000, overlenghtPct: 10 }); },
+    'did you mean "overlengthPct"', 'overlenghtPct');
+  const swapped = throws(function () { length.billOfMaterials({
+    nodes: [{ id: 'n1', type: 'olt', model: 'gpon-c-plus-8' }, { id: 'n2', type: 'ont', model: 'gpon-ont-1ge' }],
+    spans: [{ id: 's1', from: 'n1', to: 'n2', cable: 'g652d-loose-12', lengthM: 1000, splices: 2 }]
+  }, registry, { overlenghtPct: 10 }); }, 'did you mean "overlengthPct"', 'overlenghtPct on the BOM');
+  assert.ok(swapped.message.indexOf('bill of materials') !== -1, swapped.message);
   // The refusal is narrow: a key that is not near a field the calculation reads is still ignored, so
   // a caller's own bookkeeping passes through. `name` and `notes` are the two the API documents.
   const r = length.cableToBuy({ routeM: 1000, name: 'Feeder A', notes: 'pulled 2026-11' });
