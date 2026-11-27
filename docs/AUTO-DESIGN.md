@@ -15,9 +15,12 @@ POST /api/design/synthesise
 The same demand becomes one candidate per shape and setting, each one is validated and budgeted, and
 the best-ranked feasible one wins — fibre-metres by default, money when a `costs` model is supplied.
 With the defaults that is **nine** candidates: three PON ratios (`pon.ratios`: 1:8, 1:16, 1:32) and
-both active shapes for each of three optic pairs (`active.optics`: 1G-LX-10KM, 10G-LR-10KM,
-10G-ER-40KM). `technology: "pon"` or `"active"` drops the other family, and the count follows the
-ratios and optics you pass.
+both active shapes for each of three optic pairs (`active.optics`, as model slugs: `sfp-1g-lx-10km`,
+`sfp-plus-10g-lr-10km`, `sfp-plus-10g-er-40km` — both 10G pairs are the SFP+ `plus-` models, which the
+report labels `PLUS-10G-LR-10KM` and `PLUS-10G-ER-40KM`). `technology: "pon"` or `"active"` drops the
+other family, and the count follows the ratios and optics you pass. `active.optics` takes model slugs,
+not the labels the report prints: `{"headEndOptic":"10G-LR-10KM"}` is not a part, and every candidate
+comes back refused with `unknown transceiver model "10G-LR-10KM"`.
 
 | Candidate | Shape | What one customer costs |
 |---|---|---|
