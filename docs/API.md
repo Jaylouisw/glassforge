@@ -185,6 +185,15 @@ POST /api/design/link
       diversity, thirdParty, bom, verdict, upstreamVerdict, reasons, warnings, notes }
 ```
 
+The options are read through a fixed list, and a **near miss is a 400 naming the field**. A key the
+link does not read is not a setting it rejected - it is not a key at all, so the default ran and the
+answer looked complete: on the grid in `test/link-design.test.js` (1164.22 m of leg) `{"overlengthpct":10}`
+answered `designM` 1199.15 - the 3% default, **81.49 m of cable short** against the 1280.64 the caller's
+10% buys - and `{"marignDb":10}` budgeted both legs at the 3 dB reserve, where 10 dB turns their 10.39
+and 10.37 dB of headroom from `ok` into `marginal`. The rule is the budgets' rule (`LINK_OPTION_FIELDS`
+in `engine/link.js`: case, singular/plural, a prefix, one letter wrong) so a caller's `name` and
+`notes` still pass; it names the option it read and the one that was meant.
+
 Two named sites and an optic at each end, with **both legs routed along the supplied duct/street
 graph** — there is no straight-line fallback while a graph is present. With `protection: "diverse"` the
 legs are the minimum-cost edge-disjoint pair (Suurballe) where the graph allows one; where it does not,
@@ -328,7 +337,7 @@ because a guard that refused every unknown key would refuse a caller who is not 
 `cpe`, `spans`, `splices`, `spliceModel`, `connectors`, `connectorModel`, `thirdParty`, `allowanceDb`,
 `marginDb`, `wavelength`, `direction`, `txDbm`); no endpoint hands a caller's body to it, since
 `/api/design/link` builds that design from its own named options, so over the HTTP surface the refusal
-is the PON budget's.
+is the PON budget's; the link's own option list is guarded separately (§ Site-to-site links).
 
 `/api/design/length` reads nine options — `routeM`, `overlengthPct`, `splices`, `spliceReserveM`,
 `closures`, `closureReserveM`, `dropReserveM`, `drumM`, `minimumPurchaseM` — and refuses a near miss

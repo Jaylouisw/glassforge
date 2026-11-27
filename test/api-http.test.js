@@ -812,6 +812,19 @@ async function main() {
     assert.strictEqual(badLink.status, 400);
     assert.ok(badLink.body.error.indexOf('sites.b') !== -1, badLink.body.error);  });
 
+  // A near-miss option on the link is the caller's mistake, so it is a 400 naming the field - not a
+  // 200 that quoted the 3% default overlength, and not a 500 blaming the server.
+  const typoLink = await request('POST', '/api/design/link', {
+    sites: { a: { name: 'DC-West', lat: 51.5, lon: -0.1020 }, b: { name: 'DC-East', lat: 51.5, lon: -0.0960 } },
+    network: linkGrid,
+    optics: { a: 'sfp-plus-10g-er-40km', b: 'sfp-plus-10g-er-40km' },
+    overlengthpct: 10
+  });
+  test('a near-miss link option is a 400 naming the field, not a defaulted BOM', function () {
+    assert.strictEqual(typoLink.status, 400);
+    assert.ok(typoLink.body.error.indexOf('overlengthPct') !== -1, typoLink.body.error);
+  });
+
   // ---- the printed plan ------------------------------------------------------
   // A crew gets paper: the plan drawing with a scale bar, the cable to buy, the splice schedule and
   // the warnings. It is HTML so a browser can save it as PDF with no export library.

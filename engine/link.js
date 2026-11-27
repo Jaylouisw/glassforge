@@ -75,8 +75,44 @@ function protectionOf(value) {
   throw new Error('protection must be "diverse" or "single", got "' + value + '"');
 }
 
+/**
+ * Every top-level option the link design reads - and the last entry point that had no key list.
+ *
+ * `options` validated the *values* of the knobs below (`assertNumberField`, `assertChoiceField`) but
+ * never asked whether a key was one it reads, so a near miss was not a setting the link rejected: it
+ * was not a key at all, the default ran, and the answer looked complete. Measured on `main` at
+ * 80e71b4 with the two-leg grid fixture in `test/link-design.test.js` (1164.22 m of leg):
+ *
+ *   { overlengthPct: 10 }  designM 1280.64 - both legs at 10% over
+ *   { overlenghtPct: 10 }  designM 1199.15 - the 3% default, 81.49 m of cable short on the BOM
+ *   { overlengthpct: 10 }  designM 1199.15 - the same, so a case slip was not refused either
+ *   { marignDb: 10 }       both legs budgeted at `marginDb` 3: a 10 dB reserve turns their
+ *                          10.39 / 10.37 dB of headroom from `ok` into `marginal`
+ *
+ * The budget design object, the cable calculation, the bill of materials and the design's own options
+ * have refused a near miss by name since #137/#157/#192/#24; a circuit buys cable too, so it is
+ * refused here rather than skipped. The rule stays narrow (case, singular/plural, prefix, one edit),
+ * so a caller's own `name`/`notes` still pass.
+ *
+ * Read off `options` itself, not guessed: a name that is listed but never read would let the very
+ * mistake this guard exists for through, and a name that is read but missing from the list would
+ * refuse a caller who is right.
+ */
+const LINK_OPTION_FIELDS = ['sites', 'a', 'from', 'b', 'to', 'optics', 'optic', 'opticA', 'opticB',
+  'fibres', 'connectors', 'splices', 'splicesPerJoint', 'protection', 'network', 'maxSnapM',
+  'joinToleranceM', 'routeFactor', 'marginDb', 'direction', 'cable', 'ladder', 'overlengthPct',
+  'closure', 'thirdParty'];
+
 /** Normalise what a caller may hand us, and refuse the shapes that cannot describe a link. */
 function options(input, registry) {
+  // Before the values are read, because a typo is the cause and "marginDb must be a number" would be
+  // the symptom: a caller who sent `marignDb` has a reserve, just not one this function reads.
+  designFields.assertKnownFields(input, LINK_OPTION_FIELDS, 'the link design', {
+    noun: 'option',
+    consequence: 'An option the link design ignores does not narrow, widen or reserve anything: the ' +
+      'default runs, and the route, the cable BOM and the verdict on both legs are computed on a ' +
+      'setting the caller did not name, so a near miss is refused rather than skipped.'
+  });
   // A site-to-site budget reads the same two knobs, so it refuses the same two values: a reserve
   // that is not a number is not a reserve, and a direction it cannot place is a different receiver
   // at a different wavelength - `direction` was answered as `down` and nothing said so.
@@ -804,6 +840,7 @@ function design(input, registry) {
 
 module.exports = {
   DEFAULTS: DEFAULTS,
+  LINK_OPTION_FIELDS: LINK_OPTION_FIELDS,
   design: design,
   jointNodes: jointNodes,
   thirdPartySegments: thirdPartySegments

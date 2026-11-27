@@ -415,3 +415,30 @@ test('a splices-per-joint count is whole, refused rather than rounded into the B
   assert.strictEqual(r.legs[0].splices, 6, '3 joints x 2 splices = 6 on the leg');
   assert.strictEqual(r.bom.splices, 12, 'both grid legs: 6 + 6');
 });
+
+// `link.options` validated the values of the knobs it reads but never a key list, so the one entry
+// point that answers with a circuit's purchase order read no list at all: a near miss was not a
+// setting the link rejected, it was not a key - the default ran and the answer looked complete.
+// Measured on the grid fixture above before this guard: `{ overlengthPct: 10 }` answers `designM`
+// 1280.64 (1164.22 m of leg x 1.10), `{ overlenghtPct: 10 }` and `{ overlengthpct: 10 }` answer
+// 1199.15 - the 3% default, 81.49 m of cable short - and `{ marignDb: 10 }` budgets both legs at the
+// 3 dB reserve where a 10 dB reserve turns their 10.39 / 10.37 dB of headroom marginal.
+test('a near-miss link option is refused by name, not silently defaulted', function () {
+  // A case slip: the caller asked to buy 10% overlength, the BOM would quote the 3% default.
+  throws(function () { gridLink({ overlengthpct: 10 }); }, 'overlengthPct', 'a case slip');
+  // A singular where the field is plural: the two patch panels, not the four asked for.
+  throws(function () { gridLink({ connector: 4 }); }, 'connectors', 'a singular for connectors');
+  // A prefix of a field it reads: `margin` is not `marginDb`, and the reserve moves every verdict.
+  throws(function () { gridLink({ margin: 10 }); }, 'marginDb', 'a prefix of marginDb');
+  // One letter deleted: the leased segments, and the loss they state, would vanish from both the
+  // path and the cost.
+  throws(function () { gridLink({ thirParty: [] }); }, 'thirdParty', 'a deletion in thirdParty');
+  // The refusal says which surface and names the field, so a caller can fix it without reading code.
+  const err = throws(function () { gridLink({ routefactr: 1.4 }); }, 'routeFactor', 'a route factor typo');
+  assert.ok(/link design does not read the option/.test(err.message), err.message);
+  // It is a near miss guard, not an unknown-key guard: a caller's own bookkeeping still passes and
+  // the circuit it describes is unchanged.
+  const named = gridLink({ name: 'DC-to-DC primary', notes: 'MO-4471' });
+  assert.strictEqual(named.ok, true);
+  close(named.bom.cable[0].designM, 1199.15, 0.05, 'bookkeeping keys change no metres');
+});
