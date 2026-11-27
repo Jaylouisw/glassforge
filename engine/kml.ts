@@ -334,6 +334,19 @@ function keyOf(point: Coordinate, precision?: number): string {
 }
 
 /**
+ * The identity of a route: every vertex, not just the two ends.
+ *
+ * Two different streets can share both endpoints - a side street leaving the main road and returning
+ * to it, a ring drawn as two arcs, a slip road beside the main carriageway - and keying a duplicate
+ * on the ends alone dropped the second line as if it were the same route exported twice. The losing
+ * route never reached `street.buildGraph`, so the planner routed around a street that is on the
+ * drawing and could call a property unreachable. A duplicate is the same line, vertex for vertex.
+ */
+function routeKey(coords: KmlCoordinate[], precision: number): string {
+  return 'l:' + coords.map(function (point) { return keyOf(point, precision); }).join(';');
+}
+
+/**
  * Split placemarks into what this planner can use.
  *
  *   routes  - LineStrings, ready to become cable spans (length measured here)
@@ -341,8 +354,8 @@ function keyOf(point: Coordinate, precision?: number): string {
  *   skipped - anything else, with the reason, so the user is not told "imported 40 items" and
  *             left to discover that 12 of them vanished
  *
- * `dedupe` drops repeated coordinates (a KMZ exported twice, or a shared boundary drawn once per
- * parcel) and reports how many it dropped.
+ * `dedupe` drops a line it has already read, vertex for vertex (a KMZ exported twice), and reports
+ * how many it dropped. Two routes that share only their ends are different streets and both survive.
  */
 export function classify(parsed: ParsedKml | null | undefined, opts?: ClassifyOptions): ClassifiedKml {
   const o = opts || {};
@@ -357,7 +370,7 @@ export function classify(parsed: ParsedKml | null | undefined, opts?: ClassifyOp
     if (pm.geometry.type === 'LineString') {
       const first = pm.geometry.coords[0];
       const last = pm.geometry.coords[pm.geometry.coords.length - 1];
-      const key = 'l:' + keyOf(first, precision) + ':' + keyOf(last, precision);
+      const key = routeKey(pm.geometry.coords, precision);
       if (seen.has(key)) { duplicates++; continue; }
       seen.add(key);
       routes.push({
