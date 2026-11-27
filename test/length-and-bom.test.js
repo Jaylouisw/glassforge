@@ -258,11 +258,53 @@ test('a BOM option the calculation does not read is refused, not silently droppe
     '1000 + 10% (100) + 2 x 30 = 1160 m');
 });
 
+// A cable that states no drum, measured on this engine (two indoor-24 spans, 1200 m + 900 m,
+// overlengthPct 3) before the fix: the by-model row answered `drumM: 0, drums: 0, purchaseM: 2163`
+// - "bought by the metre", because the row read `cable.drumM || o.drumM || 0` and turned "not stated
+// anywhere" into 0 - while the span calculation inside the same call had used the 2000 m default and
+// `cableToBuy` on the same total buys two drums (4000 m). g657a2-indoor-24 and -48 publish no drumM
+// on purpose, and their notes promise the BOM "falls back to engine/length.js's 2,000 m default and
+// prints it", so the row must report the drum the purchase used, not a zero that buys by the metre.
+test('a cable that states no drum buys the engine default, and the row names that drum', function () {
+  const plant = {
+    nodes: [
+      { id: 'n1', type: 'olt', model: 'gpon-c-plus-8' },
+      { id: 'n2', type: 'closure', model: 'nap-8' },
+      { id: 'n3', type: 'ont', model: 'gpon-ont-1ge' }
+    ],
+    spans: [
+      { id: 's1', from: 'n1', to: 'n2', cable: 'g657a2-indoor-24', lengthM: 1200 },
+      { id: 's2', from: 'n2', to: 'n3', cable: 'g657a2-indoor-24', lengthM: 900 }
+    ]
+  };
+  const bom = length.billOfMaterials(plant, registry, { overlengthPct: 3 });
+  const row = bom.byCable[0];
+  // 1200 + 900 = 2100 m, + 3% = 2163 m -> two 2000 m drums, 4000 m bought, 1837 m spare.
+  close(row.designM, 2163, 0.01, '2100 m + 3%');
+  assert.strictEqual(row.drumM, 2000, 'the engine default drum is the one the purchase used');
+  assert.strictEqual(row.drums, 2);
+  assert.strictEqual(row.purchaseM, 4000);
+  close(row.spareM, 1837, 0.01, '4000 - 2163');
+  assert.strictEqual(row.purchaseM, row.drums * row.drumM, 'a whole number of the drums it names');
+  // The single-route calculation on the same total must agree with the aggregated row, or the BOM
+  // and the design cost (which buys `purchaseM`) describe two different orders.
+  const oneShot = length.cableToBuy({ routeM: 2163, overlengthPct: 0 });
+  assert.strictEqual(oneShot.drums, row.drums, 'one route and the aggregate buy the same drums');
+  assert.strictEqual(oneShot.purchaseM, row.purchaseM);
+  // An explicit 0 from the caller still means a cut reel, and the fallback must not overwrite it.
+  const cut = length.billOfMaterials(plant, registry, { overlengthPct: 3, drumM: 0 });
+  assert.strictEqual(cut.byCable[0].drumM, 0, 'a caller who says 0 means by the metre');
+  assert.strictEqual(cut.byCable[0].drums, 0);
+  close(cut.byCable[0].purchaseM, 2163, 0.01, 'bought by the metre is the design length');
+});
+
 test('the cable decides the drum, and a caller drumM is only a fallback', function () {
   // `cable.drumM || o.drumM`: the drum is a property of the cable, because buying 500 m drums of a
-  // 288-fibre ribbon is a product nobody sells. Every cable in this catalogue states one, so a
-  // caller's `drumM` cannot override it - that precedence is deliberate and pinned here rather than
-  // quietly flipped, because flipping it would let a body restate a drum the cable forbids.
+  // 288-fibre ribbon is a product nobody sells. A cable that states one is not overridable by a
+  // caller's `drumM` - that precedence is deliberate and pinned here rather than quietly flipped,
+  // because flipping it would let a body restate a drum the cable forbids. The two indoor rows
+  // state none on purpose; there the caller's `drumM` (then the engine default) decides, which is
+  // the case the test above pins.
   const plant = {
     nodes: [{ id: 'n1', type: 'olt', model: 'gpon-c-plus-8' }, { id: 'n2', type: 'ont', model: 'gpon-ont-1ge' }],
     spans: [{ id: 's1', from: 'n1', to: 'n2', cable: 'g652d-loose-12', lengthM: 1000 }]
