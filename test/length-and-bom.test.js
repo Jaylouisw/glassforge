@@ -391,4 +391,31 @@ test('the design BOM and the cable page buy the same cable for one plant', funct
   });
 });
 
+test('the answer echoes the reserve RATE it read, and names the totals apart', function () {
+  // `spliceReserveM` and `closureReserveM` are per-unit rates a caller sets (30 m a splice, 20 m a
+  // closure). The answer put the *totals* back under those same names - 2 x 30 = 60 under
+  // `spliceReserveM` - so reading the answer and sending it back doubled every reserve: 1000 m with
+  // 2 splices and 3 closures answered designM 1150, and re-sending that answer answered 1330. 150 m
+  // of cable difference is a drum decision on a 1900 m run, and the reader has no way to tell which
+  // meaning of the name they got. The rate is echoed under the name the request used; the totals
+  // carry their own names, the way `overlengthPct` (rate) and `overlengthM` (total) already did.
+  const r = length.cableToBuy({ routeM: 1000, splices: 2, closures: 3 });
+  assert.strictEqual(r.spliceReserveM, 30, 'the per-splice rate it read, not the total');
+  assert.strictEqual(r.spliceReserveTotalM, 60, '2 splices x 30 m');
+  assert.strictEqual(r.closureReserveM, 20, 'the per-closure rate it read');
+  assert.strictEqual(r.closureReserveTotalM, 60, '3 closures x 20 m');
+  // 1000 + 3% (30) + 60 + 60 = 1150
+  close(r.designM, 1150, 0.01, 'route + overlength + both reserve totals');
+  const again = length.cableToBuy({
+    routeM: r.routeM,
+    overlengthPct: r.overlengthPct,
+    splices: r.splices,
+    spliceReserveM: r.spliceReserveM,
+    closures: r.closures,
+    closureReserveM: r.closureReserveM,
+    drumM: r.drumM
+  });
+  close(again.designM, r.designM, 0.01, 'the answer can be sent back unchanged');
+});
+
 done();
