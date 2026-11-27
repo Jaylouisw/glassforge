@@ -397,11 +397,20 @@ cable metres** — nobody buys cable for a duct they rent:
 
 ```jsonc
 "bom": { "cableM": 1164.22,
-         "thirdParty": { "totalM": 300, "lossDb": 0.6, "cost": 1200,
+         "thirdParty": { "totalM": 300, "lossDb": 0.6, "cost": 1200, "costComplete": true,
                          "segments": [ { "provider": "CityFibre", "lengthM": 300, "attached": true } ],
                          "unattachedM": 0, "unattachedLossDb": 0, "unattachedCost": 0,
                          "inCableBom": false } }
 ```
+
+`cost` is optional and unitless: the caller states it in whatever unit it buys in, and the report
+never invents a price (`costUnit` says so). **Absent or `null` means unpriced** — the lease's stated
+metres and loss are still charged to the budget, but `cost` is `null` and `costComplete` is `false`
+— while **`0` is a stated price**, so a free lease reads `cost: 0, costComplete: true`. A present
+`cost` that is not a non-negative number is refused by name (`thirdParty[0].cost must be a
+non-negative number ... got "50"`), never read as unpriced: a form field that sent `"50"` used to
+answer `cost: null` with a `costUnit` saying the caller had stated no price, so a stated cost vanished
+from the circuit's money, and a negative one was summed into a credit nobody agreed to.
 
 `attached` is the whole question. A segment rides a leg only when that leg was built: `leg: "b"` on a
 `protection: "single"` circuit, on a graph that offered one route, or on a request where routing
