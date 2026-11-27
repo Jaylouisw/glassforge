@@ -79,7 +79,16 @@ splice). The crew's count at the same joint is one splice per strand — `splice
 `fiber.parseAddress`). The tube size is the **cable's** `fibersPerTube` (1..24, validated), so the same
 strand index has a different address in a 24-per-tube ribbon than in a 12-per-tube loose tube, and
 `network.spliceTable` derives each row's address from the span's own cable. A span naming an unknown
-cable model is addressed at the standard twelve rather than dropped from the sheet.
+cable model is addressed at the standard twelve rather than dropped from the sheet, and its rows report
+`cable: null` rather than inventing cable 1.
+
+On a span with `bundles > 1` the strand index runs across the whole bundle while a tray does not, so
+each splice row is scoped to its cable: `cable` (1-based within the bundle), `strandInCable` (1-based
+within that cable) and `label`, the cable-qualified tray address (`C02/T01-F06`). `address` stays the
+bare tray label (`T01-F06`) for `fiber.parseAddress` and the ledger, while `label` is what the printed
+schedule shows; on a single-cable span the two are equal. An index past `fibersPerCable × bundles` is
+refused by name (`strand index 25 is outside a 2 x 12-fibre bundle (24 fibres)`), never labelled a cable
+that does not exist.
 
 **Drop cable** — the small 1–2 fibre cable used on the last leg, only at or below `DROP_CABLE_MAX_M`
 (300 m). Anything longer goes to the 12-fibre ladder whatever the fibre count.
