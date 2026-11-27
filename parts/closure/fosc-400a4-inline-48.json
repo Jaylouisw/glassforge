@@ -1,0 +1,18 @@
+{
+  "kind": "closure",
+  "model": "fosc-400a4-inline-48",
+  "vendor": "CommScope",
+  "label": "FOSC 400-A4 in-line closure, 48 splices",
+  "type": "inline",
+  "ports": 5,
+  "spliceCapacity": 48,
+  "trays": 2,
+  "notes": "The 24-to-48 fibre in-line joint, one size below the B4. Figures are CommScope's FOSC-400 data sheet PS-319073.2-EU (12/15), table 'Dimensions and Capacities': the A4 closure is 420 mm long and 183 mm across, and takes one oval port for two cables of 10-25 mm plus four round ports of 5-19 mm - five cable entries, which is the `ports` field here, the same convention fosc-400b4-inline-96 uses for its oval-plus-four. Its tray column reads '2/3': two FOSC trays as standard, three possible in an A4 ordered for them (one with a storage basket), and the single-fibre splicing capacity row reads '48/72' - 48 splices at two trays, 72 at three, 24 splices a tray (two modules of 12). This row takes the two-tray order, so spliceCapacity is 48 and trays is 2: count the standard order, not the best case, the rule the B4 and 600-C rows follow. Why this row exists: the catalogue's in-line joints were 24 splices (mufa-inline-24, a butt joint with 4 cable ports), then 96 (fosc-400b4-inline-96), then 216 and 504, so a joint of 25 to 48 splices - a 24F to 48F cable spliced straight through - had no dome of its own: engine/link.js answered the 24-splice mufa's warning with the 96-splice B4, a box with 48 unused positions and 120 mm more length to bury in a duct or a handhole, and engine/network.js read a 48F through-joint in the mufa as over-stuffed. The A4 is that rung in the same published table, not an invented one: CommScope's current ordering information still lists it ('A4 420mm - 4 round ports'), and the distributor ordering guides print the A4 at 48 single-fusion splices against the B4's 96. Two caveats travel with it. The ribbon column has a dash for the A4, as it does for the B4, so a ribbon cable passes this row's strand check while the box has no ribbon tray published to hold it - confirm the tray type, and treat the 600 series as the ribbon answer. And a 48F through-joint sits exactly at capacity with no spare tray ordered, so a joint expected to grow should be ordered as the B4 at 96 (or the A4 with its third tray, at 72, which leaves no room for loose-tube storage). These are the series' published capacities, not a measured tray count, and capacity moves with the tray type and the order code: replace this row with the closure actually bought and the tray type it ships with.",
+  "sourceUrl": "https://webresources.commscope.com/download/assets/Data+Sheet:+FOSC+400+Fiber+Optic+Closure/4609ec863bd311f0b092ea1fa90d937b",
+  "tags": [
+    "inline",
+    "feeder",
+    "joint",
+    "48"
+  ]
+}
