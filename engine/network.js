@@ -310,10 +310,88 @@ function allOntBudgets(plant, registry, opts) {
 }
 
 /**
+ * A strand entry as the index it names, or `null` when it names no strand.
+ *
+ * `spans[].strands` is a list of 1-based indices on **that cable**, and the list is written by a
+ * hand-edited project as often as by a builder, so an entry is checked as a value and not trusted to
+ * be a number. Text that is a whole number is the index it spells (`'7'`), because the splice sheet
+ * has always converted with `Number()` and the ledger must count the same strand the sheet addresses.
+ * `true`, `null`, `''`, `[]` and `'x'` name nothing.
+ */
+function strandIndexOf(raw) {
+  if (typeof raw === 'number') return Number.isInteger(raw) && raw >= 1 ? raw : null;
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= 1 ? n : null;
+  }
+  return null;
+}
+
+/**
+ * How many strands a span's cable holds, and the part behind it.
+ *
+ * A span's `bundles` is how many cables run it, so its capacity is every cable's fibres: 18 strands
+ * in use on a 2 x 12 span is three-quarters full, and a 13th strand is the second cable's first. An
+ * unknown cable model leaves the capacity unknown rather than guessing zero.
+ */
+function spanFibreCapacity(span, registry) {
+  const cable = span && span.cable && registry.has('cable', span.cable) ? registry.get('cable', span.cable) : null;
+  const fiberCount = cable && isNum(cable.fiberCount) ? cable.fiberCount : null;
+  const bundles = span && span.bundles !== undefined && isBundleCount(span.bundles) ? span.bundles : 1;
+  return {
+    cable: cable,
+    fiberCount: fiberCount,
+    bundles: bundles,
+    capacityFibres: fiberCount === null ? null : fiberCount * bundles
+  };
+}
+
+/**
+ * `12 strands its 12-fibre cable carries` / `24 strands its 2 x 12-fibre cables carry`.
+ */
+function strandRangePhrase(capacityFibres, fiberCount, bundles) {
+  const cable = bundles > 1
+    ? bundles + ' x ' + fiberCount + '-fibre cables carry'
+    : fiberCount + '-fibre cable carries';
+  return (capacityFibres === 1 ? '1 strand' : capacityFibres + ' strands') + ' its ' + cable;
+}
+
+/**
+ * The strand indices a span actually carries: unique, in listed order, and inside the cable.
+ *
+ * The splice sheet and the ledger both read a span's strands through this, so the sheet cannot
+ * address a tube the cable does not have while the tab counts it as busy - the disagreement that had
+ * a 12-fibre cable print `T09-F03` beside "1 of 12 used". The sheet skips a bad entry rather than
+ * refusing the plant: it also renders stored projects that predate the save gate, and a row for a
+ * strand nobody can find is worse than no row. `strandLedger` reports the same entries as `invalid`,
+ * and `validate` refuses the plant by name.
+ */
+function carriedStrands(span, registry) {
+  const capacityFibres = spanFibreCapacity(span, registry).capacityFibres;
+  const out = [];
+  const seen = new Set();
+  for (const raw of Array.isArray(span.strands) ? span.strands : []) {
+    const index = strandIndexOf(raw);
+    if (index === null || seen.has(index)) continue;
+    if (capacityFibres !== null && index > capacityFibres) continue;
+    seen.add(index);
+    out.push(index);
+  }
+  return out;
+}
+
+/**
  * Strand accounting per span.
  *
  * Overbooking is the failure this exists to catch: a 12-fibre cable with 14 strands assigned to it
  * is not a drawing with a red pixel, it is a cable somebody will order and not be able to splice.
+ *
+ * The bound is the cable's **strand indices**, not just the number of entries. Counting entries let
+ * `[99]` on a 12-fibre cable read as "1 of 12 used, 11 spare" and answer `validate` clean, because
+ * one entry is under twelve; the splice sheet then addressed tube 9 of a one-tube cable. A value the
+ * cable does not carry - 13 on a 12, 25 on 2 x 12, or an entry that is not a strand number at all -
+ * is reported in `invalid` and named in the row's `error`, which the save gate quotes verbatim
+ * (SPEC section 6: the tab and the gate cannot disagree about what is overbooked).
  */
 function strandLedger(plant, registry) {
   const rows = [];
@@ -321,34 +399,61 @@ function strandLedger(plant, registry) {
   let totalUsed = 0;
 
   (plant.spans || []).forEach(function (span, i) {
-    let cable = null;
-    if (registry.has('cable', span.cable)) cable = registry.get('cable', span.cable);
-    const strands = Array.isArray(span.strands) ? span.strands.slice() : [];
-    const unique = new Set(strands);
-    const used = unique.size;
-    const fiberCount = cable ? cable.fiberCount : null;
-    // A span's `bundles` is how many cables run it, so its capacity is every cable's fibres: 18 strands
-    // in use on a 2 x 12 span is three-quarters full, not overbooked, and a second cable's twelve
-    // spare strands are on the order whether or not the ledger counted them.
-    const bundles = span.bundles === undefined ? 1 : (isBundleCount(span.bundles) ? span.bundles : 1);
-    const capacityFibres = fiberCount === null ? null : fiberCount * bundles;
+    const cap = spanFibreCapacity(span, registry);
+    const entries = Array.isArray(span.strands) ? span.strands.slice() : [];
+    const carried = new Set();
+    const listed = new Set();
+    const notStrands = [];
+    const beyond = [];
+    const invalid = [];
+    for (const raw of entries) {
+      const index = strandIndexOf(raw);
+      if (index === null) {
+        notStrands.push(raw);
+        invalid.push(raw);
+        continue;
+      }
+      listed.add(index);
+      if (cap.capacityFibres !== null && index > cap.capacityFibres) {
+        beyond.push(index);
+        invalid.push(raw);
+      } else {
+        carried.add(index);
+      }
+    }
     const row = {
       span: span.id || '#' + i,
       cable: span.cable,
-      bundles: bundles,
-      fiberCount: fiberCount,
-      used: used,
-      spare: capacityFibres === null ? null : Math.max(0, capacityFibres - used),
-      utilisation: capacityFibres ? Math.round((used / capacityFibres) * 1000) / 10 : null,
-      overbooked: capacityFibres !== null && used > capacityFibres
+      bundles: cap.bundles,
+      fiberCount: cap.fiberCount,
+      used: carried.size,
+      spare: cap.capacityFibres === null ? null : Math.max(0, cap.capacityFibres - carried.size),
+      utilisation: cap.capacityFibres ? Math.round((carried.size / cap.capacityFibres) * 1000) / 10 : null,
+      overbooked: cap.capacityFibres !== null && (listed.size > cap.capacityFibres || beyond.length > 0),
+      invalid: invalid
     };
-    if (row.overbooked) {
-      row.error = 'span "' + row.span + '" uses ' + used + ' strands of ' +
-        (bundles > 1 ? bundles + ' x ' + fiberCount + '-fibre cable' : 'a ' + fiberCount + '-fibre cable');
+    const faults = [];
+    if (cap.capacityFibres !== null && listed.size > cap.capacityFibres) {
+      // The sentence this row has always used, and the one strand-overbooking-gate asserts.
+      faults.push('span "' + row.span + '" uses ' + listed.size + ' strands of ' +
+        (cap.bundles > 1 ? cap.bundles + ' x ' + cap.fiberCount + '-fibre cable' : 'a ' + cap.fiberCount + '-fibre cable'));
+    } else if (beyond.length) {
+      const phrase = strandRangePhrase(cap.capacityFibres, cap.fiberCount, cap.bundles);
+      beyond.forEach(function (index) {
+        faults.push('span "' + row.span + '" lists strand ' + index + ', beyond the ' + phrase);
+      });
     }
+    if (notStrands.length) {
+      const values = notStrands.map(function (value) {
+        return value === undefined ? 'undefined' : JSON.stringify(value);
+      }).join(', ');
+      faults.push('span "' + row.span + '" lists ' + values + ', which ' +
+        (notStrands.length === 1 ? 'is not a strand number' : 'are not strand numbers'));
+    }
+    if (faults.length) row.error = faults.join('; ');
     rows.push(row);
-    if (capacityFibres !== null) totalStrands += capacityFibres;
-    totalUsed += used;
+    if (cap.capacityFibres !== null) totalStrands += cap.capacityFibres;
+    totalUsed += carried.size;
   });
 
   return {
@@ -701,15 +806,15 @@ function validate(plant, registry) {
     cap.problems.forEach(function (p) { errors.push(p); });
 
     // Strand overbooking is the same contradiction as an overbooked splitter site: a span that lists
-    // more strand indices than its cable carries is a drum somebody orders and cannot splice
-    // (SPEC §6), not a red number in one tab. The ledger has always computed it; `validate` never
-    // read it, so PUT and `/ops` saved the plant, the printed plan called it clean, and `/strands`
-    // was the only surface that said otherwise - the advisory check the ops endpoint stopped making
-    // for an unknown cable model. The ledger's own sentence is reused (it names the span, the count
-    // and the cable), so the gate and the tab cannot disagree about what is overbooked.
+    // a strand its cable does not carry is a drum somebody orders and cannot splice (SPEC section 6),
+    // not a red number in one tab. The ledger's row now carries that fault for a value as well as for
+    // a count - `[99]` on a 12-fibre cable is one entry and still no strand - and its own sentence is
+    // reused here (it names the span, the value and the cable), so the gate and the tab cannot
+    // disagree about what is overbooked. Reading `row.error` rather than `row.overbooked` is the
+    // whole gate: the row sets the flag from the same two faults that build the sentence.
     const ledger = strandLedger(plant, registry);
     ledger.rows.forEach(function (row) {
-      if (row.overbooked && row.error) errors.push(row.error);
+      if (row.error) errors.push(row.error);
     });
 
     (plant.nodes || []).forEach(function (node) {
@@ -813,12 +918,7 @@ function spliceTable(plant, registry) {
 
     const byStrand = new Map();
     for (const span of local) {
-      const seen = new Set();
-      for (const raw of Array.isArray(span.strands) ? span.strands : []) {
-        const index = Number(raw);
-        if (!Number.isInteger(index) || index < 1) continue;
-        if (seen.has(index)) continue;
-        seen.add(index);
+      for (const index of carriedStrands(span, registry)) {
         const list = byStrand.get(index) || [];
         list.push(idOf.get(span));
         byStrand.set(index, list);
@@ -916,12 +1016,7 @@ function splitterPoint(node, local, idOf, depth, registry) {
 
   for (const span of ordered) {
     const isInput = span === ordered[0];
-    const seen = new Set();
-    for (const raw of Array.isArray(span.strands) ? span.strands : []) {
-      const index = Number(raw);
-      if (!Number.isInteger(index) || index < 1) continue;
-      if (seen.has(index)) continue;
-      seen.add(index);
+    for (const index of carriedStrands(span, registry)) {
       const address = fiber.addressFor(index, tubeOptions(span, registry));
       rows.push({
         span: idOf.get(span),

@@ -348,7 +348,7 @@
       const tr = el('tr', {});
       tr.appendChild(el('td', { text: row.span }));
       tr.appendChild(el('td', { text: row.cable + ' (' + row.fiberCount + 'F)' }));
-      tr.appendChild(el('td', { class: 'num' + (row.overbooked ? ' err' : ''), text: String(row.used) }));
+      tr.appendChild(el('td', { class: 'num' + (row.error ? ' err' : ''), text: String(row.used) }));
       tr.appendChild(el('td', { class: 'num', text: row.spare === null ? '—' : String(row.spare) }));
       table.appendChild(tr);
     }

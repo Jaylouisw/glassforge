@@ -144,8 +144,10 @@ graph only gave one route — is `attached: false` and summed in the `unattached
 budget crosses it and nobody buys it.
 
 **Protection** — whether the circuit is protected: `protection.requested` is `"diverse"` (default) or
-`"single"`, `protection.achieved` is true only when the two legs share no graph edge and no leased
-segment, and `protection.legs` is how many legs the graph actually allowed (1 means unprotected).
+`"single"`, `protection.legs` is how many legs the graph actually allowed (1 means unprotected), and
+`protection.achieved` is true only when `diversity.sharedM` is 0 (no duct and no site drop is on both
+legs), no leased segment is assigned to `both` legs, and `diversity.sharedNodes` is empty — zero shared
+metres with one chamber on both legs is not a protected pair (see **Diversity**).
 
 **Attenuator (pad)** — an inline loss fitted because the receiver is *too loud*: `attenuator` on a
 budget result, `null` when the receiver is at or below its overload point. `overDb` is how far above

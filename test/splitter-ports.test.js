@@ -54,9 +54,13 @@ function sharedCable(n, opts) {
     { id: 's1', from: 'olt1', to: 'sp1', cable: 'g652d-loose-12', lengthM: 900 },
     { id: 's2', from: 'sp1', to: 'c1', cable: 'g652d-loose-12', lengthM: 60, strands: strands }
   ];
+  // Each drop is its own 1-fibre cable, so its strand is 1, not the splitter port it serves. This
+  // fixture numbered the drops 1..n, which a 1-fibre cable cannot carry - the count-only overbooking
+  // check passed it and the sheet printed T01-F08 on a one-fibre drum. What this fixture tests is the
+  // port count, which walks the ONTs below the splitter and never reads these indices.
   for (let i = 1; i <= n; i++) {
     nodes.push({ id: 'ont' + i, type: 'ont', model: 'gpon-ont-4ge', name: 'Casa ' + i, lat: 51.5021 + i * 0.0001, lon: -0.1 });
-    spans.push({ id: 'd' + i, from: 'c1', to: 'ont' + i, cable: 'g657a2-drop-1', lengthM: 40, strands: [i] });
+    spans.push({ id: 'd' + i, from: 'c1', to: 'ont' + i, cable: 'g657a2-drop-1', lengthM: 40, strands: [1] });
   }
   return { nodes: nodes, spans: spans };
 }

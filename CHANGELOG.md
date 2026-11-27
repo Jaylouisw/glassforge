@@ -37,6 +37,16 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A lease cost that arrived as text is refused, not answered as unpriced.** `thirdParty[].cost` was
+  copied with `isNum(seg.cost) ? seg.cost : null`, so a JSON form field that arrived as `"50"` read as
+  no price at all: `200` with `cost: null`, `costComplete: false` and a `costUnit` saying the caller
+  stated none - a stated 50 gone from the lease's money with nothing said - and `-5` was accepted and
+  summed into a credit nobody agreed to. It is now a `400` naming the segment and quoting the value
+  (`thirdParty[0].cost must be a non-negative number … got "50"`), like `lengthM` and `lossDb` beside
+  it. An absent cost (or an explicit `null`) still means unpriced, and `0` is a figure - the lease is
+  free - so it still answers `costComplete: true`. Tests: `link-design` (+1 case: text and negative
+  refused, `0` priced, absent unpriced).
+
 - **A spans or splitters list the budget cannot read is refused, not read as no plant.** `computeOdn`
   read `design.spans || []` and `design.splitters || []`, so a present-but-unusable list (`null`, `0`,
   `false`, `''`) became an empty one, while `{}` and `"x"` were refused as "must be an array". Measured
