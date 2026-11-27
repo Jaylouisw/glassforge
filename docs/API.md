@@ -276,15 +276,30 @@ the reserve the verdict requires, `allowanceDb` (default 0) is extra design rese
 ODN loss**, and `txDbm` is the launch power to budget at (default: the transmitter's minimum).
 `allowanceDb` is the one a planner reaches for on a project: it changes no plant, it makes the
 verdict account for slack the route has not spent — the result echoes `marginDb`, and `totalLossDb`
-carries the allowance (`odnLossDb` 11.86 + 2 for `{"allowanceDb":2}`). Measured on a project of one 1:8
-splitter and 3 km of `g652d-loose-12`: `{}` answers `totalLossDb` 11.86 with `headroomDb` 21.14,
-`{"allowanceDb":2}` answers 13.86 and 19.14, `{"spliceModel":"mechanical"}` adds 0.2 dB at the splitter's
-splice, and `{"connectorModel":"lc-apc"}` takes 0.05 dB off each of the two connectors. `headroomDb` is
-the receive power less the receiver's sensitivity (-8.86 - (-30) = 21.14), and `marginDb` is compared
-against it rather than subtracted from it: a 3 dB margin on that answer still leaves 21.14 dB of
-headroom, 18.14 dB of it spare, and the row reports the larger figure, not the net.
+carries the allowance (`odnLossDb` 11.86 + 2 for `{"allowanceDb":2}`). The worked example is a project
+of one `gpon-b-plus-8`, one `plc-1x8-sca` splitter, one `gpon-ont-1ge` and 3 km of `g652d-loose-12`,
+with a 1 m `g657a2-drop-1` drop, driven through `network.allOntBudgets` — the call the endpoint makes.
+`test/api-doc-budget-example.test.js` re-drives it, so a figure that moves in a part file has to move
+here too:
+
+```
+{}                            odnLossDb 11.86  totalLossDb 11.86  rxPowerDbm -10.36  headroomDb 16.64  classHeadroomDb 16.14  txDbm 1.5  sensitivityDbm -27  verdict ok
+{"allowanceDb":2}             odnLossDb 11.86  totalLossDb 13.86  rxPowerDbm -12.36  headroomDb 14.64  classHeadroomDb 16.14  txDbm 1.5  sensitivityDbm -27  verdict ok
+{"spliceModel":"mechanical"}  odnLossDb 12.06  totalLossDb 12.06  rxPowerDbm -10.56  headroomDb 16.44  classHeadroomDb 15.94  txDbm 1.5  sensitivityDbm -27  verdict ok
+{"connectorModel":"lc-apc"}   odnLossDb 11.76  totalLossDb 11.76  rxPowerDbm -10.26  headroomDb 16.74  classHeadroomDb 16.24  txDbm 1.5  sensitivityDbm -27  verdict ok
+{"txDbm":7}                   odnLossDb 11.86  totalLossDb 11.86  rxPowerDbm -4.86  headroomDb 22.14  classHeadroomDb 16.14  txDbm 7  sensitivityDbm -27  verdict fail  attenuator.padDb 4
+```
+
+`{}` is -10.36 dBm at the launch the budget defaults to — the transmitter's minimum, +1.5 dBm — and
+`headroomDb` is that receive power less the receiver's sensitivity: -10.36 - (-27) = 16.64. The
+`gpon-ont-1ge` receiver is -27 dBm, not the -30 dBm of a `gpon-ont-4ge`, which is what an example that
+names no ONT left a reader to guess. `marginDb` is compared against headroom rather than subtracted
+from it: a 3 dB margin on that answer still leaves 16.64 dB of headroom, 13.64 dB of it spare, and the
+row reports the larger figure, not the net. `{"spliceModel":"mechanical"}` adds 0.2 dB at the
+splitter's splice (0.3 dB a splice against fusion's 0.1), and `{"connectorModel":"lc-apc"}` takes
+0.05 dB off each of the two connectors.
 `txDbm` is the same launch the design budget reads, and it moves the verdict because the overload point is judged at it:
-the same project's `{}` is -8.86 dBm at +3 dBm, inside the ONT's -8 dBm overload point, while
+the same project's `{}` is -10.36 dBm at +1.5 dBm, inside the ONT's -8 dBm overload point, while
 `{"txDbm":7}` answers `rxPowerDbm` -4.86 and `fail` - 3.14 dB over that point, so `attenuator.padDb` is
 4. A launch the budget cannot read is not a launch: it is refused rather than dropped.
 
