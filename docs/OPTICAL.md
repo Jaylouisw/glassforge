@@ -187,10 +187,11 @@ feeder. The engine reports that band instead of passing it in silence:
   7 dBm top of the window - fit a 4 dB inline pad (up to 18 dB still passes the 3 dB margin and the
   class budget)`.
 - The verdict does not move: that case is `ok` with no `reasons`, because which launch a design is
-  signed off at is a product decision still open in issue #111. Every surface repeats the warning —
-  the Signal tab per ONT, and both the printed plan and a synthesised design once for the whole plant
-  through the same `budget.launchWindowNote`: a synthesised design counts the ONTs in the band as
-  `metrics.launchWindowOnts` and puts the sentence in `warnings`, and the plan opens its budget warnings with it.
+  signed off at is a product decision still open in issue #5 (the launch-window verdict). Every
+  surface repeats the warning — the Signal tab per ONT, and both the printed plan and a synthesised
+  design once for the whole plant through the same `budget.launchWindowNote`: a synthesised design
+  counts the ONTs in the band as `metrics.launchWindowOnts` and puts the sentence in `warnings`, and
+  the plan opens its budget warnings with it.
 
 A script that reads `verdict` alone therefore misses a plan that only holds while every line card
 lands at the bottom of its window: read `warnings` with the verdict.

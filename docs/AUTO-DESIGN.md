@@ -239,25 +239,26 @@ describes — and the winner's `warnings` carries that band as one sentence: the
 overshoot at the top of the window and the pad to buy. It comes from `budget.launchWindowNote`, the
 same function the printed plan calls, so the report and the page a crew signs off say the same thing.
 The band does not make a design infeasible — the candidate stays `ok` and `feasible`, and whether that
-is right is still open in issue #111 — and `launchWindowPad` on each budget row is the per-ONT figure
-behind the plant-level count.
+is right is still open in issue #5 (the launch-window verdict) — and `launchWindowPad` on each budget
+row is the per-ONT figure behind the plant-level count.
 
 `metrics.upstreamFailOnts` counts the ONTs that fail the **other** half of the same link — the ONT
 launching into the OLT at 1310 nm, the lossier wavelength, budgeted with `direction: 'up'` and the OLT's
 receiver ([OPTICAL.md](OPTICAL.md#the-formula)). A PON is two links over one ODN, and ranking on one of
 them offered a 12-house C+ estate whose every ONT was `ok` downstream and `fail` upstream as the best
-feasible design with nothing said (#185). Each row's `upstreamVerdict` and `upstreamRxPowerDbm` carry that
+feasible design with nothing said (#6). Each row's `upstreamVerdict` and `upstreamRxPowerDbm` carry that
 pass per address, and it is `null` when the upstream pass could not budget the row at all; the row's
 `error` then carries the downstream pass's own failure. The winner's `warnings` carries one plant-level
 sentence from `budget.upstreamNote`: how many ONTs fail, the worst one, its reason, the pad that clears it
 and how many more fail behind it.
 
-That sentence is **reported, not gated**: `feasible` and the ranking still rest on the downstream verdict,
-because only a ceiling on ODN loss is modelled and no class floor, so gating on it would empty auto-design
-for an ordinary short-feed estate. Whether an upstream failure should refuse a candidate is the open
-decision in #185/#111, and the design report does not make it in passing. One pad is ODN loss in both
-directions, so the sentence sizes the pad for the louder receiver and says so when the launch-band pad
-would leave the other end over its limit.
+That sentence is **reported, not gated**: `feasible` and the ranking still rest on the downstream
+verdict, because only a ceiling on ODN loss is modelled and no class floor, so gating on it would
+empty auto-design for an ordinary short-feed estate. Whether an upstream failure should refuse a
+candidate is the open decision in #6 (the upstream verdict) / #5 (the launch-window verdict), and
+the design report does not make it in passing. One pad is ODN loss in both directions, so the
+sentence sizes the pad for the louder receiver and says so when the launch-band pad would leave the
+other end over its limit.
 
 `rationale` is written to be checkable: every line quotes the numbers the comparison used. When
 `ok` is false there is no `plant`, and every candidate carries the reasons it was refused — a design
@@ -361,14 +362,15 @@ same object as `budget` when `"up"` was asked for) - with its own `upstreamVerdi
 `upstreamVerdict` is the worst of the legs and `null` on a refusal, which routed nothing. Reasons are
 prefixed with the leg they belong to (`A-leg: the route is 50038 m but the shorter optic reaches 40000 m`).
 
-The directions are **not symmetric** whenever the ends are different optics, and an asymmetric circuit
-gets two answers, not an average: `sfp-1g-lx-10km` at A and `sfp-1g-ex-40km` at B over the 3.0 km duct
-read `ok` downstream at -12.65 dBm and `fail` upstream at -2.65 dBm, because the EX launches its -1 dBm
-floor into the LX receiver's -3 dBm overload point. That is a 5 dB pad, not more reach. A failing
-upstream direction is **reported, not gated**: the leg warns `A-leg: fails upstream over the same path
-- <reasons>`, sizes the one pad to buy when both directions name a pad, and leaves `verdict` and `ok`
-on the direction the caller asked for - the same treatment the auto-design rows get above, and whether
-upstream should refuse a circuit is the open decision in #185/#111.
+The directions are **not symmetric** whenever the ends are different optics, and an asymmetric
+circuit gets two answers, not an average: `sfp-1g-lx-10km` at A and `sfp-1g-ex-40km` at B over the
+3.0 km duct read `ok` downstream at -12.65 dBm and `fail` upstream at -2.65 dBm, because the EX
+launches its -1 dBm floor into the LX receiver's -3 dBm overload point. That is a 5 dB pad, not more
+reach. A failing upstream direction is **reported, not gated**: the leg warns `A-leg: fails upstream
+over the same path - <reasons>`, sizes the one pad to buy when both directions name a pad, and
+leaves `verdict` and `ok` on the direction the caller asked for - the same treatment the auto-design
+rows get above, and whether upstream should refuse a circuit is the open decision in #6 (the
+upstream verdict) / #5 (the launch-window verdict).
 
 A leased (third-party) segment carries a provider, a stated length and a stated loss. It is charged to
 the budget of the leg it rides, counted in the path length and in the cost, and **excluded from the
