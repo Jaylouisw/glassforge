@@ -287,7 +287,12 @@ function billOfMaterials(plant, registry, opts) {
       routeM: round(span.lengthM, 2),
       designM: calc.designM
     });
-    const prev = byModel.get(cable.model) || { model: cable.model, label: cable.label, fiberCount: cable.fiberCount, designM: 0, drumM: cable.drumM || o.drumM || 0, lengths: 0 };
+    // The row carries the drum the span calculation actually used (`calc.drumM`: the cable's, then
+    // the caller's, then the 2000 m default), never a re-derived `cable.drumM || o.drumM || 0`:
+    // that turned "no drum stated anywhere" - the two indoor rows publish none on purpose - into 0,
+    // which `purchaseOf` reads as a cut reel, so the row bought exactly the design metres while the
+    // span calculation beside it and the design's cost had both priced 2000 m drums (gh#107).
+    const prev = byModel.get(cable.model) || { model: cable.model, label: cable.label, fiberCount: cable.fiberCount, designM: 0, drumM: calc.drumM, lengths: 0 };
     prev.designM = round(prev.designM + calc.designM, 2);
     prev.lengths += 1;
     byModel.set(cable.model, prev);
@@ -296,7 +301,9 @@ function billOfMaterials(plant, registry, opts) {
   // Drums are rounded ONCE per cable model, on the total design length. Rounding per span and
   // adding the drums up buys a spare drum for every short run on the map.
   const byCable = Array.from(byModel.values()).map(function (row) {
-    const drumM = row.drumM || 0;
+    // Resolved by the span calculation, default included: a cable with no drum and a caller with no
+    // `drumM` is the engine's 2000 m assumption, and the row says so rather than claiming 0.
+    const drumM = row.drumM;
     // The same purchase arithmetic as a single route, including the supplier minimum: two definitions
     // of "how many drums" is how the BOM came to quote less than the floor it was given.
     const purchase = purchaseOf(row.designM, drumM, minimumPurchaseM);
