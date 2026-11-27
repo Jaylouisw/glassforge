@@ -6,7 +6,7 @@
 // `network.allOntBudgets` passes the flag through - but `evaluate` only ever asked for the default
 // direction, so `metrics`, `warnings` and the whole candidate table described the downstream half.
 // The ordinary 12-house C+ estate below is `ok` on 12 of 12 ONTs downstream and `fail` on 12 of 12
-// upstream (-10.99 dBm at House 3 against the OLT receiver's -12 dBm overload, 1.01 dB over), and the
+// upstream (-10.89 dBm at House 3 against the OLT receiver's -12 dBm overload, 1.11 dB over), and the
 // report offered it as the best feasible design with nothing said (#185).
 //
 // This suite pins option 1 of #185: the report counts and names the upstream failures, and the ranking
@@ -27,7 +27,9 @@ function estate(n) {
 }
 
 // Same two seeds as `test/design-launch-window.test.js`: NEAR is the C+ 1:8 estate whose ODN is
-// 11.49-12.08 dB, FAR the same topology at ODN 15.8-16.7 dB where neither direction is tight.
+// 11.39-11.97 dB, FAR the same topology at ODN 15.7-16.2 dB where neither direction is tight. Both
+// moved down by 0.10 dB when gh#39 stopped charging the splitter site's own house a closure splice
+// for a 1 m span that was never a run.
 const NEAR = { lat: 51.499, lon: -0.1006, name: 'PoP' };
 const FAR = { lat: 51.35, lon: -0.1006, name: 'PoP' };
 
@@ -44,12 +46,12 @@ test('a design whose every ONT fails upstream says so once, for the plant', func
   const said = upstreamWarnings(near.best);
   assert.strictEqual(said.length, 1, JSON.stringify(near.best.warnings));
   const note = said[0];
-  // 12 of 12: the upstream ODN is 11.49-12.08 dB at 1310 nm and the ONT launches +0.5 dBm, so the
-  // OLT receiver sees -10.99..-11.57 dBm against its -12 dBm overload point.
+  // 12 of 12: the upstream ODN is 11.39-11.97 dB at 1310 nm and the ONT launches +0.5 dBm, so the
+  // OLT receiver sees -10.89..-11.47 dBm against its -12 dBm overload point.
   assert.ok(note.indexOf('12 of 12') !== -1, 'names how many ONTs fail upstream: ' + note);
   assert.ok(note.indexOf('House 3') !== -1,
-    'names the ONT furthest over the overload point (1.01 dB), not the one with the least headroom: ' + note);
-  assert.ok(note.indexOf('-10.99 dBm at the OLT gpon-c-plus-8') !== -1,
+    'names the ONT furthest over the overload point (1.11 dB), not the one with the least headroom: ' + note);
+  assert.ok(note.indexOf('-10.89 dBm at the OLT gpon-c-plus-8') !== -1,
     'quotes the power the OLT receiver actually sees: ' + note);
   assert.ok(note.indexOf('6 dB') !== -1, 'names the pad that clears it: ' + note);
   // The pad the band asks for is 4 dB (downstream ceil(3.32)), and 4 dB does not clear the OLT
@@ -75,8 +77,8 @@ test('one ONT row carries both directions, so the two halves cannot be read as o
   assert.ok(house1, 'no budget row for House 1: ' + JSON.stringify(winner.budgets[0]));
   assert.strictEqual(house1.verdict, 'ok', 'downstream this ONT is inside its overload point');
   assert.strictEqual(house1.upstreamVerdict, 'fail', JSON.stringify(house1));
-  // +0.5 dBm through 11.726 dB of 1310 nm ODN = -11.23 dBm at the OLT receiver.
-  close(house1.upstreamRxPowerDbm, -11.23, 0.001, 'upstream receive power');
+  // +0.5 dBm through 11.62 dB of 1310 nm ODN = -11.12 dBm at the OLT receiver.
+  close(house1.upstreamRxPowerDbm, -11.12, 0.001, 'upstream receive power');
 });
 
 test('a design clear of the upstream band stays silent about it', function () {

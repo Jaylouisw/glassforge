@@ -261,6 +261,17 @@ and the checks, and a PNG of the drawing at a stated scale.
   `method GET is not allowed on /api/design/synthesise - it answers POST`, `404` is kept for a path
   that is no endpoint at all, and `HEAD` follows `GET` where there is one. Tests: `api-http` adds
   seven.
+- **An auto-designed PON no longer buys a 24-fibre drum for the metre between a splitter and its own
+  house.** A splitter site is a demand point (the k-means medoid), so the distribution tree rooted
+  there held an edge from the splitter to the house at the same coordinates: 0 m measured, 1 m at the
+  span floor, and `cableFor` read the whole cluster's 15 fibres on it. Two 1:16 sites therefore bought
+  **one 2000 m drum of `g652d-loose-24` for 2 m of cable** (gh#39), and a `costs` model charged it
+  against every candidate. `emitTerminalTree` now contracts a node that sits on the root and serves it
+  by its own 1 m drop - the shape `street.routedTree` already gives a terminal that snaps onto the root
+  node. On the issue's 30-house grid: spans 64 → 62, closures 32 → 30, `designM` 3070.6 → 3068.6 m,
+  BOM lines 4 → 3 (purchase 8000 → 6000 m), and the houses under a site budget 0.10 dB better because
+  the duplicate closure's splice is gone. Tests: `design-root-coincident-house` (4 cases) plus five
+  suites whose pinned figures moved with it.
 
 ### Changed
 
