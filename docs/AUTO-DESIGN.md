@@ -15,12 +15,17 @@ POST /api/design/synthesise
 The same demand becomes one candidate per shape and setting, each one is validated and budgeted, and
 the best-ranked feasible one wins — fibre-metres by default, money when a `costs` model is supplied.
 With the defaults that is **nine** candidates: three PON ratios (`pon.ratios`: 1:8, 1:16, 1:32) and
-both active shapes for each of three optic pairs (`active.optics`, as model slugs: `sfp-1g-lx-10km`,
-`sfp-plus-10g-lr-10km`, `sfp-plus-10g-er-40km` — both 10G pairs are the SFP+ `plus-` models, which the
-report labels `PLUS-10G-LR-10KM` and `PLUS-10G-ER-40KM`). `technology: "pon"` or `"active"` drops the
-other family, and the count follows the ratios and optics you pass. `active.optics` takes model slugs,
-not the labels the report prints: `{"headEndOptic":"10G-LR-10KM"}` is not a part, and every candidate
-comes back refused with `unknown transceiver model "10G-LR-10KM"`.
+both active shapes for each of three optic pairs (`active.optics`, three `{ headEndOptic, cpeOptic }`
+pairs of model slugs: `sfp-1g-lx-10km`, `sfp-plus-10g-lr-10km`, `sfp-plus-10g-er-40km` — both 10G pairs
+are the SFP+ `plus-` models, which the report labels `PLUS-10G-LR-10KM` and `PLUS-10G-ER-40KM`).
+`technology: "pon"` or `"active"` drops the other family, and the count follows the ratios and optics you
+pass. An `active.optics` entry is a **pair object**, not a bare slug: `{"optics":["sfp-1g-lx-10km"]}` is a
+`400` whose reason is `the design reads "active.optics" as { headEndOptic, cpeOptic } pairs and got
+"sfp-1g-lx-10km" at position 0. Each entry is one optic at each end of the link.` An entry that names
+only one end is refused by name unless the block names that end once (`active.cpeOptic`, see
+[API.md](API.md#auto-design)). The values are model slugs, not the labels the report prints:
+`{"headEndOptic":"10G-LR-10KM","cpeOptic":"10G-LR-10KM"}` builds both active candidates, and each is
+refused with `node "n-headend" uses unknown transceiver model "10G-LR-10KM"`.
 
 | Candidate | Shape | What one customer costs |
 |---|---|---|
