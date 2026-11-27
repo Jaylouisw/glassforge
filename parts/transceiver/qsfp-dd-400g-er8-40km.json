@@ -1,0 +1,24 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp-dd-400g-er8-40km",
+  "vendor": "fs",
+  "label": "FS QSFPDD-ER8-400G 400GBASE-ER8 40 km",
+  "speedMbps": 400000,
+  "wavelengthNm": 1310,
+  "reachM": 40000,
+  "txPowerDbmMin": -0.6,
+  "txPowerDbmMax": 5.6,
+  "rxSensitivityDbm": -18.6,
+  "rxOverloadDbm": -4.4,
+  "polish": "upc",
+  "notes": "FS QSFPDD-ER8-400G data sheet, 400GBASE-ER8 to IEEE 802.3cn-2019: eight LWDM lanes at 1273.55/1277.89/1282.26/1286.67/1295.56/1300.06/1304.59/1309.14 nm on one duplex LC UPC pair, 40 km of G.652, BER 2.4e-4. Transmitter average launch power per lane -0.6..+5.6 dBm (total across eight lanes <=14.6 dBm); receiver average receive power per lane -18.6 (min) .. -4.4 (max) dBm; damage threshold -3.4 dBm per lane. Budget -0.6 - (-18.6) = 18.0 dB, and the sheet's own reach footnote says channel insertion loss is 18 dB for 40 km, so the row and the datasheet agree on the class. This row deliberately uses the AVERAGE receive minimum, not the sheet's receiver-sensitivity line: that line is OMAouter, max(-16.1, SECQ - 17.5) dBm, measured at a 1.4 dB transmitter eye closure, and subtracted from an average launch it would read 15.5 dB and understate the module by 2.5 dB without reproducing the distance it is sold for. The engine keeps one sensitivity and one launch, and both here are average. Reach and loss, measured: 40 km x 0.35 dB/km = 14.0 dB of fibre reads 4.0 dB of headroom -> marginal, not ok (ok needs 5.0); two patch panels add 0.6 dB, read 3.4 dB and stay marginal with no reasons; the last length that clears the margin is 37.1 km (5.02 dB of headroom) and 37.2 km is 4.98 dB, marginal. Overload is the sharp end, and this is not the row to pick for a short duct run: 5.6 - (-4.4) = 10.0 dB of path loss before the payload at the 5.6 dBm top of the window, so a 100 m patch reads -0.63 dBm at the launch floor and the budget fits a 10 dB inline pad (up to 14 dB still passes the 3 dB margin and the class). Near the boundary the verdict depends on which end of the launch window you read: 26.9 km with two patch panels is 10.015 dB of ODN and ok with no pad, while 26.7 km is 9.945 dB, fine at the -0.6 dBm floor but 0.05 dB above -4.4 dBm at the 5.6 dBm ceiling, and the engine asks for a 1 dB pad. That is the inverse of the 400GBASE-LR4 row, whose +5.1 dBm receive maximum needs no pad at any length. What the row buys is the rung the ladder was missing - 400G at 40 km, between 400GBASE-LR4 at 10 km and 400GBASE-ZR at 80 km - and one duplex pair carrying the whole 400G, where four 100GBASE-ER4 rows charge four pairs and four modules for one service. Eight lanes on one pair: the row says 1310 nm because the engine budgets a single wavelength, the per-lane figures are worst-lane over the 1273..1309 nm spread, and the 0.35 dB/km used to measure it is the catalogue's G.652.D typical rather than a figure from this sheet. Datasheet figures for one vendor's module, not a purchase-tested part: replace with the QSFP-DD actually bought before pricing a build.",
+  "sourceUrl": "https://img-en.fs.com/file/datasheet/qsfpdd-er8-400g.pdf",
+  "tags": [
+    "400000",
+    "1310nm",
+    "400g",
+    "40km",
+    "lwdm8",
+    "dc-to-dc"
+  ]
+}
