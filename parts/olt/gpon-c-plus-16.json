@@ -1,0 +1,22 @@
+{
+  "kind": "olt",
+  "model": "gpon-c-plus-16",
+  "vendor": "generic",
+  "label": "GPON OLT class C+, 16 ports",
+  "pon": "gpon",
+  "class": "C+",
+  "txPowerDbmMin": 3,
+  "txPowerDbmMax": 7,
+  "rxSensitivityDbm": -32,
+  "rxOverloadDbm": -12,
+  "budgetDb": 32,
+  "ports": 16,
+  "maxSplitRatio": 128,
+  "notes": "The class C+ figures are gpon-c-plus-8's own row, field for field: ITU-T G.984.2 Amendment 2 (03/2008), Appendix V, Table V.1 - OLT mean launched power +3..+7 dBm, OLT receiver minimum sensitivity -32 dBm and minimum overload -12 dBm, ONU +0.5..+5 dBm launch against -30 dBm sensitivity and -8 dBm overload, class C+ ODN 17..32 dB (Table V.2). Nothing about the optics changes with the port count; a 16-port C+ card is the same class as an 8-port one, so the two rows differ in `ports` alone. Why this row exists: a plant is a tree with exactly one root, so a C+ site that needs 9 to 16 PON ports cannot be drawn as two 8-port cards, and until now the only 16-port row in this catalogue was gpon-c-plus-plus-16, whose class budget is 35 dB against C+'s 32 and whose launch tops at +10 dBm against +7. Choosing it for a sixteen-port site hands the design 3 dB of ODN loss the purchased C+ card does not have: measured on this engine, 9 km of G.652.D at 1:32 with two splices and two connector pairs is 19.88 dB of ODN, 12.12 dB of C+ class headroom and 15.12 dB of C++ class headroom, so a plan signed off against the C++ figure is 3 dB optimistic. Measured the other way, a 140-home 1:32 estate (twelve splitter sites) is refused by gpon-c-plus-8 with 'needs 12 PON port(s) but gpon-c-plus-8 has 8' and is designed on this row at twelve sites. The port count is the board's, not a standards figure - 8-port and 16-port C+ cards both exist, and sixteen is the shape a dense chassis ships - and 1:128 is the split a 32 dB ODN supports rather than a published card limit, as on the 8-port row. Class figures from the recommendation, not one measured card: replace with the line card actually purchased before construction.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
+  "tags": [
+    "gpon",
+    "c+",
+    "16-port"
+  ]
+}
