@@ -46,6 +46,17 @@ and the checks, and a PNG of the drawing at a stated scale.
   it. An absent cost (or an explicit `null`) still means unpriced, and `0` is a figure - the lease is
   free - so it still answers `costComplete: true`. Tests: `link-design` (+1 case: text and negative
   refused, `0` priced, absent unpriced).
+
+- **A spans or splitters list the budget cannot read is refused, not read as no plant.** `computeOdn`
+  read `design.spans || []` and `design.splitters || []`, so a present-but-unusable list (`null`, `0`,
+  `false`, `''`) became an empty one, while `{}` and `"x"` were refused as "must be an array". Measured
+  on the 22.7 km / 1:64 baseline design with `spans: null`: **0 m** of fibre, ODN **23.3 dB** and
+  `verdict: ok`, where the named plant is `fail` — 0.294 dB outside the GPON B+ class budget. A
+  verdict computed on a dropped cable is a design signed off that will not light. `listField` now
+  refuses every present value that is not an array, quoting the value and naming the loss it would
+  have deleted; an absent key is still the empty plant it describes. Tests: `budget-odn-counts` (+2
+  cases: the falsy lists on the PON budget, and the same refusal through `pointToPoint`).
+
 - **A leased segment scoped at the budget is refused, not silently charged to the whole path.**
   `leg` decides which leg's budget pays for leased glass on a link; a budget is one ODN path, and
   `computeOdn` read the segment through value guards only, so `{ leg: 'b' }` and `{ legs: 'b' }` both

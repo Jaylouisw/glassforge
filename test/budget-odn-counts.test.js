@@ -124,4 +124,26 @@ test('the active path reads the same counts through the same guard', function ()
   assert.ok(active(2).ok, 'the same link with two connectors is a valid budget');
 });
 
+test('a spans or splitters list the budget cannot read is refused, not read as no plant', function () {
+  // `design.spans || []` and `design.splitters || []` answered a present-but-unusable list as an
+  // empty one: `null`, `0`, `false` and `''` all became "no cable / no splitter". Measured on the
+  // baseline design above with `spans: null`: 0 m of fibre, ODN 23.3 dB (splices + connectors + the
+  // 20.50 dB 1:64, no fibre) and `verdict: ok`, while the plant it names is `fail` - 0.294 dB outside
+  // the GPON B+ class budget. `{}` and `"x"` were already refused, so only the falsy values slipped by.
+  throws(function () { run({ spans: null }); }, 'design.spans', 'a null spans list');
+  throws(function () { run({ spans: 0 }); }, 'design.spans', 'a numeric spans list');
+  throws(function () { run({ splitters: null }); }, 'design.splitters', 'a null splitters list');
+  // Absent is still absent: the empty plant is the state the key omits, and it budgets as 0 m.
+  const bare = budget.pointToPoint({ headEnd: { model: 'sfp-1g-lx-10km' }, cpe: { model: 'sfp-1g-lx-10km' } }, registry);
+  close(bare.fibreLengthM, 0, 0.001, 'an omitted spans key is still no cable');
+});
+
+test('the active path refuses an unreadable spans list too, through the shared ODN', function () {
+  // computeOdn is shared, so pointToPoint read `spans: null` as no cable in exactly the same way.
+  throws(function () {
+    budget.pointToPoint({ headEnd: { model: 'sfp-1g-lx-10km' }, cpe: { model: 'sfp-1g-lx-10km' },
+      spans: null }, registry);
+  }, 'design.spans', 'active null spans');
+});
+
 done();
