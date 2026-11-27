@@ -700,6 +700,18 @@ function validate(plant, registry) {
     const cap = capacity(plant, registry);
     cap.problems.forEach(function (p) { errors.push(p); });
 
+    // Strand overbooking is the same contradiction as an overbooked splitter site: a span that lists
+    // more strand indices than its cable carries is a drum somebody orders and cannot splice
+    // (SPEC §6), not a red number in one tab. The ledger has always computed it; `validate` never
+    // read it, so PUT and `/ops` saved the plant, the printed plan called it clean, and `/strands`
+    // was the only surface that said otherwise - the advisory check the ops endpoint stopped making
+    // for an unknown cable model. The ledger's own sentence is reused (it names the span, the count
+    // and the cable), so the gate and the tab cannot disagree about what is overbooked.
+    const ledger = strandLedger(plant, registry);
+    ledger.rows.forEach(function (row) {
+      if (row.overbooked && row.error) errors.push(row.error);
+    });
+
     (plant.nodes || []).forEach(function (node) {
       if (node.type !== 'closure' || !node.model || !registry.has('closure', node.model)) return;
       const closure = registry.get('closure', node.model);

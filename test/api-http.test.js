@@ -809,8 +809,10 @@ async function main() {
     op: 'add-span', span: { from: splitOlt, to: splitSplitter, cable: 'g652d-loose-12', lengthM: 500, strands: [1] }
   });
   const feederSpan = splitState.body.spans[0].id;
+  // A two-fibre drop: the splitter's two ports feed strands 1 and 2, and a 1-fibre drop would be a
+  // span listing more strands than its cable carries - overbooked, and refused by the save gate.
   splitState = await request('POST', '/api/projects/' + splitProject.body.id + '/ops', {
-    op: 'add-span', span: { from: splitSplitter, to: splitOnt, cable: 'g657a2-drop-1', lengthM: 40, strands: [1, 2] }
+    op: 'add-span', span: { from: splitSplitter, to: splitOnt, cable: 'g657a2-drop-2', lengthM: 40, strands: [1, 2] }
   });
   const dropSpan = splitState.body.spans[1].id;
   const splitPrint = await request('GET', '/print/project/' + splitProject.body.id);

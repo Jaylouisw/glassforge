@@ -37,6 +37,16 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **An overbooked span is a refusal at the save gate, not a red number in one tab.** `strandLedger`
+  has always answered `overbooked`, but `network.validate` never read it: `PUT` and `/ops` saved a
+  plant whose span lists more strand indices than its cable carries, the printed plan called it a
+  clean design, and only the strands tab coloured the cell red — the advisory check `/ops` stopped
+  making for an unknown cable model. `validate` now merges the ledger's own sentence as an error
+  (naming the span, the count and the cable), the same treatment `capacity()` gives an overbooked
+  splitter site and what SPEC §6 asks for. A bundled span is not caught: the ledger's capacity
+  already counts every cable. Tests: `strand-overbooking-gate` (5 cases); the `api-http`
+  splitter-plan fixture put two strands on 1-fibre drop cable and now buys `g657a2-drop-2`, which is
+  what that case always meant.
 - **A link whose legs share no duct but meet in one chamber is not called diverse.** Suurballe's pair
   is edge-disjoint, and `diversity.sharedM` read `0` for two legs that still both turn at the same
   manhole - two ducts either side of one chamber, or a side street drawn from the middle of the main
@@ -49,7 +59,6 @@ and the checks, and a PNG of the drawing at a stated scale.
   hits one carries the usual "not diverse" warning. Tests: `link-shared-joint` adds 4 (the
   edge-disjoint pair through one chamber, shared metres named beside the joint, a ring with `[]` and
   the two sites excluded, a whole-corridor pair with no interior vertex).
-
 - **A link's cable ladder is a list of catalogue models, refused rather than silently defaulted.**
   `engine/link.js` normalised every other BOM knob through `design-fields` and left `ladder` as
   `Array.isArray(o.ladder) && o.ladder.length ? o.ladder : DEFAULT_LADDER`. A bare model name was read
