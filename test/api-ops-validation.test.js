@@ -416,6 +416,48 @@ async function main() {
     assert.ok(bundleBom.body.error.indexOf('span "s1" has an invalid bundles count "1.5"') !== -1, bundleBom.body.error);
   });
 
+  // ------------------------------------------------------------------ a strand list that is not a list
+  // `strands` is the list of strand numbers in use on a span. `PUT` copied a caller's value through
+  // raw and the validator never looked at its shape, so `"strands": "1,2"` saved with a 200 and every
+  // reader then read no strands at all: the tab said the span carried nothing, the splice schedule
+  // listed none of them, and a design's `runs[].strands` read `"1,2".length` - three. `/ops` did the
+  // other half of the same bug, coercing anything that was not an array to `[]`, so the caller's two
+  // strands were dropped in silence. One rule for both writers: a list, or absent.
+  const strandId = (await request('POST', '/api/projects', { name: 'Strand lists' })).body.id;
+  await build(strandId, validPlant);
+  const storedStrand = await request('GET', '/api/projects/' + strandId);
+  const putBadStrands = await request('PUT', '/api/projects/' + strandId, {
+    nodes: storedStrand.body.nodes,
+    spans: storedStrand.body.spans.map(function (span, i) {
+      return i === 0 ? Object.assign({}, span, { strands: '1,2' }) : span;
+    })
+  });
+  test('PUT refuses a strands value that is not a list, naming the span and the value', function () {
+    assert.strictEqual(putBadStrands.status, 400, brief(putBadStrands));
+    assert.deepStrictEqual(putBadStrands.body.errors,
+      ['span "s1" has an invalid strands list "1,2" - strands is a list of the strand numbers in use, ' +
+       'and a value that is not a list is refused rather than read as no strands']);
+  });
+  const afterBadStrands = await request('GET', '/api/projects/' + strandId);
+  test('the refused strand list left the stored plant alone', function () {
+    assert.deepStrictEqual(afterBadStrands.body.spans[0].strands, []);
+  });
+
+  const badStrandOp = await op(strandId, {
+    op: 'add-span',
+    span: { from: 'n2', to: 'n3', cable: 'g657a2-drop-1', lengthM: 30, strands: '1,2' }
+  });
+  test('an add-span whose strands is not a list is a 400, not a 200 that drops the field', function () {
+    assert.strictEqual(badStrandOp.status, 400, brief(badStrandOp));
+    assert.deepStrictEqual(badStrandOp.body.errors,
+      ['span "s3" has an invalid strands list "1,2" - strands is a list of the strand numbers in use, ' +
+       'and a value that is not a list is refused rather than read as no strands']);
+  });
+  const afterBadStrandOp = await request('GET', '/api/projects/' + strandId);
+  test('the refused span was not saved', function () {
+    assert.deepStrictEqual(afterBadStrandOp.body.spans.map(function (s) { return s.id; }), ['s1', 's2']);
+  });
+
   // ------------------------------------------------------------------ a span with no measured length
   // `billOfMaterials` refuses a span whose length is missing, zero or not a number - "span s1 has no
   // measured length" - because a BOM is the number someone spends money against. The write gate

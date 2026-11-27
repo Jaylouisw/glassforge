@@ -83,6 +83,23 @@ function isBundleCount(value) {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1;
 }
 
+/**
+ * How a span's `strands` value is quoted back when it is not a list.
+ *
+ * The value may be anything a JSON body can hold, so it is rendered as JSON where that reads
+ * (`2`, `null`, `{}`), and as itself where it is text - `"1,2"` is what the caller typed, and
+ * `\"1,2\"` is what they need to see. `String()` alone turns `{}` into `[object Object]`.
+ */
+function strandListText(value) {
+  if (typeof value === 'string') return value;
+  try {
+    const text = JSON.stringify(value);
+    return text === undefined ? String(value) : text;
+  } catch (err) {
+    return String(value);
+  }
+}
+
 function nodeById(plant, id) {
   return (plant.nodes || []).find(function (n) { return n.id === id; }) || null;
 }
@@ -764,6 +781,18 @@ function validate(plant, registry) {
     }
     if (!isBundleCount(span.bundles)) {
       errors.push('span "' + span.id + '" has an invalid bundles count "' + String(span.bundles) + '"');
+    }
+    // A strand list is a list, or it is absent (a cable drawn with nothing assigned, which is spare
+    // capacity, not zero capacity). Every reader walks it as one: the strand ledger counts its
+    // length into `used`, the splice schedule addresses each entry, and a design's `runs[].strands`
+    // is `.length`. A value that is not a list is not "no strands" - `"1,2"` read as zero in the
+    // tab and as three in a run - so it is refused by name, like splices, closures and bundles.
+    // `PUT` stored it raw and validated clean; `/ops` coerced it to `[]`, a 200 that dropped the
+    // field. An entry that is not a strand number is the ledger's own sentence, further down.
+    if (span.strands !== undefined && !Array.isArray(span.strands)) {
+      errors.push('span "' + span.id + '" has an invalid strands list "' + strandListText(span.strands) +
+        '" - strands is a list of the strand numbers in use, and a value that is not a list is ' +
+        'refused rather than read as no strands');
     }
   }
 
