@@ -1,0 +1,23 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp56-200g-lr4-10km",
+  "vendor": "gigalight",
+  "label": "QSFP56 200GBASE-LR4 10 km",
+  "speedMbps": 200000,
+  "wavelengthNm": 1310,
+  "reachM": 10000,
+  "txPowerDbmMin": -3.4,
+  "txPowerDbmMax": 5.3,
+  "rxSensitivityDbm": -9.7,
+  "rxOverloadDbm": 5.3,
+  "polish": "upc",
+  "sourceUrl": "https://www.gigalight.com/downloads/datasheets/optical-transceivers/qsfp56/GQS-SPO201-LR4CZ.pdf",
+  "tags": [
+    "200000",
+    "1310nm",
+    "200g",
+    "long-reach",
+    "dc-to-dc"
+  ],
+  "notes": "The 10 km rung at 200G, the hole between qsfp56-200g-fr4-2km and qsfp56-200g-er4-40km: every other speed here has a 10 km row - 10GBASE-LR, 25GBASE-LR, 50GBASE-LR, 100GBASE-LR1 and -LR4 - while a 200G service between two sites 3-8 km apart had to be quoted an FR4 it cannot reach or an ER4 whose 10 dB class floor puts a pad on it. Figures: Gigalight GQS-SPO201-LR4CZ data sheet (200GBASE-LR4, QSFP56 with PAM4 DSP, cooled 4-channel EA-DFB TOSA, 4-channel PIN ROSA, duplex LC/UPC, IEEE 802.3bs 200GBASE-LR4), optical characteristics table, per lane - average launch power -3.4..+5.3 dBm, average receive power -9.7..+5.3 dBm, receiver power (OMAouter) maximum +5.1 dBm, receiver sensitivity (OMAouter) -7.7 dBm, stressed receiver sensitivity (OMAouter) -5.2 dBm, four LAN-WDM lanes 1294.53/1299.02/1303.54/1308.09 nm on one duplex pair. Corroborated by the FS TRQ5F20ENF sheet, which prints the same -3.4/+5.3 launch and -9.7/+5.3 receive per lane, and by the Approved Networks AN-QSFP56-200G-LR4 sheet, which prints the same -3.4..+5.3 average per lane and +5.3 average receiver overload; its per-channel -7.05 dBm line is an average-sensitivity measurement condition, not the class receive floor, and the -9.7 dBm floor is what the other two print and what 6.3 dB of channel insertion loss requires. The row keeps the average receive power minimum (-9.7), not the OMAouter sensitivity (-7.7), for the reason every class row here does: a launch figure is subtracted from an average receive figure, and the 2.0 dB between them is the OMA-to-average conversion on this lane, not slack. Both ends of the class check out: -3.4 minus -9.7 is 6.3 dB of channel insertion loss - the 200GBASE-LR4 class, the same 6.3 dB as 100GBASE-LR1 and 0.1 dB wider than 10GBASE-LR - and +5.3 launch minus +5.3 receive is a 0 dB class floor, so this row never asks for a pad and overload can only fire on a module running above its own ceiling. Measured by driving budget.pointToPoint with two LC/UPC matings (2 x 0.25 = 0.50 dB): 1 km reads ODN 0.85 dB and 5.45 dB of headroom, ok; 3 km reads 1.55 dB and 4.75 dB, marginal; 8.0 km reads 3.30 dB and 3.00 dB, marginal; 9 km reads 3.65 dB and 2.65 dB, fail; the declared 10 km reads 4.00 dB and 2.30 dB, FAIL against the default 3 dB margin, and the same 10 km with two fusion splices instead of the patch field reads 3.70 dB and 2.60 dB, still fail. The bands are the engine's: ok needs 5 dB of headroom, marginal needs 3 dB, so with a patch field at each end this row is ok to 2.285 km (5.00 dB at 2.285 km, marginal at 2.3 km), marginal out to 8.0 km (3.00 dB at 8.0 km) and outside its margin past it - a 10 km 200G service is a 6.3 dB class with 3.5 dB of fibre in it at 0.35 dB/km and 2.8 dB left for matings, penalties and reserve, and ER4 is the row for a link that must survive a repair. Four lanes on one duplex pair, so wavelengthNm is 1310 because the engine budgets one wavelength, per-lane figures are worst-lane, and the cable's 0.35 dB/km 1310 window covers the 1294.5-1308.1 nm lane band; a 1295 nm entry would be a precision the budget cannot spend. Class figures for one module family, not a purchase-tested part - replace the row with the optic actually bought, and its measured per-lane receive power, before pricing a build."
+}

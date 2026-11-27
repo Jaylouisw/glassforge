@@ -1,0 +1,24 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp56-200g-dr4-500m",
+  "vendor": "gigalight",
+  "label": "QSFP56 200GBASE-DR4 500 m (MPO-12/APC)",
+  "speedMbps": 200000,
+  "wavelengthNm": 1310,
+  "reachM": 500,
+  "txPowerDbmMin": -5.1,
+  "txPowerDbmMax": 4,
+  "rxSensitivityDbm": -8.1,
+  "rxOverloadDbm": 3,
+  "polish": "apc",
+  "sourceUrl": "https://www.gigalight.com/datasheets/200g-qsfp56-dr4-500m.pdf",
+  "tags": [
+    "200000",
+    "1310nm",
+    "200g",
+    "short-reach",
+    "parallel-single-mode",
+    "dc-to-dc"
+  ],
+  "notes": "The 500 m rung at 200G, the row qsfp28-100g-dr-500m and qsfp-dd-400g-dr4-500m already have and this speed did not: the 200G rung shipped with FR4 (2 km) and ER4 (40 km) only, so a 200G service inside one building or across one campus had no 500 m part to quote and had to be drawn on a 2 km module whose reach nobody needs. Figures: Gigalight GQS-SPO201-DR4CZ data sheet (200GBASE-DR4, QSFP56, uncooled 4-channel 1310 nm EML, single MPO-12 receptacle with 8 degree APC, IEEE 802.3bs 200GBASE-DR4), optical characteristics table, per lane - average launch power -5.1..+4.0 dBm, average receive power -8.1..+3.0 dBm, receiver power (OMAouter) maximum +2.8 dBm, receiver sensitivity (OMAouter) -6.6 dBm, stressed receiver sensitivity (OMAouter) -4.1 dBm, TDECQ 3.4 dB, damage threshold +4.0 dBm, lane band 1304.5-1317.5 nm. Corroborated by the FiberStamp FST-200G-DR4 sheet, which prints the same -5.1 launch floor, -8.1 receive floor, +3.0 receive ceiling and -6.6 OMA sensitivity; the Gigalight GQS-SPO20-DR4CZA DML variant is the same part on a DML laser with a 3.0 dBm launch ceiling and the same +3.0 receive ceiling, which is why the floor below is a property of the EML class and not of the engine. The row keeps the average receive power minimum (-8.1), not the OMAouter sensitivity (-6.6), for the reason every class row here does: a launch figure is subtracted from an average receive figure, and the 1.5 dB between them is the OMA-to-average conversion on this lane, not slack. Both ends of the class: -5.1 minus -8.1 is 3.0 dB of channel insertion loss, the same 3.0 dB as 100GBASE-DR and 400GBASE-DR4 because it is the same parallel-single-mode lane family, and +4.0 launch minus +3.0 receive leaves a 1.0 dB class FLOOR - unlike the duplex DR row, this optic cannot be run loss-free, and a 3 dB margin plus a 3 dB class leaves no room to pad it. Measured by driving budget.pointToPoint with an MPO-12/APC pair (2 x 0.2 = 0.40 dB): 100 m reads ODN 0.435 dB and 2.57 dB of headroom, fail; the declared 500 m reads 0.575 dB and 2.43 dB, fail; 500 m with no matings reads 2.83 dB, still fail. Every one of those budgets also carries the launch-window warning, and it is true rather than a nuisance: at the +4.0 dBm top of the window the customer optic sees +3.43 dBm over a 500 m span, 0.43 dB above the +3.0 dBm it is rated for, and the 1 dB pad that would fix it costs more margin than the class has. The way this row is meant to be read is with the launch capped: set txDbm 3.0 at the 500 m span and the same budget reads 10.52 dB of headroom, ok, no warning, class headroom 2.42 dB - the engine budgets the pair at the launch it is given, so a module held at its DML ceiling is a compliant DR4 link while at txDbm 4.0 the same span reads +3.43 dBm at the customer optic and the verdict is fail on overload. Buy this row for price at 500 m or less, not for budget: 200GBASE-FR4 has 4.0 dB of class and a 0 dB floor and is still the safer optic at 500 m, and a 200G span that must clear the 3 dB margin should be drawn on FR4 or LR4. Eight strands are needed (4 Tx + 4 Rx through one MPO-12), so a leg is designed with fibres: 8 - four positions of the twelve are dark - and the termination is MPO-12/APC, billed with connectors { count: 2, model: 'mpo-12-apc' } (0.40 dB), not the SC/APC default. wavelengthNm is 1310 rather than the 1311 nm lane centre, for the reason qsfp28-100g-dr-500m gives: the budget keys each cable's attenuation table on this number and refuses a window the cable does not publish, and 0.35 dB/km at the 1310 window covers 1304.5-1317.5 nm. Class figures for one module family, not a purchase-tested part - replace the row with the module actually bought, and with its MPO polarity and lane assignment, before pricing a build."
+}

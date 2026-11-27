@@ -32,7 +32,14 @@ test('the 200G rung exists, so the ladder no longer jumps from 100G to 400G', fu
   const speeds = registry.all('transceiver').map(function (t) { return t.speedMbps; });
   assert.ok(speeds.indexOf(200000) !== -1, 'a 200G optic must exist: ' + speeds.join(','));
   const twoHundred = registry.all('transceiver').filter(function (t) { return t.speedMbps === 200000; });
-  assert.strictEqual(twoHundred.length, 2, 'a short and a long rung, as at 10G, 25G, 50G and 100G');
+  // This used to assert the count was exactly 2, because FR4 (2 km) and ER4 (40 km) were the whole
+  // rung then. A count is what a rung outgrows - DR4 (500 m) and LR4 (10 km) landed later - so pin
+  // the reach rungs by name: a 200G service is quoted at the same four distances as other speeds.
+  assert.deepStrictEqual(
+    twoHundred.map(function (t) { return t.reachM; }).sort(function (a, b) { return a - b; }),
+    [500, 2000, 10000, 40000],
+    'the 200G rung covers 500 m, 2 km, 10 km and 40 km'
+  );
   assert.strictEqual(registry.get('transceiver', ER.model).wavelengthNm, 1310, 'four lanes near 1300 nm');
   assert.strictEqual(registry.get('transceiver', FR.model).wavelengthNm, 1310);
 });

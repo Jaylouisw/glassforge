@@ -26,7 +26,7 @@ clone still starts with no build — see [ADR 0004](docs/adr/0004-typescript-hyb
 [Development](#development).
 
 <!-- parts:start -->
-**82 parts across 8 kinds** — 9 cables, 12 splitters, 13 OLTs, 7 ONTs, 25 transceiver, 8 closures, 6 connectors, 2 splices.
+**84 parts across 8 kinds** — 9 cables, 12 splitters, 13 OLTs, 7 ONTs, 27 transceiver, 8 closures, 6 connectors, 2 splices.
 <!-- parts:end -->
 
 ## What it does today
