@@ -500,6 +500,102 @@ function refuseEndpointLaunch(end, path) {
 }
 
 /**
+ * The rows of one direction, summarised: which ONTs are in the band, the worst by overshoot, and the
+ * sizes an order needs. `direction` comes from the budget result the row carries - `allOntBudgets`
+ * stamps every one - and rows a caller built by hand default to downstream, which is the direction
+ * every caller passed before the reverse pass existed.
+ *
+ * Split out of `launchWindowNote` because the note is now a sentence about *two* passes over one ODN:
+ * it has to compare the downstream band with the upstream one and quote the larger pad, and two
+ * copies of the count-and-size arithmetic would disagree the first time one of them changed.
+ */
+function bandSummary(rows) {
+  const budgeted = (rows || []).filter(function (r) { return r && r.result; });
+  const hot = budgeted.filter(function (r) { return r.result.launchWindowPad; });
+  const direction = budgeted.length && budgeted[0].result.direction === 'up' ? 'up' : 'down';
+  // Pads are bought in whole dB, so the sizes are what an order needs: a 1:16 estate can need a 1 dB
+  // pad on six drops and a 2 dB pad on two, and quoting the worst size for all eight over-pads the six.
+  const bySize = new Map();
+  hot.forEach(function (r) {
+    const db = r.result.launchWindowPad.padDb;
+    bySize.set(db, (bySize.get(db) || 0) + 1);
+  });
+  const sizes = Array.from(bySize.keys()).sort(function (a, b) { return b - a; });
+  const sizeList = sizes.map(function (db) { return bySize.get(db) + ' x ' + db + ' dB'; }).join(', ');
+  if (!hot.length) {
+    return { direction: direction, budgeted: budgeted, hot: hot, worst: null, pad: null,
+      sizes: sizes, sizeList: sizeList, noPad: 0, rest: budgeted.length, bySize: bySize };
+  }
+  // The worst overshoot, ties broken on the ONT id: the sentence must not depend on the order the
+  // plant happened to be built in, and `reduce` keeps whichever row came first.
+  const worst = hot.reduce(function (a, b) {
+    const diff = b.result.launchWindowPad.overDb - a.result.launchWindowPad.overDb;
+    if (diff > 0) return b;
+    if (diff < 0) return a;
+    return String(b.ont) < String(a.ont) ? b : a;
+  });
+  const noPad = hot.filter(function (r) { return !r.result.launchWindowPad.fits; }).length;
+  return { direction: direction, budgeted: budgeted, hot: hot, worst: worst,
+    pad: worst.result.launchWindowPad, sizes: sizes, sizeList: sizeList, noPad: noPad,
+    rest: budgeted.length - hot.length, bySize: bySize };
+}
+
+/**
+ * How the band is named in one direction. Downstream the OLT launches into the ONT, so the receiver
+ * is the ONT and the window is the OLT's; upstream it is the other way round, and quoting the OLT's
+ * window for a figure measured at the ONT's launch is how a report stops describing the plant in front
+ * of the crew. An active plant has no OLT: its two ends are a head-end and a customer optic.
+ */
+function bandVoice(result, direction) {
+  const p2p = result.technology === 'p2p';
+  const up = direction === 'up';
+  const windowModel = up
+    ? (p2p ? result.cpe : result.ont)
+    : (p2p ? result.headEnd : result.olt);
+  return {
+    // Downstream reads as before: 'inside the overload point only at the bottom of the OLT X launch
+    // window' - the ONT is the implied receiver of a PON, and naming it too would change every plan
+    // quote without adding a fact.
+    receiver: up ? (p2p ? 'the head-end optic' : 'the OLT receiver') : (p2p ? 'the customer optic' : null),
+    window: (up ? (p2p ? 'customer optic ' : 'ONT ') : (p2p ? 'head-end optic ' : 'OLT ')) + windowModel,
+    stale: up
+      ? (p2p ? 'every customer optic launches at ' : 'every ONT laser launches at ')
+      : 'every line card lands at '
+  };
+}
+
+/** The band as one sentence, for one direction's summary. */
+function bandSentence(sum, marginDb) {
+  const worst = sum.worst;
+  const pad = sum.pad;
+  const voice = bandVoice(worst.result, sum.direction);
+  const hot = sum.hot.length;
+  const total = sum.budgeted.length;
+  // One pad at the OLT is only the right purchase when every ONT in the band needs the same pad. A
+  // pad is one size, so a band that needs a 1 dB pad on six drops and a 2 dB pad on two cannot be
+  // served from the feeder: the 2 dB pad over-pads the six and spends their margin to fix the two.
+  const where = sum.rest === 0 && sum.bySize.size === 1
+    ? pad.padDb + ' dB of inline pad at the OLT carries the design to full launch'
+    : 'a pad at each of the ' + hot + ' affected ONT' + (hot === 1 ? '' : 's') +
+      ' carries the design to full launch (' + sum.sizeList + ')' +
+      (sum.rest === 0
+        ? ', because one pad size does not serve the whole band'
+        : ', and the other ' + sum.rest + ' cannot share a pad on the feeder');
+
+  return hot + ' of ' + total + ' ONT' + (total === 1 ? '' : 's') + ' ' + (hot === 1 ? 'is' : 'are') +
+    ' inside ' + (voice.receiver ? voice.receiver + "'s overload point" : 'the overload point') +
+    ' only at the bottom of the ' + voice.window + ' launch window: worst ' + pad.overDb +
+    ' dB over at the ' + pad.atTxDbm + ' dBm top, ' +
+    (pad.fits
+      ? 'so ' + where
+      : 'and the worst of them needs ' + pad.padDb + ' dB of pad against the ' + pad.maxPadDb +
+        ' dB the margin and the class budget can fund') +
+    ' - as it stands it holds only while ' + voice.stale + worst.result.txDbm + ' dBm' +
+    (sum.noPad ? '; ' + sum.noPad + ' of them cannot be padded inside the ' + marginDb +
+      ' dB margin and the class budget, so those need a different split or optic' : '');
+}
+
+/**
  * The launch-window band, said once for the whole plant rather than once per ONT.
  *
  * `launchWindowWarning` is a per-ONT sentence, because a budget describes one link. A plant is not a
@@ -521,73 +617,62 @@ function refuseEndpointLaunch(end, path) {
  * `pad.fits === false` clause - a pad the margin and the class budget cannot fund - points at a
  * different split or optic.
  *
+ * **Both directions of one ODN.** `opts.other` is the reverse pass's rows, and it changes the size,
+ * not the verdict: a pad is ODN loss, so one pad serves both receivers and the note must name the
+ * largest either direction needs. The direction that binds leads the sentence - upstream reads "the
+ * OLT receiver is inside its overload point only at the bottom of the ONT's launch window" - and the
+ * milder direction is named beside it when the two sizes differ. Without that, a C+ 1:8 estate 3 km
+ * out is told to fit the 3 dB pad its downstream band asks for and the OLT receiver is 1.45 dB over
+ * its overload point at the top of the ONT's window, with every row `ok` and no other sentence on the
+ * page about it.
+ *
  * rows are `{ ont, name, result }` as `network.allOntBudgets` returns them; rows whose budget threw
  * carry no result and are not counted, because "2 of 3" has to mean three budgeted ONTs. Returns null
- * when no row is in the band - an empty note is not a warning, and a 0 dB pad is a plate nobody orders.
+ * when no row in either pass is in the band - an empty note is not a warning, and a 0 dB pad is a
+ * plate nobody orders.
  */
 function launchWindowNote(rows, opts) {
   const o = opts || {};
   const marginDb = isNum(o.marginDb) ? o.marginDb : DEFAULT_MARGIN_DB;
-  const budgeted = (rows || []).filter(function (r) { return r && r.result; });
-  const hot = budgeted.filter(function (r) { return r.result.launchWindowPad; });
-  if (!hot.length) return null;
+  const mine = bandSummary(rows);
+  const theirs = o.other ? bandSummary(o.other) : null;
+  const theirsHot = !!(theirs && theirs.hot.length);
+  if (!mine.hot.length && !theirsHot) return null;
 
-  // The worst overshoot, ties broken on the ONT id: the sentence must not depend on the order the
-  // plant happened to be built in, and `reduce` keeps whichever row came first.
-  const worst = hot.reduce(function (a, b) {
-    const diff = b.result.launchWindowPad.overDb - a.result.launchWindowPad.overDb;
-    if (diff > 0) return b;
-    if (diff < 0) return a;
-    return String(b.ont) < String(a.ont) ? b : a;
-  });
-  const pad = worst.result.launchWindowPad;
-  const noPad = hot.filter(function (r) { return !r.result.launchWindowPad.fits; }).length;
-  const rest = budgeted.length - hot.length;
-  // Pads are bought in whole dB, so the sizes are what an order needs: a 1:16 estate can need a 1 dB
-  // pad on six drops and a 2 dB pad on two, and quoting the worst size for all eight over-pads the six.
-  const bySize = new Map();
-  hot.forEach(function (r) {
-    const db = r.result.launchWindowPad.padDb;
-    bySize.set(db, (bySize.get(db) || 0) + 1);
-  });
-  const sizeList = Array.from(bySize.keys()).sort(function (a, b) { return b - a; })
-    .map(function (db) { return bySize.get(db) + ' x ' + db + ' dB'; }).join(', ');
-  // One pad at the OLT is only the right purchase when every ONT in the band needs the same pad. A
-  // pad is one size, so a band that needs a 1 dB pad on six drops and a 2 dB pad on two cannot be
-  // served from the feeder: the 2 dB pad over-pads the six and spends their margin to fix the two.
-  const where = rest === 0 && bySize.size === 1
-    ? pad.padDb + ' dB of inline pad at the OLT carries the design to full launch'
-    : 'a pad at each of the ' + hot.length + ' affected ONT' + (hot.length === 1 ? '' : 's') +
-      ' carries the design to full launch (' + sizeList + ')' +
-      (rest === 0
-        ? ', because one pad size does not serve the whole band'
-        : ', and the other ' + rest + ' cannot share a pad on the feeder');
+  // A pad is ODN loss, so one pad in the ODN serves both receivers - and the size to buy is the
+  // largest either direction needs. Sizing it from the downstream band alone leaves the OLT receiver
+  // over its overload point whenever the ONT runs at the top of its window (#233): on a C+ 1:8 estate
+  // 3 km out the downstream band asks for 3 dB and the upstream band for 5 dB, and both rows are `ok`.
+  // The direction that binds leads the sentence, because its figure is the one an order has to match;
+  // the reverse band, when it needs less, is named beside it rather than left to be discovered.
+  let primary = mine;
+  let other = theirs;
+  if (!mine.hot.length) { primary = theirs; other = mine; }
+  else if (theirsHot && theirs.pad.padDb > mine.pad.padDb) { primary = theirs; other = mine; }
 
-  const text = hot.length + ' of ' + budgeted.length + ' ONT' + (budgeted.length === 1 ? '' : 's') +
-    ' ' + (hot.length === 1 ? 'is' : 'are') + ' inside the overload point only at the bottom of the OLT ' +
-    worst.result.olt + ' launch window: worst ' + pad.overDb + ' dB over at the ' + pad.atTxDbm +
-    ' dBm top, ' +
-    (pad.fits
-      ? 'so ' + where
-      : 'and the worst of them needs ' + pad.padDb + ' dB of pad against the ' + pad.maxPadDb +
-        ' dB the margin and the class budget can fund') +
-    ' - as it stands it holds only while every line card lands at ' + worst.result.txDbm + ' dBm' +
-    (noPad ? '; ' + noPad + ' of them cannot be padded inside the ' + marginDb +
-      ' dB margin and the class budget, so those need a different split or optic' : '');
+  let text = bandSentence(primary, marginDb);
+  if (other && other.hot.length && other.pad.padDb !== primary.pad.padDb) {
+    // The other direction's own sizes, said only when they differ: an equal size is one purchase and
+    // one sentence. It cannot promise a single pad, because the advice above may already be a pad at
+    // each ONT - what holds in both cases is that a pad is ODN loss and serves both receivers.
+    text += '; the ' + (other.direction === 'up' ? 'upstream' : 'downstream') + ' direction needs ' +
+      other.sizeList + ', and a pad is ODN loss in both directions, so size it for the larger';
+  }
 
   return {
     text: text,
-    onts: hot.length,
-    total: budgeted.length,
-    worstOnt: worst.ont,
-    olt: worst.result.olt,
-    padDb: pad.padDb,
-    overDb: pad.overDb,
-    atTxDbm: pad.atTxDbm,
-    maxPadDb: pad.maxPadDb,
-    sizes: Array.from(bySize.keys()).sort(function (a, b) { return b - a; }),
-    fits: pad.fits,
-    unpadded: noPad
+    onts: primary.hot.length,
+    total: primary.budgeted.length,
+    worstOnt: primary.worst.ont,
+    olt: primary.worst.result.olt,
+    direction: primary.direction,
+    padDb: primary.pad.padDb,
+    overDb: primary.pad.overDb,
+    atTxDbm: primary.pad.atTxDbm,
+    maxPadDb: primary.pad.maxPadDb,
+    sizes: primary.sizes,
+    fits: primary.pad.fits,
+    unpadded: primary.noPad
   };
 }
 

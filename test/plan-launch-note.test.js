@@ -164,8 +164,15 @@ async function main() {
       'the plan a crew signs off never says how much of the estate is in the band');
     assert.strictEqual(occurrences(printed.text, '16 of 16 ONTs'), 1,
       'the plant-level note is repeated once per ONT');
-    assert.ok(printed.text.indexOf('1 dB of inline pad at the OLT') !== -1,
+    // The pad to buy is the larger of the two bands, not the downstream one: at ODN 14.55 dB the ONT
+    // receiver is 0.47 dB over its -8 dBm point at the +7 dBm ceiling (a 1 dB pad), but the OLT
+    // receiver is 2.45 dB over -12 dBm at the ONT's +5 dBm ceiling (a 3 dB pad), and one pad serves
+    // both. This assertion used to read '1 dB of inline pad at the OLT' - the downstream figure, which
+    // left the OLT receiver over its overload point at the top of the ONT's window (#233).
+    assert.ok(printed.text.indexOf('3 dB of inline pad at the OLT') !== -1,
       'the pad the engine sized is not on the page that orders it');
+    assert.ok(printed.text.indexOf('the downstream direction needs 16 x 1 dB') !== -1,
+      'the milder direction is named beside it, so the larger size is not arbitrary');
     assert.ok(printed.text.indexOf('Casa 1') !== -1,
       'the summary replaced the per-ONT attribution the plan used to carry');
   });
@@ -173,10 +180,19 @@ async function main() {
   const clearId = await seedPlant(3000, 'Clear of the band');
   const clearPrinted = await request('GET', '/print/project/' + clearId);
 
-  test('a plant past the top of the band prints no band note', function () {
+  test('a plant past the top of the downstream band is still told about the upstream one', function () {
     assert.strictEqual(clearPrinted.status, 200);
-    assert.strictEqual(occurrences(clearPrinted.text, 'ONTs are inside the overload point'), 0,
-      'a plant at ODN 15.17 dB is past the band and must not be told to buy a pad');
+    // Downstream ODN 15.17 dB is past the C+ band's 15 dB top, but the same fibre is 0.06 dB more
+    // lossy at 1310 nm, so upstream ODN 15.23 dB is still under its 17 dB top: the ONT receiver is
+    // 1.44 dB over -12 dBm at the +5 dBm ceiling, a 2 dB pad. This test used to assert no band note at
+    // all, because the note was built from the downstream rows alone (#233); the only band on this
+    // plant is the upstream one, and it is the one a crew has to fit a pad for.
+    assert.strictEqual(occurrences(clearPrinted.text, 'bottom of the OLT gpon-c-plus-8 launch window'), 0,
+      'the downstream band is behind this plant and must not be reported');
+    assert.strictEqual(occurrences(clearPrinted.text, 'bottom of the ONT gpon-ont-4ge launch window'), 1,
+      'the upstream band is not, and it was reported as clean');
+    assert.ok(clearPrinted.text.indexOf('2 dB of inline pad at the OLT') !== -1,
+      'ceil(1.44) = 2 dB, sized at the ONT ceiling launch');
   });
 
   await new Promise(function (resolve) { server.close(resolve); });

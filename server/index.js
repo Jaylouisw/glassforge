@@ -921,14 +921,6 @@ function printPage(req, res, project, registry) {
     });
   }
 
-  // The band, once for the plant (#111, #110). Every per-ONT budget row already carries its own
-  // sentence, and a 1:16 estate puts all sixteen in the same band - sixteen copies of one sentence
-  // bury the two numbers the page exists for: how much of the estate is in the band, and how much pad
-  // to buy. `budget.launchWindowNote` is the same sentence the design report prints, so the plan and
-  // the synthesis cannot disagree about it. The per-ONT rows stay: a warning names the ONT it is about.
-  const bandNote = engine.budget.launchWindowNote(budgetRows, {});
-  if (bandNote) signalWarnings.unshift(bandNote.text);
-
   // ---- the other direction of the same link -------------------------------------------------------
   //
   // A PON is two links over one ODN: the OLT launches into the ONT, and the ONT launches into the
@@ -941,10 +933,10 @@ function printPage(req, res, project, registry) {
   // (#111) saying anything. So a crew reads the band note, fits the 4 dB pad it names, and the OLT
   // still saturates on the ONT's launch.
   //
-  // Only the verdicts are lifted, never the upstream `warnings`: the band sentence says which
-  // receiver saturates and which launch window does it, and the downstream band has already named a
-  // pad. Two pad sentences for one ODN read as two pads to buy, and the failure's own reason names
-  // the size that binds (a pad anywhere in the ODN serves both directions).
+  // Only the verdicts are lifted, never the upstream `warnings`: the band note above already takes
+  // both passes and names the size that clears both receivers, and a failing row's own reason names
+  // the same size (a pad anywhere in the ODN serves both directions). Two pad sentences for one ODN
+  // read as two pads to buy.
   //
   // A row whose path cannot be budgeted carries `error` and is skipped: the downstream pass above
   // already printed that fault, and a path fault is not a direction fault.
@@ -954,6 +946,19 @@ function printPage(req, res, project, registry) {
   } catch (err) {
     signalWarnings.push('the upstream optical budget could not be run: ' + err.message);
   }
+  // The band, once for the plant (#111, #110). Every per-ONT budget row already carries its own
+  // sentence, and a 1:16 estate puts all sixteen in the same band - sixteen copies of one sentence
+  // bury the two numbers the page exists for: how much of the estate is in the band, and how much pad
+  // to buy. The per-ONT rows stay: a warning names the ONT it is about.
+  //
+  // The band is one pad in one ODN, so it is sized from both passes (#233). `budget.launchWindowNote`
+  // given the downstream rows alone sized the pad for the ONT receiver: a C+ estate 3 km out is
+  // `ok` in both directions, 3 dB in the downstream band and 5 dB in the upstream one, and a crew that
+  // fitted the 3 dB pad it named left the OLT receiver 1.45 dB over its overload point at the top of
+  // the ONT's window. The same sentence is what a synthesised design puts in its `warnings`, so the
+  // page and the report that chose the design cannot disagree about the size to buy.
+  const bandNote = engine.budget.launchWindowNote(budgetRows, { other: upstreamRows });
+  if (bandNote) signalWarnings.unshift(bandNote.text);
   const upstreamBudgeted = upstreamRows.filter(function (r) { return r.result; });
   const upstreamFailures = upstreamBudgeted.filter(function (r) { return r.result.verdict === 'fail'; });
   const upstreamMarginals = upstreamBudgeted.filter(function (r) { return r.result.verdict === 'marginal'; });

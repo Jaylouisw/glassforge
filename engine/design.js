@@ -1195,7 +1195,12 @@ function evaluate(plant, opts, registry, meta) {
   // one: two copies of a paragraph this specific drift apart, and the copy that drifts is the one a
   // crew reads.
   const bandNote = budgetModule.launchWindowNote(budgets, {
-    marginDb: isNum(opts.marginDb) ? opts.marginDb : DEFAULTS.marginDb
+    marginDb: isNum(opts.marginDb) ? opts.marginDb : DEFAULTS.marginDb,
+    // One pad serves both directions of the ODN, so the size this report names has to clear both
+    // receivers: a C+ estate 3 km out is 3 dB in the downstream band and 5 dB in the upstream one, and
+    // naming the downstream figure sent a crew out with a pad that left the OLT receiver over its
+    // overload point at the top of the ONT's window (#233).
+    other: upstream
   });
   const launchWindowNote = bandNote ? bandNote.text : null;
 
