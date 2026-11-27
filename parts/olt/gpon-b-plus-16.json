@@ -1,0 +1,22 @@
+{
+  "kind": "olt",
+  "model": "gpon-b-plus-16",
+  "vendor": "generic",
+  "label": "GPON OLT class B+, 16 ports",
+  "pon": "gpon",
+  "class": "B+",
+  "txPowerDbmMin": 1.5,
+  "txPowerDbmMax": 5,
+  "rxSensitivityDbm": -28,
+  "rxOverloadDbm": -8,
+  "budgetDb": 28,
+  "ports": 16,
+  "maxSplitRatio": 64,
+  "notes": "The class B+ figures are gpon-b-plus-8's own row, field for field: ITU-T G.984.2 (03/2003), Table III.1 added by Amendment 1 (02/2006) - Appendix III industry best practice for the 2.488 Gbit/s downstream, 1.244 Gbit/s upstream system - reprinted as Table A.1 in the 2019 edition: OLT mean launched power +1.5..+5 dBm, OLT receiver minimum sensitivity -28 dBm and minimum overload -8 dBm; ONU launch +0.5..+5 dBm, ONU sensitivity -27 dBm, ONU overload -8 dBm; 28 dB ODN. Nothing about the optics changes with the port count - a 16-port B+ card is the same class as an 8-port one - so the two rows differ in `ports` alone. Neither direction is left with slack: 1.5 - (-27) = 28.5 dB downstream and 0.5 - (-28) = 28.5 dB upstream against a 28 dB class, so the class verdict is the tighter one and it is meant to be. Why this row exists: a plant is a tree with exactly one root, so a B+ site that needs 9 to 16 PON ports cannot be drawn as two 8-port cards, and until now gpon-b-plus-8 was the catalogue's only B+ row. A 140-address estate at 1:32 - twelve splitter sites - is refused by the 8-port card by name ('needs 12 PON port(s) but gpon-b-plus-8 has 8'), and the only sixteen-port GPON row the catalogue then had is gpon-c-plus-plus-16, class C++ at 35 dB - 7 dB of class a B+ card does not buy. A sixteen-port C+ card is 32 dB, still 4 dB more than a B+ ODN. Measured on this engine, that estate is designed on this row with a worst receiver headroom of 8.81 dB (+1.5 dBm B+ launch floor against the -27 dBm B+ ONT), where the same estate on gpon-c-plus-plus-16 reads 13.31 dB because its launch floor is +6.0 dBm: a plan signed off against the C++ figure carries 4.5 dB of launch, and 7 dB of class, that a bought B+ card never bought. The port count is the board's, not a standards figure - 8-port and 16-port B+ cards both ship - and 1:64 is the ratio a 28 dB ODN supports rather than a published card limit: 20.5 dB of 1:64 splitter plus 0.2 dB of splices and 0.6 dB of matings leaves 6.7 dB of fibre, about 30 km at 0.22 dB/km, and a longer run needs a different splitter or card, not the margin. These are the recommendation's class limits, not one measured card: replace the row with the line card actually purchased before construction - the budget moves with its optics.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.984.2/en",
+  "tags": [
+    "gpon",
+    "b+",
+    "16-port"
+  ]
+}
