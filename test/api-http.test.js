@@ -173,6 +173,39 @@ async function main() {
     assert.ok(notAnOnt.body.error.indexOf('n1') !== -1 && /not "ont"/.test(notAnOnt.body.error), notAnOnt.body.error);
   });
 
+  // `ontId` is a *node id*, and the narrowing is decided by truthiness plus a `===` lookup, so any
+  // other JSON type was flattened into the lookup or skipped entirely: `[ "n3" ]` concatenated to the
+  // string "n3" and the 400 named the ONT the project *has* as missing, `{ id: "n3" }` became
+  // "[object Object]", and `0`/`""` are falsy so the caller asked to narrow and got every ONT with a
+  // 200. A present value that is not a node id is the caller's field, refused by name before any
+  // lookup - the same call `readJsonBody` makes for the body itself.
+  const ontIdArray = await request('POST', '/api/projects/' + id + '/budget', { ontId: ['n3'] });
+  const ontIdObject = await request('POST', '/api/projects/' + id + '/budget', { ontId: { id: 'n3' } });
+  const ontIdZero = await request('POST', '/api/projects/' + id + '/budget', { ontId: 0 });
+  const ontIdEmpty = await request('POST', '/api/projects/' + id + '/budget', { ontId: '' });
+  test('a budget ontId that is not a node id string is a 400 naming the field, before any lookup', function () {
+    // No fibre maths here: the answer depends only on the refusal, so the assertions stay on the
+    // status and the sentence.
+    for (const [label, res, shape] of [
+      ['an array', ontIdArray, 'an array'],
+      ['an object', ontIdObject, 'an object'],
+      ['a number', ontIdZero, 'a number'],
+      ['an empty string', ontIdEmpty, 'an empty string']
+    ]) {
+      assert.strictEqual(res.status, 400, label + ': ' + JSON.stringify(res.body));
+      assert.ok(res.body && res.body.error, label + ': no error sentence');
+      assert.ok(res.body.error.indexOf('ontId') !== -1,
+        label + ': the refusal must name the field ontId: ' + res.body.error);
+      assert.ok(res.body.error.indexOf(shape) !== -1,
+        label + ': the refusal must name the shape it got (' + shape + '): ' + res.body.error);
+      assert.ok(res.body.error.indexOf('[object Object]') === -1,
+        label + ': the shape is hidden behind String(): ' + res.body.error);
+    }
+    // The array case used to name `n3` as the missing node while listing `n3` as an ONT that exists.
+    assert.ok(ontIdArray.body.error.indexOf('has ONTs') === -1,
+      'a shape refusal must not be dressed as a missing-node refusal: ' + ontIdArray.body.error);
+  });
+
   // A wavelength the direction cannot carry is the caller's mistake, and it fails every ONT the same
   // way: one 400 naming the rule, not a 200 whose every row repeats the sentence. Upstream at 1550 nm
   // used to be answered as a real verdict - on a 16 km B+ plant, `marginal` where 1310 nm is `fail`.

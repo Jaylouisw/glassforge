@@ -176,6 +176,10 @@ function readBody(req, limit) {
 function describeJsonBody(value) {
   if (value === null) return 'null';
   if (Array.isArray(value)) return 'an array';
+  // `typeof {}` is 'object', and the generic article made every refusal read "got a object".
+  // A field refusal is only useful if it can be read back to the caller as written, so the one
+  // type that needs "an" says so; the rest keep the same sentence they always had.
+  if (typeof value === 'object') return 'an object';
   return 'a ' + typeof value;
 }
 
@@ -452,7 +456,23 @@ async function handle(req, res, ctx) {
       // ontId is a node id: an id that names nothing, or names the OLT, is the caller's
       // mistake. designForOnt throws for both, and uncaught that becomes a 500 - "the server
       // broke" - when the answer is a 400 naming the id and the ONTs this plant actually has.
-      if (body.ontId) {
+      //
+      // A value that is not a *string* was read as an id anyway, because the truthiness test
+      // below decided whether to look up at all and the `===` test flattened the value:
+      // `["n3"]` concatenated to "n3" and the 400 called the ONT the project has missing,
+      // `{ id: "n3" }` became "[object Object]", and `0`/`""` are falsy so a caller who
+      // asked to narrow got every ONT with a 200. The field is checked for shape first, so the
+      // refusal names the field and what arrived rather than the plant.
+      if (body.ontId !== undefined) {
+        if (typeof body.ontId !== 'string') {
+          return fail(req, res, 400, 'ontId must be a node id string and got ' +
+            describeJsonBody(body.ontId) +
+            ' - /budget narrows to one ONT by node id; omit the field to budget the whole plant');
+        }
+        if (body.ontId === '') {
+          return fail(req, res, 400, 'ontId must be a node id string and got an empty string' +
+            ' - /budget narrows to one ONT by node id; omit the field to budget the whole plant');
+        }
         const nodes = project.nodes || [];
         const onts = nodes.filter(function (n) { return n && n.type === 'ont'; });
         const target = nodes.find(function (n) { return n && n.id === body.ontId; });
@@ -470,7 +490,7 @@ async function handle(req, res, ctx) {
       // `ont` the node id): `ontId` is the whole plant's answer with one row in it, not a second
       // schema. The bare result it used to send carried the ONT *model* in `ont` and turned a path
       // that cannot be budgeted into a 500 the list call reports as an error row.
-      const budgets = body.ontId
+      const budgets = body.ontId !== undefined
         ? [engine.network.budgetRow(project, body.ontId, registry, body)]
         : engine.network.allOntBudgets(project, registry, body);
       return sendJson(req, res, 200, { budgets: budgets });
