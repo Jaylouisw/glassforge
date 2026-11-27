@@ -1,0 +1,25 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp28-100g-cwdm4-2km",
+  "vendor": "generic",
+  "label": "QSFP28 100GBASE-CWDM4 2 km",
+  "speedMbps": 100000,
+  "wavelengthNm": 1310,
+  "reachM": 2000,
+  "txPowerDbmMin": -6.5,
+  "txPowerDbmMax": 2.5,
+  "rxSensitivityDbm": -11.5,
+  "rxOverloadDbm": 2.5,
+  "polish": "upc",
+  "sourceUrl": "https://cwdm4-msa.org/wp-content/uploads/2015/12/CWDM4-MSA-Technical-Spec-1p1-1.pdf",
+  "tags": [
+    "100000",
+    "1310nm",
+    "100g",
+    "2km",
+    "cwdm",
+    "duplex-lc",
+    "msa"
+  ],
+  "notes": "A 100GBASE-CWDM4 module: four 25.78125 Gb/s lanes over the 1271 / 1291 / 1311 / 1331 nm CWDM grid on ONE duplex LC/UPC pair, 2 km on SMF, FEC mandatory. Every figure here is the 100G CWDM4 MSA Technical Specification Rev 1.1 (cwdm4-msa.org), which is what defines this class - there is no IEEE clause for CWDM4, it is a vendor-defined PMD on the 100GBASE-LR4 receiver shape. Table 2-3, per lane: average launch power -6.5..+2.5 dBm (total average launch max 8.5 dBm), OMA -4.0..+2.5 dBm, OMA-minus-TDP min -5.0 dBm, extinction ratio >= 3.5 dB, transmitter off <= -30 dBm. Table 2-4, per lane: average receive power -11.5..+2.5 dBm, receive OMA max +2.5 dBm, receiver sensitivity (OMA) -10.0 dBm at 5e-5 BER (normative, the MSA footnotes it as such), stressed receiver sensitivity (OMA) -7.3 dBm, damage threshold +3.5 dBm, receiver reflectance <= -26 dB. Table 4-1: operating distance 2 km, channel insertion loss max 5 dB over 1264.5-1337.5 nm, optical return loss >= 21 dB, dispersion +6.7 / -11.9 ps/nm, DGD 3.0 ps. Table 5-1: cabled attenuation max 0.5 dB/km for OSP cable per TIA-568-C.3. Budget -6.5 - (-11.5) = 5.0 dB, exactly the MSA's channel-insertion-loss limit - one of the few rows where the subtraction and the published class are the same number rather than an inference from it. Section 5.2.1 then spends 3.89 dB of that 5 dB on connections and splices ('seven connections at an average insertion loss of 0.5 dB'), so the class already assumes jointed, patched cable rather than a bare strand. FEC is not optional: section 1.7 requires RS(528,514) per IEEE 802.3bj clause 91 and forbids bypassing the correction function, so the 5e-5 BER sensitivity above is pre-FEC and the 2 km class assumes the host has FEC on; Glassforge budgets no FEC, which is why the row carries class figures rather than a decoded receiver number. Why this row exists next to qsfp28-100g-fr1-2km: the same 2 km reach with 1.0 dB more budget - 5.0 against FR1's 4.0 - because CWDM4 runs four 25G lanes where FR1 runs a single 100G PAM4 lane. Measured on the default 3 dB margin, which the engine's ok band widens to margin + 2: 2 km of G.652.D at 0.35 dB/km is 0.70 dB, two SC/APC matings 0.60 dB, so the ODN is 1.30 dB and the headroom 3.70 dB - marginal, where the FR1 row at the same 2 km reads 2.70 dB and fails on the margin. 1 km is 0.95 dB of ODN and 4.05 dB of headroom, back-to-back with both patch cords 4.40 dB, both marginal, and the only way to reach ok is to remove every connector (5.00 dB): a 5 dB class sits 2 dB above the margin, so read a marginal here as 'this class works, at the edge of the reserve', not as a warning about the row. The last length that exactly clears the 3 dB margin is 4.0 km (5.0 - 0.6 - 3.0 = 1.4 dB of fibre), and it is refused on reach, so inside the class the margin never binds - the 2 km MSA operating distance does, and a 2.1 km span fails by name ('the route is 2100 m but the shorter optic reaches 2000 m'), not on loss. That ordering is the point of the row: a 5 dB budget on 0.35 dB/km glass plus 0.6 dB of connectors would carry 12.5 km of fibre, and what makes this a 2 km part is dispersion (+6.7 / -11.9 ps/nm over the channel), so the 2-10 km gap belongs to qsfp28-100g-lr4-10km, whose four CWDM lanes sit on a receiver built for 10 km. Overload never bites: average receive max and average launch max are both +2.5 dBm, the class floor is 0 dB, and even a 2 m patch needs no attenuator (measured: pad null). The engine budgets one wavelength per link, so the row says 1310 nm - the only window the cables publish inside the 1271-1331 nm band. That is not a hidden assumption: the MSA gives every lane the same launch and receive limits, so no lane is privileged in the budget, and its own worst-case cable figure (0.5 dB/km) is quoted across the whole 1264.5-1337.5 nm range rather than per lane. What the single-wavelength model cannot see: the mux/demux inside the module (already inside the class figures), lane skew, and the fact that this duplex pair carries four wavelengths while an LR4 pair carries four different ones - the two rows are not interchangeable even though both say 1310 nm. They differ electrically too, 4 x 25.78 Gb/s here against one 100G lane on FR1, so the port's optic table, not the reach, decides which module goes in. MSA Table 6-1 colour-codes the class green on the bail latch - the field way to tell it from an FR1 module. Class figures for the MSA, not one measured module: replace the row with the module actually purchased before pricing a build."
+}
