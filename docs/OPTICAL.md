@@ -5,18 +5,21 @@ a standard, the standard wins and this file is the bug.
 
 ## Fibre attenuation
 
-Single-mode G.652.D and G.657.A2 attenuation used by the shipped cable parts:
+Single-mode G.652.D and G.657.A2 attenuation the shipped cable parts carry:
 
-| Wavelength | G.652.D (limit) | G.657.A2 (limit) | Used for |
+| Wavelength | G.652.D (dB/km used) | G.657.A2 (dB/km used) | Used for |
 |---|---|---|---|
 | 1310 nm | 0.35 dB/km | 0.35 dB/km | GPON upstream, XGS-PON upstream |
 | 1490 nm | 0.22 dB/km | 0.22 dB/km | GPON downstream |
 | 1550 nm | 0.21 dB/km | 0.21 dB/km | RF overlay / future |
 
-Source: ITU-T G.652 (characteristics of a single-mode optical fibre) and G.657 (bend-insensitive
-fibre). These are **limits**, not a factory's measurements; a real construction-grade budget should
-use the test report that ships with the drum. The parts say so in `notes`, and `sourceUrl` points at
-the recommendation.
+These are **typical installed figures, not the recommendations' maxima**. ITU-T G.652 (characteristics
+of a single-mode optical fibre) and G.657 (bend-insensitive fibre) put the limit at 0.40 dB/km across
+1310-1625 nm and 0.30 dB/km across 1530-1565 nm, and G.657.A2 publishes the same attenuation maxima as
+G.652.D. 1490 nm is interpolated between those two published windows: no ITU-T recommendation publishes
+a 1490 nm attenuation figure of its own, so 0.22 dB/km is a working number, not a citation. Every
+shipped cable says exactly this in its `notes` and points `sourceUrl` at the recommendation; a real
+construction-grade budget should use the test report that ships with the drum.
 
 The engine reads the figure **per cable part and per wavelength**. A cable that publishes no figure at
 the wavelength being budgeted is an error — treating it as zero-loss glass produces a design that
