@@ -37,6 +37,16 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A link's cable ladder is a list of catalogue models, refused rather than silently defaulted.**
+  `engine/link.js` normalised every other BOM knob through `design-fields` and left `ladder` as
+  `Array.isArray(o.ladder) && o.ladder.length ? o.ladder : DEFAULT_LADDER`. A bare model name was read
+  as the default ladder: a 526 m leg asked to be bought from `["g652d-loose-48"]` came out on
+  `g652d-loose-12`, and a ladder naming a cable the catalogue does not have (`["g652d-nope"]`) was
+  ignored outright whenever every leg was short enough for drop cable — a 207.7 m circuit answered
+  `200` with drop cable and a ladder nobody read. A circuit's BOM is a purchase order, and auto-design
+  has refused both shapes since #157, so `/api/design/link` now refuses them too, by name and at the
+  ladder entry's position. Tests: `link-design` adds 1 (bare name, unknown model, the list still read,
+  an empty ladder still the default).
 - **An over-limit upload keeps its 413.** `readBody` answered the refusal the instant the body
   crossed the limit, so the response closed a socket whose receive buffer still held megabytes of the
   upload — and the kernel answers that remainder with RST: the caller discarded the 413 it had just

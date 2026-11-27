@@ -202,6 +202,33 @@ test('two fibres over a short run are drop cable; over 300 m they are not', func
   assert.strictEqual(gridLink().legs[0].cable, 'g652d-loose-12');
 });
 
+test('a link ladder is a list of catalogue cable models, refused rather than defaulted', function () {
+  // The ladder is what every span is bought from, and `link.options` ran every other BOM knob through
+  // design-fields and left this one as `Array.isArray(o.ladder) && o.ladder.length ? o.ladder :
+  // DEFAULT_LADDER`. A bare model name was read as the default ladder - the 526 m leg below came out
+  // on g652d-loose-12, not the g652d-loose-48 the caller named - and a ladder naming a cable the
+  // catalogue does not have was dropped without a word whenever the leg was short enough for drop
+  // cable (207.7 m here). Auto-design has refused both shapes since #157, and a circuit buys cable too.
+  const bare = throws(function () { gridLink({ ladder: 'g652d-loose-48' }); }, 'ladder',
+    'a ladder sent as one model name');
+  assert.ok(bare.message.indexOf('list') !== -1, bare.message);
+
+  const shortNet = { edges: [{ id: 'cross', coords: [p(51.5, -0.1000), p(51.5, -0.0970)] }] };
+  throws(function () {
+    link.design({
+      sites: { a: { name: 'A', lat: 51.5, lon: -0.1000 }, b: { name: 'B', lat: 51.5, lon: -0.0970 } },
+      network: shortNet, optics: ER, protection: 'single', ladder: ['g652d-nope']
+    }, registry);
+  }, 'g652d-nope', 'a ladder naming a cable the catalogue does not have');
+
+  // The same ladder as a list is read: 526 m is a cable run, not a drop.
+  const r = gridLink({ ladder: ['g652d-loose-48'] });
+  assert.strictEqual(r.legs[0].cable, 'g652d-loose-48');
+  assert.strictEqual(r.bom.cable[0].model, 'g652d-loose-48');
+  // An empty ladder is the documented way to ask for the default, and it still answers.
+  assert.strictEqual(gridLink({ ladder: [] }).legs[0].cable, 'g652d-loose-12');
+});
+
 test('a link with one end missing is a caller error, not a design', function () {
   throws(function () { link.design({ sites: { a: A }, optics: ER }, registry); }, 'sites.b');
   throws(function () { link.design({ sites: { a: A, b: { name: 'B' } }, optics: ER }, registry); }, 'must be numbers');

@@ -76,7 +76,7 @@ function protectionOf(value) {
 }
 
 /** Normalise what a caller may hand us, and refuse the shapes that cannot describe a link. */
-function options(input) {
+function options(input, registry) {
   // A site-to-site budget reads the same two knobs, so it refuses the same two values: a reserve
   // that is not a number is not a reserve, and a direction it cannot place is a different receiver
   // at a different wavelength - `direction` was answered as `down` and nothing said so.
@@ -119,6 +119,13 @@ function options(input) {
       'never joined, so the count has to be at least 1.'
   });
   const o = input || {};
+  // `ladder` is the one BOM knob that was still normalised with `Array.isArray(...) ? ... : default`,
+  // and the answer is a purchase order: a bare model name was read as the default ladder (the 526 m
+  // grid leg came out on 12-fibre cable, not the 48 the caller named) and a ladder naming a cable the
+  // catalogue does not have was ignored whenever every leg was short enough for drop cable. The
+  // auto-design endpoint has refused both shapes by name since #157; a circuit buys cable too.
+  designFields.assertCableLadder(o.ladder, function (model) { return registry.has('cable', model); },
+    registry.all('cable').map(function (cable) { return cable.model; }), 'the link design');
   // A crew count is whole, and this one reaches the purchase order: the BOM's `splices` is
   // `spliceEvents x splicesPerJoint` and each splice also charges 30 m of splice reserve. Three joints
   // at 2.5 splices is 7.5, which `round` answered as 8 - a splice nobody makes, quoted on a document
@@ -438,7 +445,7 @@ function thirdPartyReport(opts, legIds) {
  */
 function design(input, registry) {
   if (!registry) throw new TypeError('link.design needs a parts registry');
-  const opts = options(input);
+  const opts = options(input, registry);
   const notes = [];
   const warnings = [];
 

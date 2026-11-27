@@ -192,6 +192,11 @@ symmetric: `sfp-1g-lx-10km` at A and `sfp-1g-ex-40km` at B over a 3.0 km duct re
 option - and is what each leg's budget charges; `legs[].splices` is the crew's count, that number times
 `splicesPerJoint` (default `fibres`), and `bom.splices` sums it. A 24-fibre leg through one joint is one
 splice event and 24 splices to perform.
+`ladder` is the list of cable models a leg is bought from, and it is checked before anything is
+routed: a bare model name, or a model the cable catalogue does not have, is a `400` naming `ladder`
+and its position, never a silent fall back to the default ladder. The ladder is the BOM, and the
+circuit it quotes is a purchase order, so a shape the engine cannot read is refused even when every
+leg is short enough for drop cable.
 A leased segment that rides a leg this circuit built is charged to that leg's budget and to the cost,
 and is never in `bom.cableM` (`bom.thirdParty.inCableBom === false`). A segment assigned to a leg that
 was not built — `leg: "b"` under `protection: "single"`, on a circuit the graph only gave one route, or
