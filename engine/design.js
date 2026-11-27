@@ -1141,6 +1141,7 @@ function evaluate(plant, opts, registry, meta) {
   let cost = null;
   let costBreakdown = null;
   const unpricedCable = [];
+  const unpricedTerms = [];
   if (opts.costs) {
     // Every cable the BOM builds with must carry a price. A model that leaves one out is not a
     // money model - charging it 0 makes the design that uses it look free - so the models are
@@ -1157,10 +1158,21 @@ function evaluate(plant, opts, registry, meta) {
       if (perM === undefined) { unpricedCable.push(line.model); continue; }
       cableCost += perM * line.purchaseM;
     }
+    // A term the model does not price is not a term that costs nothing. The three labour/parts terms
+    // are optional on the shape, and a missing one was multiplied by its count as 0 - so a cable-only
+    // model answered `objective: "cost"`, `cost: 5400` for a 20-house estate whose priced total is
+    // 8488 (23 closures at 120, 26 splices at 8, 3 splitters at 40 = 3088 unpriced), with
+    // `costBreakdown.closures: 0` naming a price the caller never gave. That is the same default a
+    // missing attenuation or an unpriced cable is refused for (SPEC 8), on the one number a money
+    // ranking is bought on. A term the design actually builds is collected and `synthesise` refuses
+    // the request; a term with a zero count needs no price, because the design never uses it.
     const spliceCost = isNum(opts.costs.splice) ? opts.costs.splice * splices : 0;
     const closureCost = isNum(opts.costs.closure) ? opts.costs.closure * closures : 0;
     const splitterCost = isNum(opts.costs.splitter) ? opts.costs.splitter * splitters : 0;
-    if (unpricedCable.length) {
+    if (splices > 0 && !isNum(opts.costs.splice)) unpricedTerms.push('splice');
+    if (closures > 0 && !isNum(opts.costs.closure)) unpricedTerms.push('closure');
+    if (splitters > 0 && !isNum(opts.costs.splitter)) unpricedTerms.push('splitter');
+    if (unpricedCable.length || unpricedTerms.length) {
       cost = null;
     } else {
       // A ranked-by-money verdict without its terms is as unreviewable as a budget without its
@@ -1178,6 +1190,10 @@ function evaluate(plant, opts, registry, meta) {
   }
   metrics.cost = cost;
   metrics.costBreakdown = costBreakdown;
+  // Which cost terms the model left unsaid. Not a price and never read as one: `synthesise` refuses
+  // the request rather than rank on a total that is missing a term, and the breakdown is null for the
+  // same candidate, so nothing downstream can read `closures: 0` as a free closure again.
+  metrics.costUnpriced = Array.from(new Set(unpricedTerms)).sort();
 
   // One sentence for the upstream direction, built from the rows rather than per ONT - a design of 300
   // drops that repeated the same failure 300 times would be unreadable. The sentence lives in
@@ -1244,6 +1260,9 @@ function evaluate(plant, opts, registry, meta) {
     // Not part of any response: `synthesise` reads it to refuse a price list that cannot rank the
     // candidates it is about to compare, and the candidate table never carries this field.
     unpricedCable: Array.from(new Set(unpricedCable)).sort(),
+    // The same contract for the other three terms: read by `synthesise` to refuse the request, never
+    // part of the candidate table.
+    unpricedTerms: Array.from(new Set(unpricedTerms)).sort(),
     reasons: reasons,
     warnings: structural.warnings
       // An upstream failure is the strongest thing this report can say, so it reads first.
@@ -1421,6 +1440,25 @@ function synthesise(demandInput, userOptions, registry) {
     if (unpriced.size) {
       throw new TypeError('costs.cablePerM has no price for ' + Array.from(unpriced).sort().join(', ') +
         ' - a money objective that treats an unpriced cable as free ranks the wrong design; price every cable the design builds with, or omit costs to rank by fibre-metres');
+    }
+    // Same rule for the three terms that are not cable. `costs` is a price list, so a term it does not
+    // mention is not a term that costs nothing: a cable-only model answered `objective: "cost"` with
+    // a total short of the purchase by every closure, splice and splitter the design builds. Only a
+    // term a candidate actually uses is refused - a topology with no splitter needs no splitter price,
+    // and a caller who means "these are free" writes 0, which is a figure this model can rank on.
+    const unpricedTerms = new Set();
+    for (const candidate of candidates) {
+      for (const term of candidate.unpricedTerms || []) unpricedTerms.add(term);
+    }
+    if (unpricedTerms.size) {
+      const named = Array.from(unpricedTerms).sort().map(function (term) { return 'costs.' + term; });
+      const list = named.length > 1
+        ? named.slice(0, -1).join(', ') + ' and ' + named[named.length - 1]
+        : named[0];
+      throw new TypeError(list + (named.length > 1 ? ' are' : ' is') + ' not priced, and a design here ' +
+        'builds ' + (named.length > 1 ? 'them' : 'it') + ' - a money objective that charges an unsaid ' +
+        'term as 0 quotes a total short of what the design costs, so price the term or write 0 to say ' +
+        'it costs nothing; omit costs to rank by fibre-metres');
     }
   }
 
