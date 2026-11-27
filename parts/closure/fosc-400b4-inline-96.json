@@ -1,0 +1,18 @@
+{
+  "kind": "closure",
+  "model": "fosc-400b4-inline-96",
+  "vendor": "CommScope",
+  "label": "FOSC 400-B4 in-line closure, 96 splices",
+  "type": "inline",
+  "ports": 6,
+  "spliceCapacity": 96,
+  "trays": 4,
+  "notes": "The 48-to-96 fibre in-line joint, one size below the 600-C. Figures are CommScope's FOSC-400 data sheet PS-319073.2-EU (12/15), table 'Dimensions and Capacities': the B4 closure is 540 mm long and 183 mm across, and takes one oval port for two cables of 10-25 mm plus four round ports of 5-19 mm - six cable entries, which is the `ports` field here. Its tray column reads '4/6': four FOSC trays as standard, six possible in a B4 ordered for them, and the single-fibre splicing capacity row reads '96/144' - 96 splices at four trays, 144 at six. This row takes the four-tray order at 24 splices a tray (two modules of 12), so spliceCapacity is 96 and trays is 4, the same convention fosc-600c-inline-216 follows: count the standard order, not the best case. Two caveats travel with that. The six-tray order reaches 144 splices only with no storage basket (the sheet says loose-tube storage is 'very limited in this case'), and a standard B closure cannot be retrofitted with a fifth and sixth tray once installed - order the six if the joint will grow. And ribbon is not this box: the same table gives the B4 column a dash for ribbon splicing capacity, so a 96-strand ribbon cable passes this row's strand check while the box has no ribbon tray published to hold it - confirm the tray type before ordering a ribbon joint, and treat the 600 series rows as the ribbon answer. Why this row exists: the catalogue's in-line joints were 24 splices (mufa-inline-24), 216 (fosc-600c-inline-216) and 504 (fosc-600d-inline-504) against feeder cables sold here at 48, 72 and 96 fibres, so a 48F through-joint read 'would carry 48 splices, capacity 24' in the mufa and engine/link.js named the 216-splice trunk box first - a closure sized for a 144F cable where a 48F spur needs the 96. It is also the first in-line box that joints a 96F cable at its own capacity instead of in the 216. These are the series' published capacities, not a measured tray count, and capacity moves with the tray type and the number of trays on the order code: replace this row with the closure actually bought and the tray type it ships with.",
+  "sourceUrl": "https://webresources.commscope.com/download/assets/Data+Sheet:+FOSC+400+Fiber+Optic+Closure/4609ec863bd311f0b092ea1fa90d937b",
+  "tags": [
+    "inline",
+    "feeder",
+    "joint",
+    "96"
+  ]
+}
