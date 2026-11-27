@@ -4,10 +4,10 @@
   "vendor": "generic",
   "label": "NAP 16-port",
   "type": "nap",
-  "ports": 16,
+  "ports": 17,
   "spliceCapacity": 48,
   "trays": 4,
-  "notes": "16 drop ports, 48 splice positions in 4 trays - typical of a 16-port NAP rather than a datasheet figure. IEC 61753-1 defines the qualification categories the closure has to survive, not its capacity. Replace with the bought closure's datasheet.",
+  "notes": "Sixteen drop ports, the feeder entry that feeds them and a fourth tray, so 17 cable ports and 48 splice positions. `ports` is the cable count the engine checks: engine/network.js warns when the spans touching a closure outnumber its `ports` (docs/PARTS.md states the same), so the field is drop adapters PLUS the feeder entry, never the adapter count alone. It said 16 until 2026-11-27, so a fully loaded 16-drop NAP with its feeder read '17 cables into 16 ports'. Vendor boxes publish the two counts separately - CommScope's SSC2811-SM-8 '1(Input) + 8(Drop)', Prysmian's MTWB '16 drop ports' against 'No. of Input cable ports 1 top and 1 bottom' - and this row's extra entry over nap-8's is what a cascaded site spends when the feeder carries on to the next box. Ports, trays and splice capacity are typical of the class rather than one datasheet (IEC 61753-1 qualifies the closure and publishes no capacity figure). Replace with the bought closure's datasheet before ordering.",
   "sourceUrl": "https://webstore.iec.ch/en/publication/31424",
   "tags": [
     "nap"

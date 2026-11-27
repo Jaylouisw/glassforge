@@ -4,10 +4,10 @@
   "vendor": "generic",
   "label": "Splitter box 16-port",
   "type": "splitter-box",
-  "ports": 16,
+  "ports": 17,
   "spliceCapacity": 48,
   "trays": 4,
-  "notes": "Holds one 1:8 or 1:16 cassette plus the feeder splice: 16 ports, 48 splice positions in 4 trays, typical of the class rather than a datasheet. IEC 61753-1 covers the closure's qualification categories, not its capacity. Replace with the bought closure's datasheet.",
+  "notes": "Holds one 1:8 or 1:16 cassette plus the feeder splice: 16 drop ports, the feeder entry into them, 48 splice positions in 4 trays. `ports` counts cables - engine/network.js compares the spans touching a node against it and docs/PARTS.md says why - so a 1:16 cassette site is 16 drops plus the feeder that reaches it, 17. The row said 16 until 2026-11-27 and so named a fully loaded box as over-ported. A 1:8 cassette in this box spends 8 of the ports and is silent; a 1:16 is what the 17 is for. Ports, trays and capacity are typical of the class, not a datasheet: IEC 61753-1 covers qualification only. Replace with the bought box's datasheet before ordering.",
   "sourceUrl": "https://webstore.iec.ch/en/publication/31424",
   "tags": [
     "splitter-box"

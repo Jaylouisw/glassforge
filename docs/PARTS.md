@@ -117,13 +117,15 @@ against, instead of a PON class.
 ```json
 {
   "kind": "closure", "model": "nap-8", "label": "NAP 8-port",
-  "type": "nap", "ports": 8, "spliceCapacity": 24, "trays": 2
+  "type": "nap", "ports": 9, "spliceCapacity": 24, "trays": 2
 }
 ```
 
 `type`: `nap`, `mufa`, `inline`, `handhole`, `cabinet`, `splitter-box`. A closure whose `ports` are
 outnumbered by the cables running into it warns (the code compares cables into the node against
-`ports`); `spliceCapacity` is what stops an over-stuffed tray.
+`ports`); `spliceCapacity` is what stops an over-stuffed tray. `ports` is therefore the number of
+cables the box takes, never its drop-adapter count: a NAP sold as 8-port has 8 drop ports and the
+feeder entry that reaches them, so it carries `ports: 9`, and the 16-port boxes carry 17.
 
 ## connector and splice
 

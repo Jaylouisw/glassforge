@@ -4,10 +4,10 @@
   "vendor": "generic",
   "label": "NAP 8-port",
   "type": "nap",
-  "ports": 8,
+  "ports": 9,
   "spliceCapacity": 24,
   "trays": 2,
-  "notes": "The box a technician opens at the pole: 8 drop ports, two 12-fibre trays. Those counts are typical of the class, not a datasheet; IEC 61753-1 covers the closure's qualification, not its capacity. Replace with the bought closure's datasheet.",
+  "notes": "The box a technician opens at the pole: 8 drop ports, the feeder entry that feeds them, and two 12-fibre trays. `ports` counts CABLES, not drop adapters - docs/PARTS.md says so and engine/network.js compares the spans touching a node against it - and the two counts differ by exactly the entry the feeder arrives through: CommScope's SSC2811-SM-8 end box publishes 'Distribution capacity 1(Input) + 8(Drop)', one inlet adapter (red) and eight outlet adapters (black), and Prysmian's MTWB lists 16 drop ports against 'No. of Input cable ports 1 top and 1 bottom'. This row said 8 until 2026-11-27, which made a NAP loaded with the eight drops it is sold for plus the feeder reaching it read '9 cables into 8 ports' - the box the design had just bought, reported as the wrong box, on the one plant it exists for. 9 is the END box, not the cascade variant: the SSC2811-SM-9U SubBox publishes 1(Input) + 1(Extension) + 8(Drop) = 10, so a daisy-chained NAP belongs in a box with a cascade port - nap-16 carries the extra entry and the auto-designer already assigns it from 9 cables upward. Drop count, trays and the 12-fibre trays are typical of the class, not one datasheet: IEC 61753-1 covers the closure's qualification and publishes no capacity figure. Replace with the bought closure's datasheet before ordering.",
   "sourceUrl": "https://webstore.iec.ch/en/publication/31424",
   "tags": [
     "nap"
