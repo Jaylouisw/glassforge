@@ -2,9 +2,11 @@
 /**
  * Every URL in the repo has to point at the place the project actually lives.
  *
- * Development moved to Forgejo and the links did not follow: the README told people to clone from
- * GitHub, the hardware-request button opened a GitHub issue form, SECURITY.md sent vulnerability
- * reports to a GitHub advisory form, and package.json advertised a GitHub repository. None of those
+ * The links have now survived two moves - onto a self-hosted Forgejo and back to GitHub - and each
+ * time some of them did not follow. When the project was on Forgejo the README still told people to
+ * clone from GitHub, the hardware-request button opened a GitHub issue form, SECURITY.md sent
+ * vulnerability reports to a GitHub advisory form, and package.json advertised a GitHub repository;
+ * on the way back the same file set pointed at the forge instead. None of those
  * is where work happens, so the first instruction a contributor followed took them somewhere else -
  * and nothing failed when it happened, because a stale URL is invisible to every other test.
  *
@@ -61,8 +63,7 @@ function check(root) {
     }
     // A cheap pre-filter. It has to cover every rule below, or the file is skipped before the
     // rule sees it - which is exactly how the GitHub-CLI rule passed silently at first.
-    if (text.indexOf('github.com') === -1 && text.indexOf('GitHub') === -1 &&
-        text.indexOf('gh auth') === -1) continue;
+    if (!/git\.jayw\.uk|odin:3000|FORGEJO_TOKEN|forgejo-api/i.test(text)) continue;
 
     const lines = text.split('\n');
     for (let i = 0; i < lines.length; i++) {
@@ -73,18 +74,19 @@ function check(root) {
         if (pattern.test(line)) {
           problems.push({
             file: rel, line: i + 1, code: 'E_STALE_REPO_URL',
-            detail: 'points at the old GitHub repository; the canonical home is ' + canonical.BASE,
+            detail: 'points at the retired Forgejo instance; the canonical home is ' + canonical.BASE,
             text: line.trim()
           });
           break;
         }
       }
 
-      // 2. Instructions that only make sense on GitHub's tooling.
-      if (!allowed && /\bgh auth status\b|\bapi\.github\.com\b/.test(line)) {
+      // 2. Instructions that only worked on the old forge: its token file and its API wrapper.
+      //    `gh` is now the supported CLI, so the rule points the other way round.
+      if (!allowed && /FORGEJO_TOKEN|forgejo-api/.test(line)) {
         problems.push({
-          file: rel, line: i + 1, code: 'E_GITHUB_ONLY_TOOLING',
-          detail: 'Forgejo does not run the `gh` CLI; use `tea` or the REST API',
+          file: rel, line: i + 1, code: 'E_FORGEJO_ONLY_TOOLING',
+          detail: 'the Forgejo token file and API wrapper are gone; use the `gh` CLI',
           text: line.trim()
         });
       }
@@ -92,7 +94,7 @@ function check(root) {
   }
 
   // 3. The clone instructions and badges, which are the two most-followed URLs in the project,
-  //    must match the canonical base exactly rather than merely not being GitHub.
+  //    must match the canonical base exactly rather than merely not being the old forge.
   const readme = path.join(base, 'README.md');
   if (fs.existsSync(readme)) {
     const text = fs.readFileSync(readme, 'utf8');

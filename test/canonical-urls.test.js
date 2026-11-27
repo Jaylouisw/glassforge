@@ -9,13 +9,15 @@ const { check } = require('../scripts/check-canonical-urls');
 
 const ROOT = path.join(__dirname, '..');
 
-test('the canonical base is the Forgejo repository', function () {
-  assert.strictEqual(canonical.BASE, 'https://git.jayw.uk/jaylouisw/glassforge');
+test('the canonical base is the GitHub repository', function () {
+  assert.strictEqual(canonical.BASE, 'https://github.com/jaylouisw/glassforge');
   assert.strictEqual(canonical.clone(), canonical.BASE + '.git');
   assert.strictEqual(canonical.issue('bug_report.yml'), canonical.BASE + '/issues/new?template=bug_report.yml');
+  assert.strictEqual(canonical.badge('ci.yml'), canonical.BASE + '/actions/workflows/ci.yml/badge.svg');
+  assert.strictEqual(canonical.source('engine/geo.ts'), canonical.BASE + '/blob/main/engine/geo.ts');
 });
 
-test('no tracked file presents GitHub as the place to clone or contribute', function () {
+test('no tracked file presents the retired forge as the place to clone or contribute', function () {
   const result = check();
   assert.deepStrictEqual(result.problems, [], JSON.stringify(result.problems, null, 2));
   assert.ok(result.scanned > 5, 'only ' + result.scanned + ' files scanned - the walker is broken');
@@ -28,7 +30,7 @@ test('the checker fails on a planted stale URL', function () {
   try {
     fs.writeFileSync(path.join(dir, 'README.md'),
       '# probe\n\nClone from ' + canonical.clone() + '\n\n[![CI](' + canonical.badge('ci.yml') + ')]\n');
-    fs.writeFileSync(path.join(dir, 'stale.md'), 'git clone https://github.com/Jaylouisw/glassforge.git\n');
+    fs.writeFileSync(path.join(dir, 'stale.md'), 'git clone https://git.jayw.uk/jaylouisw/glassforge.git\n');
     const result = check(dir);
     assert.strictEqual(result.ok, false, 'the planted URL was not caught');
     assert.ok(result.problems.some(function (p) { return p.file === 'stale.md' && p.code === 'E_STALE_REPO_URL'; }),

@@ -4,7 +4,6 @@
 .editorconfig
 .dockerignore
 .github
-.forgejo
 
 node_modules
 *.log

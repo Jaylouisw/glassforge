@@ -5,8 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # Merging through the API does not reach the runner as a push event, so a matrix can be run
-  # against any branch on demand rather than by pushing a dummy commit.
+  # A matrix can be run against any branch on demand, rather than by pushing a dummy commit.
   workflow_dispatch:
 
 permissions:
@@ -66,7 +65,7 @@ jobs:
         # reads like a flaky runner rather than "you used a Node 20 API".
         run: node scripts/check-node-surface.js
 
-      - name: Every project URL points at Forgejo
+      - name: Every project URL points at GitHub
         run: node scripts/check-canonical-urls.js
 
       - name: README part counts match the catalogue

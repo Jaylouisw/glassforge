@@ -32,12 +32,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://git.jayw.uk/jaylouisw/glassforge.git"
+    "url": "git+https://github.com/jaylouisw/glassforge.git"
   },
   "bugs": {
-    "url": "https://git.jayw.uk/jaylouisw/glassforge/issues"
+    "url": "https://github.com/jaylouisw/glassforge/issues"
   },
-  "homepage": "https://git.jayw.uk/jaylouisw/glassforge#readme",
+  "homepage": "https://github.com/jaylouisw/glassforge#readme",
   "license": "MIT",
   "engines": {
     "node": ">=18"

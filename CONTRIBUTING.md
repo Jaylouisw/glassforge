@@ -1,13 +1,13 @@
 # Contributing to Glassforge
 
-Development happens on the Forgejo instance at
-[git.jayw.uk/jaylouisw/glassforge](https://git.jayw.uk/jaylouisw/glassforge). Issues and pull requests
+Development happens on GitHub at
+[jaylouisw/glassforge](https://github.com/jaylouisw/glassforge). Issues and pull requests
 there are the only tracker — there is no GitHub tracker, and no GitHub mirror to keep in step. Push a
 branch with `bash scripts/push-branch.sh <branch>`; it is the only push recipe that works on this
 forge.
 
 ```bash
-git clone https://git.jayw.uk/jaylouisw/glassforge.git
+git clone https://github.com/jaylouisw/glassforge.git
 cd glassforge
 npm install   # devDependencies only — the TypeScript compiler; nothing is installed at runtime
 npm test

@@ -9,73 +9,180 @@ Object.defineProperty(exports, "__esModule", { value: true });
  * is the record. A lane reported "PR #14 open and mergeable" and a concurrent ls-remote disagreed;
  * the API was right. So this reads the API, not the remote.
  *
+ * The repository moved from a self-hosted Forgejo to GitHub, so the reads now go through `gh api`
+ * (already installed and authenticated as the operator). This file holds no token, reads no token file
+ * and prints no credential: `gh` owns the authentication, exactly as it does for `gh pr`/`gh issue`.
+ *
  *   node scripts/repo-state.js              # human-readable
  *   node scripts/repo-state.js --json       # machine-readable
  *
- * Token: GLASSFORGE_TOKEN_FILE, defaulting to the Hermes secrets path. Never printed.
+ * Env overrides: GLASSFORGE_REPO (owner/name), GLASSFORGE_MAIN (base branch), GLASSFORGE_GH (binary).
  */
-const fs = require("node:fs");
-const API = process.env.GLASSFORGE_API || 'http://odin:3000/api/v1/repos/jaylouisw/glassforge';
-const TOKEN_FILE = process.env.GLASSFORGE_TOKEN_FILE ||
-    'C:/Users/jay/AppData/Local/hermes/secrets/forgejo.token';
-function token() {
-    const value = fs.readFileSync(TOKEN_FILE, 'utf8').replace(/[\r\n]/g, '');
-    if (!value)
-        throw new Error('token file ' + TOKEN_FILE + ' is empty');
-    return value;
+const node_child_process_1 = require("node:child_process");
+const REPO = process.env.GLASSFORGE_REPO || 'jaylouisw/glassforge';
+const MAIN_BRANCH = process.env.GLASSFORGE_MAIN || 'main';
+const GH = process.env.GLASSFORGE_GH || 'gh';
+const MAX_BUFFER = 32 * 1024 * 1024;
+const PAGE = 100;
+/** Run `gh` and return its stdout, turning a non-zero exit into one readable line. */
+function gh(args) {
+    try {
+        return (0, node_child_process_1.execFileSync)(GH, args, { encoding: 'utf8', maxBuffer: MAX_BUFFER, stdio: ['ignore', 'pipe', 'pipe'] });
+    }
+    catch (error) {
+        const record = error;
+        const stderr = typeof record.stderr === 'string' ? record.stderr.trim() : '';
+        const fallback = typeof record.message === 'string' ? record.message : String(error);
+        throw new Error('gh ' + args.join(' ') + ' failed: ' + (stderr || fallback));
+    }
 }
-async function get(path, auth) {
-    const response = await fetch(API + path, { headers: { Authorization: 'token ' + auth } });
-    if (!response.ok)
-        throw new Error(path + ' -> HTTP ' + response.status);
-    return (await response.json());
+function parseJson(source) {
+    return JSON.parse(source);
 }
-async function checksFor(sha, auth) {
+/** One request, already complete (a single object or a short list). */
+function ghJson(path) {
+    return parseJson(gh(['api', '--method', 'GET', path]));
+}
+/**
+ * Every page of a list endpoint, flattened.
+ *
+ * `--paginate` prints one JSON document per page and `--slurp` wraps those documents in an array, so
+ * the result here is the concatenation of the pages. Without the slurp, two pages of JSON would be
+ * pasted together and JSON.parse would fail on the boundary.
+ */
+function ghPages(path) {
+    const joined = path.includes('?') ? path + '&per_page=' + PAGE : path + '?per_page=' + PAGE;
+    const pages = list(parseJson(gh(['api', '--method', 'GET', '--paginate', '--slurp', joined])));
+    const rows = [];
+    for (const page of pages)
+        rows.push(...list(page));
+    return rows;
+}
+function isRecord(value) {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function field(source, key) {
+    return isRecord(source) ? source[key] : undefined;
+}
+function text(value, fallback = '') {
+    return typeof value === 'string' ? value : fallback;
+}
+function number(value) {
+    return typeof value === 'number' ? value : 0;
+}
+function list(value) {
+    return Array.isArray(value) ? value : [];
+}
+function records(value) {
+    return list(value).filter(isRecord);
+}
+/**
+ * Map a GitHub check run onto the vocabulary the old Forgejo statuses used, so the printed summary and
+ * the JSON shape stay identical: success / pending / failure / error.
+ */
+function checkRunStatus(run) {
+    if (text(field(run, 'status')) !== 'completed')
+        return 'pending';
+    switch (text(field(run, 'conclusion'))) {
+        case 'success':
+        case 'neutral':
+        case 'skipped':
+            return 'success';
+        case 'failure':
+        case 'timed_out':
+        case 'cancelled':
+        case 'action_required':
+        case 'startup_failure':
+            return 'failure';
+        default:
+            return text(field(run, 'conclusion')) || 'unknown';
+    }
+}
+/**
+ * Per-check state for a commit: GitHub splits this over two endpoints (check runs for Actions, commit
+ * statuses for everything else), and a commit with no CI configured simply has neither.
+ */
+function checksFor(sha) {
     if (!sha)
         return [];
-    const status = await get('/commits/' + sha + '/status', auth);
-    return (status.statuses || []).map((entry) => ({
-        context: (entry.context || '').replace(' (pull_request)', ''),
-        status: entry.status || 'unknown'
-    }));
+    const checks = [];
+    const seen = new Set();
+    const runPage = ghJson('repos/' + REPO + '/commits/' + sha + '/check-runs?per_page=' + PAGE);
+    for (const run of records(field(runPage, 'check_runs'))) {
+        const context = text(field(run, 'name')).replace(' (pull_request)', '').trim();
+        if (!context || seen.has(context))
+            continue;
+        seen.add(context);
+        checks.push({ context: context, status: checkRunStatus(run) });
+    }
+    const statuses = records(field(ghJson('repos/' + REPO + '/commits/' + sha + '/status'), 'statuses'));
+    for (const entry of statuses) {
+        const context = text(field(entry, 'context')).replace(' (pull_request)', '').trim();
+        if (!context || seen.has(context))
+            continue;
+        seen.add(context);
+        checks.push({ context: context, status: text(field(entry, 'state'), 'unknown') });
+    }
+    return checks;
 }
-async function collect() {
-    const auth = token();
+/** `mergeable` is null on GitHub until the merge is computed; a single-PR read forces the answer. */
+function mergeableFor(pull) {
+    const mergeable = field(pull, 'mergeable');
+    if (typeof mergeable === 'boolean')
+        return mergeable;
+    const detail = ghJson('repos/' + REPO + '/pulls/' + number(field(pull, 'number')));
+    return field(detail, 'mergeable') === true;
+}
+function collect() {
     const warnings = [];
-    const repoName = API.replace(/^.*\/repos\//, '');
     let main = null;
     try {
-        const branch = await get('/branches/main', auth);
+        const branch = ghJson('repos/' + REPO + '/branches/' + MAIN_BRANCH);
         main = {
-            label: (branch.commit?.message || '').split('\n')[0],
-            ref: 'main',
-            sha: branch.commit?.id || ''
+            label: text(field(field(field(branch, 'commit'), 'commit'), 'message')).split('\n')[0],
+            ref: MAIN_BRANCH,
+            sha: text(field(field(branch, 'commit'), 'sha'))
         };
     }
     catch (error) {
-        warnings.push('could not read main: ' + (error instanceof Error ? error.message : String(error)));
+        warnings.push('could not read ' + MAIN_BRANCH + ': ' + (error instanceof Error ? error.message : String(error)));
     }
-    const rawPulls = await get('/pulls?state=open&limit=50', auth);
     const pulls = [];
-    for (const raw of rawPulls) {
-        const head = (raw.head || {});
-        const sha = head.sha || '';
+    for (const raw of ghPages('repos/' + REPO + '/pulls?state=open')) {
+        const full = isRecord(raw) ? raw : {};
+        const head = field(full, 'head');
+        const sha = text(field(head, 'sha'));
+        let mergeable = false;
+        try {
+            mergeable = mergeableFor(full);
+        }
+        catch (error) {
+            warnings.push('could not read mergeable for #' + number(field(full, 'number')) + ': ' +
+                (error instanceof Error ? error.message : String(error)));
+        }
         pulls.push({
-            number: Number(raw.number),
-            title: String(raw.title || ''),
-            branch: head.ref || '',
+            number: number(field(full, 'number')),
+            title: text(field(full, 'title')),
+            branch: text(field(head, 'ref')),
             sha: sha,
-            mergeable: raw.mergeable === true,
-            draft: raw.draft === true,
-            checks: await checksFor(sha, auth)
+            mergeable: mergeable,
+            draft: field(full, 'draft') === true,
+            checks: checksFor(sha)
         });
     }
-    const rawIssues = await get('/issues?state=open&type=issues&limit=50', auth);
-    const issues = rawIssues.map((raw) => ({
-        number: Number(raw.number),
-        title: String(raw.title || ''),
-        labels: (raw.labels || []).map((label) => label.name || '')
-    }));
+    const issues = [];
+    for (const raw of ghPages('repos/' + REPO + '/issues?state=open')) {
+        if (!isRecord(raw))
+            continue;
+        // The issues endpoint also returns pull requests; anything with `pull_request` is already above.
+        if (field(raw, 'pull_request') !== undefined)
+            continue;
+        issues.push({
+            number: number(field(raw, 'number')),
+            title: text(field(raw, 'title')),
+            labels: records(field(raw, 'labels')).map((label) => text(field(label, 'name')))
+        });
+    }
     // Two open pull requests on one commit is a duplicate that only surfaces at merge time.
     const bySha = new Map();
     for (const pull of pulls) {
@@ -86,7 +193,7 @@ async function collect() {
     const duplicates = [...bySha.entries()]
         .filter(([, numbers]) => numbers.length > 1)
         .map(([sha, numbers]) => numbers.map((n) => '#' + n).join(' and ') + ' share head commit ' + sha.slice(0, 10));
-    return { repo: repoName, main: main, pulls: pulls, issues: issues, duplicates: duplicates, warnings: warnings };
+    return { repo: REPO, main: main, pulls: pulls, issues: issues, duplicates: duplicates, warnings: warnings };
 }
 function summariseChecks(checks) {
     if (!checks.length)
@@ -122,8 +229,8 @@ function print(state) {
     for (const warning of state.warnings)
         console.log('  WARNING    ' + warning);
 }
-async function main() {
-    const state = await collect();
+function main() {
+    const state = collect();
     if (process.argv.includes('--json'))
         console.log(JSON.stringify(state, null, 2));
     else
@@ -131,7 +238,10 @@ async function main() {
     if (state.warnings.length)
         process.exitCode = 1;
 }
-main().catch((error) => {
+try {
+    main();
+}
+catch (error) {
     console.error('repo-state failed: ' + (error instanceof Error ? error.message : String(error)));
     process.exit(1);
-});
+}
