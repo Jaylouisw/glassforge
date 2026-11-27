@@ -210,9 +210,14 @@ async function main() {
     { op: 'add-span', span: { from: 'n1', to: 'n2', cable: 'g652d-loose-24', lengthM: 800 } },
     { op: 'add-span', span: { from: 'n2', to: 'n3', cable: 'g652d-loose-12', lengthM: 60, strands: [1, 2, 3, 4, 5, 6, 7, 8] } }
   ];
+  // Each drop is its own 1-fibre cable, so each lists its own strand 1. This fixture used to number
+  // the drops' strands 1..9, which a 1-fibre cable cannot carry: the count-only overbooking check let
+  // it through (one entry is under one fibre), and the splice sheet printed T01-F02 on a one-fibre
+  // drum. The port count this suite is about comes from the ONTs below the splitter, not from these
+  // indices, so numbering each drop's single strand 1 keeps the test's point and keeps it physical.
   for (let i = 1; i <= 8; i++) {
     sharedSteps.push({ op: 'add-node', node: { type: 'ont', model: 'gpon-ont-4ge', name: 'Casa ' + i } });
-    sharedSteps.push({ op: 'add-span', span: { from: 'n3', to: 'n' + (3 + i), cable: 'g657a2-drop-1', lengthM: 40, strands: [i] } });
+    sharedSteps.push({ op: 'add-span', span: { from: 'n3', to: 'n' + (3 + i), cable: 'g657a2-drop-1', lengthM: 40, strands: [1] } });
   }
   const eightOnOneCable = await build(sharedId, sharedSteps);
   test('eight customers down one cable fill a 1:8, and the plant reports eight ports used', function () {
@@ -225,7 +230,7 @@ async function main() {
 
   const ninthOnCable = await build(sharedId, [
     { op: 'add-node', node: { type: 'ont', model: 'gpon-ont-4ge', name: 'Casa 9' } },
-    { op: 'add-span', span: { from: 'n3', to: 'n12', cable: 'g657a2-drop-1', lengthM: 40, strands: [9] } }
+    { op: 'add-span', span: { from: 'n3', to: 'n12', cable: 'g657a2-drop-1', lengthM: 40, strands: [1] } }
   ]);
   test('a ninth customer on that cable is a 400 naming the site, not a saved fibre', function () {
     assert.strictEqual(ninthOnCable.status, 400, brief(ninthOnCable));

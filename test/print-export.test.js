@@ -96,9 +96,9 @@ test('the splice schedule lists every strand at every splice point, with its TIA
 test('a strand index that is not a positive integer is skipped, not allowed to kill the schedule', function () {
   const plant = plantWithStrands();
   plant.spans[0].strands = [0, 1.5, 'x', 3];
-  plant.spans[1].strands = [3];
+  plant.spans[1].strands = [2];
   const table = engine.network.spliceTable(plant, engine.createRegistry());
-  assert.deepStrictEqual(table.points[0].rows.map(function (r) { return r.strand; }), [3, 3]);
+  assert.deepStrictEqual(table.points[0].rows.map(function (r) { return r.strand; }), [2, 3]);
 });
 
 test('a splitter terminates its strands; it does not splice them through to the distribution cable', function () {
@@ -114,7 +114,7 @@ test('a splitter terminates its strands; it does not splice them through to the 
     ],
     spans: [
       { id: 's1', from: 'o1', to: 'sp1', cable: 'g652d-loose-12', lengthM: 500, strands: [1], purpose: 'feeder' },
-      { id: 's2', from: 'sp1', to: 'n1', cable: 'g657a2-drop-1', lengthM: 40, strands: [1, 2] }
+      { id: 's2', from: 'sp1', to: 'n1', cable: 'g657a2-drop-2', lengthM: 40, strands: [1, 2] }
     ]
   };
   const table = engine.network.spliceTable(splitters, engine.createRegistry());
