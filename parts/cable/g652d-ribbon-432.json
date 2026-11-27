@@ -1,0 +1,25 @@
+{
+  "kind": "cable",
+  "model": "g652d-ribbon-432",
+  "vendor": "generic",
+  "label": "G.652.D ribbon 432F",
+  "fiberCount": 432,
+  "fibersPerTube": 12,
+  "construction": "ribbon",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Ribbon construction: Corning's SST-UltraRibbon 432F product (432ZV4-14100D53, gel-free dielectric, SMF-28 Ultra) is 18 ribbons of 24 fibres in one buffer tube, and the family sheet states each ribbon separates by hand into 12-fibre ribbons that are individually numbered - so fibersPerTube is 12 and the tray address is the 12-fibre ribbon, not the 24-fibre ribbon printed on the cable. Attenuation: 0.35 dB/km at 1310 nm is this family's PUBLISHED MAXIMUM for performance option 00 (Corning SST-UltraRibbon family spec sheet 0096_NAFTA_AEN, 288-864 fibres, max 0.35/0.35/0.25 dB/km at 1310/1383/1550 nm), so it is a ceiling and a safe budget figure rather than a typical. 0.21 dB/km at 1550 nm and 0.22 dB/km at 1490 nm are the catalogue's typical installed figures, kept identical to every sibling cable row so a 432F trunk is not budgeted worse than a 288F one on construction alone; they are NOT figures from this sheet - Corning's published maximum at 1550 nm is 0.25 dB/km, and no ITU-T recommendation publishes a 1490 nm attenuation figure, so 0.22 bridges the two published windows and is an interpolation. Replace all three with the bought cable's test report for a construction-grade budget. Why this rung and not 576 or 864: cableFor's smallest-that-fits rule fell back to the largest rung when nothing fit, and the catalogue topped out at g652d-ribbon-288 - measured by driving design.cableFor(300, registry.all('cable').map(model), registry), a 300-fibre span was designed on a cable twelve fibres short (auto-design bundles it and warns; engine/link.js refuses the same count and named the 288 as the only way out). 432 is the smallest ribbon count above 288 that a closure in this catalogue can joint: the largest is the FOSC 600-D at 504 splices, so 432 fits and 576 does not, and a 576F row would sell a cable no box here can splice. The row reaches a design only when the ladder names it - DEFAULT_LADDER in engine/design.js tops out at g652d-loose-144 - so pass this model in the design ladder option, or add it to the default in an engine change. drumM is 2,000 m and it is a put-up, not a figure from this sheet (0096 publishes no reel length): it keeps the 2 km floor the 288F ribbon row uses, sourced there to Prysmian's Sirocco sheet (standard delivery 2 km) and FusionLink's FlexRibbon sheet (4 km), and this sheet's count range extends further rather than publishing a shorter reel. Set drumM to the reel actually ordered, and replace the three attenuation figures with the purchased cable's test report.",
+  "sourceUrl": "https://www.corning.com/catalog/coc/documents/product-family-specifications/0096_NAFTA_AEN.pdf",
+  "tags": [
+    "generic",
+    "g.652.d"
+  ]
+}
