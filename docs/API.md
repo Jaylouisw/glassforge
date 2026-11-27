@@ -192,8 +192,8 @@ answer looked complete: on the grid in `test/link-design.test.js` (1164.22 m of 
 answered `designM` 1199.15 - the 3% default, **81.49 m of cable short** against the 1280.64 the caller's
 10% buys - and `{"marignDb":10}` budgeted both legs at the 3 dB reserve, where 10 dB turns their 10.39
 and 10.37 dB of headroom from `ok` into `marginal`. The rule is the budgets' rule (`LINK_OPTION_FIELDS`
-in `engine/link.js`: case, singular/plural, a prefix, one letter wrong) so a caller's `name` and
-`notes` still pass; it names the option it read and the one that was meant.
+in `engine/link.js`: case, singular/plural, a prefix, one letter wrong, a swapped pair) so a caller's
+`name` and `notes` still pass; it names the option it read and the one that was meant.
 
 Two named sites and an optic at each end, with **both legs routed along the supplied duct/street
 graph** — there is no straight-line fallback while a graph is present. With `protection: "diverse"` the
@@ -356,7 +356,8 @@ HTTP 400
 ```
 
 The refusal is deliberately narrow: it fires on a case difference, a singular/plural, a prefix of a
-real field (`margin` for `marginDb`) or one letter wrong, and names the field that was meant. Every
+real field (`margin` for `marginDb`), one letter wrong, or a swapped adjacent pair (`marignDb` for
+`marginDb` — one keystroke is one edit), and names the field that was meant. Every
 other key is still ignored — `name`, `notes` or a caller's own bookkeeping passes through untouched,
 because a guard that refused every unknown key would refuse a caller who is not wrong.
 `budget.pointToPoint`, the **active** budget, refuses the same way against its own list (`headEnd`,

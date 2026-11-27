@@ -37,6 +37,20 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A swapped adjacent pair is a near miss: one keystroke is one edit.** The shared matcher
+  (`designFields.suggestField`, `engine/design-fields.ts`) measured a typo with plain Levenshtein, so
+  a transposition counted as a deletion plus an insertion — two edits — and was not a near miss at
+  all. Every guard built on it therefore ignored the typo a hand on a keyboard makes most often.
+  Measured: `{"marignDb": 10}` on the 15 km GPON B+ design answered `200` with `marginDb` 3 — the
+  10 dB reserve, the one that turns a `marginal` link into a refusal, silently dropped —
+  `{"routeM": 1000, "overlenghtPct": 10}` bought `designM` 1030 where 10% is 1100 (70 m of the named
+  slack missing), the BOM order read 1090 where it is 1160, and the link design quoted 1199.15 m of
+  cable where 10% is 1280.64 (81.49 m short). The distance now takes an adjacent-transposition step
+  (optimal string alignment), so a swap is one edit at every surface: the PON and active budgets, the
+  cable calculation and its route form, the bill of materials, the site-to-site link and
+  `design.synthesise`'s options. Tests: `budget-design-fields` (the matcher itself, both budgets, the
+  design options), `length-and-bom` (both purchase surfaces), `link-design`.
+
 - **The head end's own distance to the street is cable, not a free connection.** Auto-design snapped
   the head-end site onto the street like any other site and then never charged the gap: the first span
   left `n-headend` at its true coordinates but was billed the graph distance from the snapped vertex,

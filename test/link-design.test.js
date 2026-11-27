@@ -446,6 +446,11 @@ test('a near-miss link option is refused by name, not silently defaulted', funct
   // One letter deleted: the leased segments, and the loss they state, would vanish from both the
   // path and the cost.
   throws(function () { gridLink({ thirParty: [] }); }, 'thirdParty', 'a deletion in thirdParty');
+  // A swapped adjacent pair is one keystroke. `marignDb` budgeted both legs at the 3 dB reserve where
+  // 10 dB turns their headroom marginal, and `overlenghtPct` bought the 3% default: 81.49 m short.
+  throws(function () { gridLink({ marignDb: 10 }); }, 'did you mean "marginDb"', 'a swapped pair in marginDb');
+  throws(function () { gridLink({ overlenghtPct: 10 }); }, 'did you mean "overlengthPct"', 'a swapped pair in overlengthPct');
+  throws(function () { gridLink({ thridParty: [] }); }, 'did you mean "thirdParty"', 'a swapped pair in thirdParty');
   // The refusal says which surface and names the field, so a caller can fix it without reading code.
   const err = throws(function () { gridLink({ routefactr: 1.4 }); }, 'routeFactor', 'a route factor typo');
   assert.ok(/link design does not read the option/.test(err.message), err.message);

@@ -546,6 +546,31 @@ async function main() {
     assert.ok(typoBudget.body.error.indexOf('splitters') !== -1, typoBudget.body.error);
   });
 
+  // A swapped adjacent pair is one keystroke, so it is one edit: `marignDb: 10` answered 200 with
+  // `marginDb` 3 before the matcher counted a transposition as one (#25, #27) - the 10 dB reserve,
+  // the one that turns a `marginal` link into a refusal, silently dropped.
+  const swappedMargin = await request('POST', '/api/design/budget', {
+    design: {
+      olt: { model: 'gpon-b-plus-8' }, ont: { model: 'gpon-ont-1ge' },
+      spans: [{ cable: 'g652d-loose-12', lengthM: 15000 }], splitters: [{ model: 'plc-1x8-sca' }],
+      marignDb: 10
+    }
+  });
+  const spelledMargin = await request('POST', '/api/design/budget', {
+    design: {
+      olt: { model: 'gpon-b-plus-8' }, ont: { model: 'gpon-ont-1ge' },
+      spans: [{ cable: 'g652d-loose-12', lengthM: 15000 }], splitters: [{ model: 'plc-1x8-sca' }],
+      marginDb: 10
+    }
+  });
+  test('a swapped pair in a design field is a 400, and the spelled field is read', function () {
+    assert.strictEqual(spelledMargin.status, 200, JSON.stringify(spelledMargin.body).slice(0, 200));
+    assert.strictEqual(spelledMargin.body.marginDb, 10, 'the reserve the caller spelled is the one budgeted');
+    assert.strictEqual(swappedMargin.status, 400, 'status ' + swappedMargin.status + ': ' + JSON.stringify(swappedMargin.body).slice(0, 200));
+    assert.ok(swappedMargin.body.error.indexOf('"marignDb"') !== -1, swappedMargin.body.error);
+    assert.ok(swappedMargin.body.error.indexOf('did you mean "marginDb"') !== -1, swappedMargin.body.error);
+  });
+
   // A launch power written inside the end object is the shape the engine's own doc block advertised
   // (`olt { model, txDbm? }`) and has never read: it budgeted at the transmitter's minimum and answered
   // 200 - on this 15 km design, -13.30 dBm instead of -9.80 dBm, 3.50 dB optimistic. A refusal the
@@ -647,11 +672,15 @@ async function main() {
   // rule the budget endpoints refuse by name (#137, #192), applied where the money is spent.
   const typoDrum = await request('POST', '/api/design/length', { routeM: 1000, drumm: 500 });
   const typoOverlength = await request('POST', '/api/design/length', { routeM: 1000, overlengthpct: 10 });
+  // A swap is one keystroke: `overlenghtPct` answered 1030 m (the 3% default) where 1100 m was asked.
+  const typoSwapped = await request('POST', '/api/design/length', { routeM: 1000, overlenghtPct: 10 });
   test('a near-miss option on the cable calculation is a 400 naming the field', function () {
     assert.strictEqual(typoDrum.status, 400, 'status ' + typoDrum.status + ': ' + JSON.stringify(typoDrum.body));
     assert.ok(typoDrum.body.error.indexOf('did you mean "drumM"') !== -1, typoDrum.body.error);
     assert.strictEqual(typoOverlength.status, 400, 'status ' + typoOverlength.status + ': ' + JSON.stringify(typoOverlength.body));
     assert.ok(typoOverlength.body.error.indexOf('did you mean "overlengthPct"') !== -1, typoOverlength.body.error);
+    assert.strictEqual(typoSwapped.status, 400, 'status ' + typoSwapped.status + ': ' + JSON.stringify(typoSwapped.body).slice(0, 200));
+    assert.ok(typoSwapped.body.error.indexOf('did you mean "overlengthPct"') !== -1, typoSwapped.body.error);
   });
 
   // The route form of the same endpoint had no measured length and said nothing: `{"points":[]}`

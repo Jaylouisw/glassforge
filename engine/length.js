@@ -58,9 +58,8 @@ const OPTION_FIELDS = ['routeM', 'overlengthPct', 'splices', 'spliceReserveM', '
  * states its own drum wins (`cable.drumM || o.drumM`): it is the fallback for a cable that states
  * none, which is a live path, not an option the BOM ignores.
  *
- * A single adjacent transposition (`{"overlenghtPct": 10}`) is still dropped: the shared matcher
- * counts one swap as two edits. That is the matcher's rule, not this list's, and changing it moves
- * the budget, link and design refusals too - filed separately rather than widened here.
+ * A single adjacent transposition (`{"overlenghtPct": 10}`) is refused by the same matcher: a swap
+ * is one keystroke, so it is one edit, and the BOM does not buy the 3% default instead.
  */
 const BOM_OPTION_FIELDS = ['overlengthPct', 'spliceReserveM', 'closureReserveM', 'drumM',
   'minimumPurchaseM'];
