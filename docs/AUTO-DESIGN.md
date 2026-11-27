@@ -316,7 +316,9 @@ POST /api/design/link
 
 `street.diversePaths` measures every leg on the supplied graph. There is no straight-line fallback while
 a graph is present: a chord for a duct route is the one number in the result nobody could defend, which
-is why `routedM` is the sum of street edges and `route` is the street geometry.
+is why `routedM` is the sum of street edges and `route` is the street geometry. The one case it is not
+called for is a coincident pair — both sites on the same node — which has a single leg of `routedM: 0`
+(SPEC §9).
 
 A worked grid — two sites 415.3 m apart on the same latitude, with no street between them, and a north
 and a south street joining them at either end:
