@@ -451,28 +451,28 @@
     }
     body.appendChild(card);
 
+    // The columns and their cells come from `web/auto.js`, not from an array here: the table must
+    // show the number the ranking used (cost, when a cost model was supplied) and the upstream
+    // direction of every ONT's link (#185), and a hand-written header is how both went missing.
+    // Header and rows are built from one key list, so they cannot disagree about a column.
+    const columns = GFAuto.columns(result.objective);
     const table = el('table', {});
     const head = el('tr', {});
-    ['Topology', 'Feasible', 'Cable m', 'Fibre-m', 'ONT', 'SPL', 'Closure', 'Worst dB']
-      .forEach(function (h) { head.appendChild(el('th', { text: h })); });
+    columns.forEach(function (column) {
+      const th = el('th', { text: column.label });
+      if (column.hint) th.title = column.hint;
+      head.appendChild(th);
+    });
     table.appendChild(head);
     for (const candidate of result.candidates) {
       const tr = el('tr', {});
-      tr.appendChild(el('td', { text: candidate.label }));
-      tr.appendChild(el('td', { text: candidate.feasible ? 'yes' : 'no' }));
-      tr.appendChild(el('td', { class: 'num', text: String(candidate.metrics.cableM) }));
-      tr.appendChild(el('td', { class: 'num', text: String(candidate.metrics.fibreMetres) }));
-      tr.appendChild(el('td', { class: 'num', text: String(candidate.metrics.onts) }));
-      tr.appendChild(el('td', { class: 'num', text: String(candidate.metrics.splitters) }));
-      tr.appendChild(el('td', { class: 'num', text: String(candidate.metrics.closures) }));
-      tr.appendChild(el('td', {
-        class: 'num' + (candidate.feasible ? '' : ' err'),
-        text: candidate.metrics.worstHeadroomDb === null ? '—' : String(candidate.metrics.worstHeadroomDb)
-      }));
+      for (const cell of GFAuto.cells(candidate, result.objective)) {
+        tr.appendChild(el('td', { class: cell.cls, text: cell.text }));
+      }
       table.appendChild(tr);
       if (!candidate.feasible) {
         const reason = el('tr', {});
-        const cell = el('td', { class: 'err', colspan: '8', text: candidate.reasons[0] || 'infeasible' });
+        const cell = el('td', { class: 'err', colspan: String(columns.length), text: candidate.reasons[0] || 'infeasible' });
         reason.appendChild(cell);
         table.appendChild(reason);
       }

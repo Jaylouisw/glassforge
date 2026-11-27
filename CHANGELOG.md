@@ -37,6 +37,24 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **The Auto tab's candidate table shows the number it ranked by, and the upstream direction it
+  counts.** The table was a hand-written header in `web/app.js` and a hand-written cell list beside
+  it, so it could only show the figures somebody remembered to add: `metrics.cost` was missing
+  whenever a `costs` model made money the ranking (`objective: "cost"`), and
+  `metrics.upstreamFailOnts` - the count of ONT links that fail ONT → OLT - was missing everywhere.
+  On the 12-house C+ estate the auto-design suite builds, the winner by fibre-metres (PON 1:8) is
+  **12 of 12 ONTs failed upstream** while the 1:16 and 1:32 candidates on the same estate are 0 of
+  12 (#185): the trade-off that decides whether the plan needs a pad was invisible in the table that
+  offers it. Both columns are read from the response (`Cost` appears only when `objective` is
+  `cost`, directly after `Fibre-m`; `Up fail` is a warning class on a non-zero count, never an error,
+  because whether the upstream direction should gate feasibility is the open decision in #185 and
+  this table does not move a verdict). Header and rows are built from one key list and one value
+  function in the new `web/auto.ts` (compiled in place to `web/auto.js`, committed, no `any`), so a
+  column cannot be in the header and missing from the row - the infeasible-reason row was hard-coded
+  to `colspan: 8`. An absent count on an older payload is a dash, not a zero. Tests:
+  `auto-candidate-table` (5 cases: header/row alignment for both objectives, the cost cell is the
+  engine's own figure, 12/12 flagged as a warning on a feasible design beside 0/12 unflagged, a
+  payload without the count), and `ui-dom-contract` loads the new script.
 - **An overbooked span is a refusal at the save gate, not a red number in one tab.** `strandLedger`
   has always answered `overbooked`, but `network.validate` never read it: `PUT` and `/ops` saved a
   plant whose span lists more strand indices than its cable carries, the printed plan called it a
