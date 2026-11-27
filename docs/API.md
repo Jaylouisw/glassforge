@@ -126,6 +126,27 @@ With `costs`, `objective` is `cost` and every candidate's `metrics.cost` prices 
 `metrics.costBreakdown: { cable, splices, closures, splitters, total }`; without `costs`, both are
 `null`.
 
+`costs` is a price list, and a term it leaves unsaid is **refused by name**, never charged as zero:
+`cablePerM` has to name every cable model the design builds with, and `splice`, `closure` and
+`splitter` have to be present whenever a candidate builds that term. A demand priced on one cable model
+is a `400` naming the models it is missing:
+
+```
+$ curl -s -X POST http://127.0.0.1:8000/api/design/synthesise -H 'Content-Type: application/json' \
+    -d '{"demand":"label,lat,lon\nCasa 1,51.5000,-0.1000\nCasa 2,51.5005,-0.0998",
+         "headEnd":{"lat":51.4985,"lon":-0.1004}, "costs":{"cablePerM":{"g652d-loose-12":2}}}'
+HTTP 400
+{"error":"costs.cablePerM has no price for g657a2-drop-1, g657a2-drop-2 - a money objective that treats an unpriced cable as free ranks the wrong design; price every cable the design builds with, or omit costs to rank by fibre-metres"}
+```
+
+With every cable priced but no labour terms, the refusal names `costs.closure, costs.splice and
+costs.splitter are not priced, and a design here builds them - a money objective that charges an
+unsaid term as 0 quotes a total short of what the design costs, so price the term or write 0 to say it
+costs nothing; omit costs to rank by fibre-metres`. `0` is a figure the ranking can use — it says the
+term is free — and a term a candidate never builds needs no price at all, so an `active` request on a
+model with no `splitter` entry answers `200` while the same body with `"technology":"pon"` is the
+`costs.splitter is not priced` refusal. See [AUTO-DESIGN.md](AUTO-DESIGN.md#why-fibre-metres-not-metres).
+
 `ladder` and `overlengthPct` are the two knobs that change what is bought rather than where it goes: the
 ladder is the cable list every span is chosen from, and `overlengthPct` (default 3) is the BOM slack quoted
 on every route. A present-but-unreadable value is a `400`, never a default, because either one silently
