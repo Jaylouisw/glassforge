@@ -519,8 +519,18 @@ function cableForSpan(fibres, lengthM, ladder, registry) {
   return cableFor(Math.max(12, fibres), ladder, registry);
 }
 
-function strandList(count, fiberCount) {
-  const n = Math.min(count, fiberCount);
+/**
+ * The strands a span uses: the run `1..count`, capped at the span's capacity in fibres.
+ *
+ * The cap is the capacity of the **whole span**, not of one cable. `bundles` is how many whole cables
+ * run the route (SPEC §5) and `spanFibreCapacity` already counts every cable's fibres (SPEC §6: "18
+ * strands in use on a 2 x 12 span is three-quarters full"), so capping at one cable's `fiberCount`
+ * made a 37-ONT active-tree span - seven 12-fibre cables, 84 fibres of capacity, 74 live - list
+ * **12** strands: the ledger read "12 of 84 used, 72 spare" and the splice sheet scheduled 24 rows
+ * for 74 live fibres, so 62 fibres a crew has to splice were absent from the sheet (gh#96).
+ */
+function strandList(count, capacityFibres) {
+  const n = Math.min(count, capacityFibres);
   const out = [];
   for (let i = 1; i <= n; i++) out.push(i);
   return out;
@@ -886,7 +896,9 @@ function emitTerminalTree(plant, tree, cfg, registry) {
       from: from, to: to,
       cable: cable.model,
       lengthM: edge.lengthM,
-      strands: strandList(fibres, cable.fiberCount),
+      // The span's capacity is every cable in the bundle; listing one cable's run hid the fibres
+      // the second cable carries from the ledger and from the splice sheet.
+      strands: strandList(fibres, cable.fiberCount * bundles),
       bundles: bundles,
       purpose: cfg.purpose,
       feedsOnts: edge.terminals,
@@ -933,7 +945,8 @@ function emitFeederTree(plant, tree, cfg, registry) {
       from: idOf.get(edge.from), to: idOf.get(edge.to),
       cable: cable.model,
       lengthM: edge.lengthM,
-      strands: strandList(fibres, cable.fiberCount),
+      // Capacity is every cable in the bundle, the same rule as the distribution tree above.
+      strands: strandList(fibres, cable.fiberCount * bundles),
       bundles: bundles,
       purpose: 'feeder',
       feedsSplitters: edge.terminals,
