@@ -37,6 +37,19 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **Two adjacent letters swapped is a near miss, so `marignDb: 10` is refused instead of buying the
+  3 dB default.** The key guard measured nearness with plain Levenshtein, which counts `ab` -> `ba` as
+  two edits - so the typo class a hand on a keyboard produces most often was not a near miss, the key
+  was ignored and the default ran. Measured on `main` at `80e71b4`: a 24 km GPON B+ design
+  (`marignDb: 10`, 11.72 dB of headroom) answered `ok` at the 3 dB default where the 10 dB reserve the
+  caller wrote is `marginal`; `length.cableToBuy({ routeM: 1000, overlenghtPct: 10 })` quoted
+  `designM` 1030 (the 3% default) instead of 1100; `design.synthesise` took the same body. The
+  matcher's `distance` is now optimal-string-alignment - a swap is one edit - with the rest of the
+  narrow rule unchanged (case, singular/plural, prefix, one deletion), so a word that is not a near
+  miss (`ontology`, `notes`) still passes. Every refusal surface inherited the fix because they share
+  `suggestField`: the PON and active budgets, the cable calculation and its drawn-route form, and the
+  design's options. `docs/API.md` and `GLOSSARY.md` now say "a swapped pair" with the old promise.
+  Tests: `design-near-miss-transposition` (8 cases).
 - **A design option spelled one case off is refused by name, not replaced by its default.** The
   budget design object, the site-to-site link and the cable calculation have refused a near miss
   since #137/#157/#192; the design's own top-level options were the last list read without a key

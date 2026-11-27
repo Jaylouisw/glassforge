@@ -300,7 +300,8 @@ HTTP 400
 ```
 
 The refusal is deliberately narrow: it fires on a case difference, a singular/plural, a prefix of a
-real field (`margin` for `marginDb`) or one letter wrong, and names the field that was meant. Every
+real field (`margin` for `marginDb`), one letter wrong or **two adjacent letters swapped**
+(`marignDb`, `overlenghtPct`), and names the field that was meant. Every
 other key is still ignored — `name`, `notes` or a caller's own bookkeeping passes through untouched,
 because a guard that refused every unknown key would refuse a caller who is not wrong.
 `budget.pointToPoint`, the **active** budget, refuses the same way against its own list (`headEnd`,

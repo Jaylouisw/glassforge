@@ -12,8 +12,8 @@
  * the same mistake and gets a `200`.
  *
  * The refusal is deliberately narrow: it fires on a field that is a *near miss* of one the engine
- * does read - case difference, singular/plural, a prefix (`margin` for `marginDb`) or a one-letter
- * edit - and says which field was meant. Unrelated extra keys (`name`, `notes`, a caller's own
+ * does read - case difference, singular/plural, a prefix (`margin` for `marginDb`), a one-letter edit
+ * or two adjacent letters swapped (`marignDb`) - and says which field was meant. Unrelated extra keys (`name`, `notes`, a caller's own
  * bookkeeping) are still ignored, because refusing those would make the budget unusable for a
  * caller who is not wrong. This module cannot be sure a word is a typo; it can be sure that
  * `splitter` is one.
@@ -22,23 +22,50 @@
 /** A field name the engine reads. `readonly` so a caller cannot edit the list it is checked against. */
 export type FieldList = readonly string[];
 
-/** Damerau-free Levenshtein distance, iterative: enough for "one letter wrong" on short names. */
+/**
+ * Optimal-string-alignment distance: Levenshtein plus **one adjacent transposition as one edit**.
+ *
+ * Plain Levenshtein counts `marignDb` for `marginDb` as two substitutions, so the most common typo a
+ * hand on a keyboard produces was not a near miss at all and the guard let it through: the 10 dB
+ * reserve of #25 was read as the 3 dB default and the answer looked complete. A swap is one keystroke,
+ * so it is one edit here - which is what the `docs/API.md` sentence "one letter wrong" promised.
+ *
+ * The distance itself is unchanged for everything else: a deletion, an insertion and a substitution
+ * are still one edit, and the transposition step only fires on an actual `ab`/`ba` pair. Rows are
+ * rotated rather than summed, so this stays O(len(a) x len(b)) on the short names it is asked about.
+ */
 function distance(a: string, b: string): number {
   if (a === b) return 0;
-  const prev: number[] = new Array(b.length + 1);
-  const cur: number[] = new Array(b.length + 1);
-  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  const width = b.length + 1;
+  let prev2: number[] = new Array(width);
+  let prev: number[] = new Array(width);
+  let cur: number[] = new Array(width);
+  for (let j = 0; j < width; j++) {
+    prev[j] = j;
+    prev2[j] = 0;
+  }
   for (let i = 1; i <= a.length; i++) {
     cur[0] = i;
     const ai = a.charAt(i - 1);
-    for (let j = 1; j <= b.length; j++) {
+    const before = i > 1 ? a.charAt(i - 2) : '';
+    for (let j = 1; j < width; j++) {
       const cost = ai === b.charAt(j - 1) ? 0 : 1;
       const del = (prev[j] as number) + 1;
       const ins = (cur[j - 1] as number) + 1;
       const sub = (prev[j - 1] as number) + cost;
-      cur[j] = Math.min(del, ins, sub);
+      let best = Math.min(del, ins, sub);
+      // `before ai` against `bj bi`: the two letters swapped is one edit, not two. `prev2` is row i-2,
+      // which is why the rows are rotated and not recomputed.
+      if (i > 1 && j > 1 && ai === b.charAt(j - 2) && before === b.charAt(j - 1)) {
+        const swap = (prev2[j - 2] as number) + 1;
+        if (swap < best) best = swap;
+      }
+      cur[j] = best;
     }
-    for (let j = 0; j <= b.length; j++) prev[j] = cur[j] as number;
+    const spent = prev2;
+    prev2 = prev;
+    prev = cur;
+    cur = spent;
   }
   return prev[b.length] as number;
 }
@@ -47,8 +74,9 @@ function distance(a: string, b: string): number {
  * The field the caller probably meant, or null when the key is not a near miss of any known field.
  *
  * Order of certainty: an exact case-insensitive match first (so the message can name the real
- * casing, `headEnd`), then singular/plural, then a prefix, then one edit. The shortest candidate
- * wins a tie, and ids break the remaining tie, so the suggestion is deterministic.
+ * casing, `headEnd`), then singular/plural, then a prefix, then one edit - and "one edit" includes a
+ * swapped adjacent pair, because `marignDb` is a typo, not a setting. The shortest candidate wins a
+ * tie, and ids break the remaining tie, so the suggestion is deterministic.
  */
 export function suggestField(field: string, known: FieldList): string | null {
   const lower = field.toLowerCase();
