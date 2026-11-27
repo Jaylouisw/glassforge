@@ -504,3 +504,45 @@ test('an optic pair the link cannot read is refused, not replaced by the 10 km d
   const absent = link.design({ sites: { a: A, b: B } }, registry);
   assert.strictEqual(absent.legs[0].optics.b, 'sfp-plus-10g-lr-10km', 'an absent block is no opinion');
 });
+
+test('a leased segment scoped with a near-miss key is refused, not put on both legs', function () {
+  // `leg` is the one key on a leased segment that decides which budget pays for the glass, and it
+  // was read without a key guard: `{ leg: 'b' }` scopes 6 dB of leased loss to the B-leg, while
+  // `{ legs: 'b' }` was not a scoping the link design could read - it was not a scoping at all, and
+  // the segment defaulted to `both`. Measured on the two-leg grid fixture with 600 m / 6 dB:
+  //
+  //   leg:  'b'  A-leg thirdPartyLossDb 0,     rxPowerDbm -5.41, verdict ok
+  //   legs: 'b'  A-leg thirdPartyLossDb 6,     rxPowerDbm -11.41, verdict marginal
+  //              and diversity read "diverse except a 600 m leased segment carried on both legs"
+  //
+  // So the circuit is budgeted over 6 dB of fibre it never rides and told it is not diverse. The
+  // answer is a purchase order either way, so the typo is refused by name rather than defaulted.
+  const err = throws(function () {
+    gridLink({ thirdParty: [{ provider: 'CityFibre', lengthM: 600, lossDb: 6, legs: 'b' }] });
+  }, 'did you mean "leg"', 'a pluralised lease scope');
+  assert.ok(err.message.indexOf('both legs') !== -1 || err.message.indexOf('never rides') !== -1,
+    'the refusal says what the default would do: ' + err.message);
+
+  // The other three keys a segment cannot do without, spelled one edit off. Each has to name the
+  // field it meant, not merely report that a required one is missing: the caller is one keystroke
+  // from a circuit that budgets the lease it wrote down.
+  const slips = [
+    [{ provider: 'CityFibre', lenghtM: 600, lossDb: 6 }, 'lengthM'],
+    [{ provider: 'CityFibre', lengthM: 600, losDb: 6 }, 'lossDb'],
+    [{ providor: 'CityFibre', lengthM: 600, lossDb: 6 }, 'provider']
+  ];
+  slips.forEach(function (pair) {
+    const e = throws(function () { gridLink({ thirdParty: [pair[0]] }); }, 'did you mean "' + pair[1] + '"',
+      'a typo in ' + pair[1]);
+    assert.ok(e.message.indexOf('thirdParty[0]') !== -1, 'the refusal names the segment: ' + e.message);
+  });
+
+  // What still reads as before: every key the segment does read is accepted, and a caller's own
+  // bookkeeping key is ignored rather than refused - only a near miss is a typo.
+  const ok = gridLink({ thirdParty: [
+    { provider: 'CityFibre', lengthM: 300, lossDb: 0.6, cost: 1200, leg: 'b', reference: 'CF-123', notes: 'quote 17' }
+  ] });
+  close(ok.legs[0].budget.thirdPartyLossDb, 0, 0.001, 'a B-leg lease is still on the B-leg');
+  close(ok.legs[1].budget.thirdPartyLossDb, 0.6, 0.001, 'a B-leg lease is still on the B-leg');
+  assert.strictEqual(ok.bom.thirdParty.cost, 1200);
+});

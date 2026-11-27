@@ -107,6 +107,27 @@ const LINK_OPTION_FIELDS = ['sites', 'a', 'from', 'b', 'to', 'optics', 'optic', 
 const LINK_OPTIC_FIELDS = ['a', 'b'];
 
 /**
+ * The six keys a leased segment is read through - and a near miss of one is refused.
+ *
+ * `leg` is the key that decides which leg's budget pays for the glass, and the segment block was the
+ * one nested shape beside `optics` read with value guards only. A value guard cannot see a key that is
+ * spelled wrong: `{ provider, lengthM, lossDb, legs: 'b' }` is not a segment scoped to the B-leg, it is
+ * a segment with no scope at all, and the default (`both`) silently applies. Measured on the two-leg
+ * grid fixture with 600 m / 6 dB of leased loss:
+ *
+ *   leg:  'b'  A-leg thirdPartyLossDb 0,      rxPowerDbm -5.41,  verdict ok
+ *   legs: 'b'  A-leg thirdPartyLossDb 6,      rxPowerDbm -11.41, verdict marginal
+ *              diversity: "diverse except a 600 m leased segment (CityFibre) carried on both legs"
+ *
+ * The A-leg is budgeted over leased fibre it never rides, the pad it asks for is for glass the light
+ * does not enter, and a protected pair is reported as not diverse. The answer is a circuit and its
+ * purchase order, so - like the budget's fields, the link's options, the `optics` pair and the BOM's
+ * options - a near miss is refused by name rather than defaulted. A caller's own bookkeeping key on a
+ * segment is still ignored: only a key close enough to be a typo is a refusal.
+ */
+const THIRD_PARTY_FIELDS = ['provider', 'lengthM', 'lossDb', 'leg', 'cost', 'reference'];
+
+/**
  * The optic pair, or a refusal naming the shape the link reads.
  *
  * `optics` is the one nested block the link reads, and it was read without a shape guard:
@@ -287,6 +308,15 @@ function thirdPartySegments(input) {
   return input.map(function (seg, i) {
     const where = 'thirdParty[' + i + ']';
     if (!seg || typeof seg !== 'object') throw new TypeError(where + ' must be an object');
+    // Before the values are read, because a typo is the cause and "lengthM must be a non-negative
+    // number" would be the symptom of a key the caller never spelled. See `THIRD_PARTY_FIELDS`.
+    designFields.assertKnownFields(seg, THIRD_PARTY_FIELDS, 'the leased segment ' + where, {
+      noun: 'field',
+      consequence: 'A key the link design does not read is not a setting: a misspelt length or loss ' +
+        'is a segment it cannot read, and a misspelt leg is not a scope - the segment defaults to both ' +
+        'legs, so the other leg is budgeted over leased loss it never rides and the diversity report ' +
+        'calls the lease shared. A near miss is refused rather than skipped.'
+    });
     if (!seg.provider || typeof seg.provider !== 'string') {
       throw new TypeError(where + '.provider is required - a leased segment names who owns it');
     }
