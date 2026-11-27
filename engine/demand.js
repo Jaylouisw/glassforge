@@ -50,7 +50,15 @@ function normaliseHeader(cell) {
   return String(cell || '').trim().toLowerCase().replace(/^["']|["']$/g, '');
 }
 
-/** RFC-4180-ish field split: quoted fields, doubled quotes, and the delimiter inside quotes. */
+/**
+ * RFC-4180-ish field split: quoted fields, doubled quotes, the delimiter inside quotes, and a quoted
+ * field that spans lines.
+ *
+ * A quote opens a field only where a field starts - the delimiter just before it, or the start of the
+ * row - which is the rule RFC 4180 actually states. Treating every quote as the start of a quoted
+ * section made an inch mark (`12" duct`) swallow the rest of the row, and the record splitter above,
+ * applying the same wrong rule, then treated the following row's quoted address as still open.
+ */
 function splitRow(line, delimiter) {
   const out = [];
   let field = '';
@@ -64,7 +72,7 @@ function splitRow(line, delimiter) {
       // space rather than kept: a field becomes a node name and a line of the printed plan, and
       // neither was ever meant to carry a newline into the table it is printed in.
       else field += ch === '\n' ? ' ' : ch;
-    } else if (ch === '"') quoted = true;
+    } else if (ch === '"' && field.trim() === '') quoted = true;
     else if (ch === delimiter) { out.push(field); field = ''; }
     else field += ch;
   }
@@ -90,17 +98,25 @@ function splitRecords(text) {
   const records = [];
   let current = '';
   let quoted = false;
+  // A quote opens a field only where a field starts - at the start of a record or right after a
+  // delimiter (spaces between the two are allowed) - exactly the rule `splitRow` applies. Anything
+  // else is text: an inch mark in `12" duct` used to open a quoted section that ran to the next
+  // quote in the file, so the record splitter stopped splitting on the newline and an unrelated
+  // row's multi-line address was cut in half.
+  let atFieldStart = true;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
     if (quoted) {
       if (ch === '"' && text[i + 1] === '"') { current += '""'; i++; continue; }
-      if (ch === '"') quoted = false;
+      if (ch === '"') { quoted = false; atFieldStart = false; }
       current += ch;
       continue;
     }
-    if (ch === '"') { quoted = true; current += ch; continue; }
-    if (ch === '\n') { records.push(current); current = ''; continue; }
+    if (ch === '"' && atFieldStart) { quoted = true; current += ch; continue; }
+    if (ch === '\n') { records.push(current); current = ''; atFieldStart = true; continue; }
     current += ch;
+    atFieldStart = ch === ',' || ch === ';' || ch === '\t' ||
+      (atFieldStart && (ch === ' ' || ch === '\r'));
   }
   if (quoted) return null;
   records.push(current);
