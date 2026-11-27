@@ -388,6 +388,25 @@ async function main() {
     assert.ok(unreadableSlack.body.error.indexOf('overlengthPct') !== -1, unreadableSlack.body.error);
   });
 
+  // The synthesise handler now hands the design the caller's body, minus its own two keys, so a key
+  // the design does not read is the engine's to refuse instead of the handler's to drop. A case slip
+  // is the near miss the other purchase-affecting endpoints already refuse by name: `margindb: 40`
+  // answered 200 with the 3 dB default (a feasible plant), while `marginDb: 40` refuses this estate -
+  // the typo bought the design the caller's own reserve exists to reject.
+  const marginTypo = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv, headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' }, margindb: 40
+  });
+  const marginWide = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv, headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' }, marginDb: 40
+  });
+  test('a design option spelled one case off is a 400, not the default it meant to replace', function () {
+    assert.strictEqual(marginWide.status, 200, JSON.stringify(marginWide.body).slice(0, 200));
+    assert.strictEqual(marginWide.body.ok, false, 'a 40 dB reserve leaves this estate with no candidate');
+    assert.strictEqual(marginTypo.status, 400, 'status ' + marginTypo.status + ': ' + JSON.stringify(marginTypo.body).slice(0, 200));
+    assert.ok(marginTypo.body.error.indexOf('"margindb"') !== -1, marginTypo.body.error);
+    assert.ok(marginTypo.body.error.indexOf('did you mean "marginDb"') !== -1, marginTypo.body.error);
+  });
+
   // The cost model is the caller's price list, and a hole in it used to be charged as 0 - a money
   // objective that ranked a design with an unpriced cable as if the cable were free. That is
   // caller input, so it is a 400 naming the cable, not a 500 and not a quiet zero.

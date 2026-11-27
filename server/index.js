@@ -548,29 +548,24 @@ async function handle(req, res, ctx) {
   if (pathname === '/api/design/synthesise' && method === 'POST') {
     const body = await readJsonBody(req, MAX_UPLOAD_BYTES);
     if (body.demand === undefined) return fail(req, res, 400, 'demand is required: a CSV string or an array of { lat, lon } rows');
+    // The design reads its options off the caller's body - minus the two keys that are this
+    // endpoint's own envelope: `demand` is the first argument, and `applyToProject` is the step after
+    // the design, not a design option.
+    //
+    // This used to forward a whitelist of named keys, and it dropped two documented options while
+    // doing so: a body naming a 48-fibre `ladder` designed the trunk on 12-fibre cable, and
+    // `overlengthPct: 10` answered the design measured at 3%. A key added to the design and forgotten
+    // here is a setting that never arrives, and the engine's own guards cannot fire on a key they
+    // never receive (`{"overlengthPct": "ten"}` answered 200). The whole body goes through instead;
+    // `design.options` refuses the value it cannot use, and now also a key that is a near miss of one
+    // it reads: `{"margindb": 40}` used to answer `ok: true` at the 3 dB default while
+    // `{"marginDb": 40}` refuses the estate.
+    const designOpts = Object.assign({}, body);
+    delete designOpts.demand;
+    delete designOpts.applyToProject;
     let result;
     try {
-      result = engine.design.synthesise(body.demand, {
-        headEnd: body.headEnd,
-        technology: body.technology,
-        routeFactor: body.routeFactor,
-        marginDb: body.marginDb,
-        network: body.network,
-        maxSnapM: body.maxSnapM,
-        joinToleranceM: body.joinToleranceM,
-        // The cable ladder decides what every span is bought from, and the handler forwarded nine
-        // named keys without it: a body naming a 48-fibre ladder designed the trunk on 12-fibre cable.
-        // The engine refuses a ladder it cannot use by name, so a typo is a 400, not a default.
-        ladder: body.ladder,
-        // Every cable line the design prices is route x (1 + overlengthPct/100). The handler
-        // forwarded nine named keys and dropped this one, so `overlengthPct: 10` answered the
-        // design measured at 3% and `overlengthPct: "ten"` answered 200 instead of the engine
-        // refusal - a guard cannot fire on a key it never receives. A BOM is bought on this number.
-        overlengthPct: body.overlengthPct,
-        pon: body.pon,
-        active: body.active,
-        costs: body.costs
-      }, registry);
+      result = engine.design.synthesise(body.demand, designOpts, registry);
     } catch (err) {
       throw asBadRequest(err);
     }

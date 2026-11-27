@@ -262,8 +262,36 @@ function assertActiveOptions(block) {
   }
 }
 
+/**
+ * Every top-level option the design reads - and the last list that was read without a key guard.
+ *
+ * The guards inside `options` check the *values* of the knobs they know, and the nested `pon`/`active`
+ * blocks refuse a near miss by name; a top-level key one letter or one case off was neither. It is not
+ * a setting the design rejects - it is not a key at all, so the default ran and the answer looked
+ * complete. Measured on this engine, 12 houses over 0.8 km of diagonal:
+ *
+ *   { marginDb: 40 }      no candidate is feasible - a 40 dB reserve refuses the estate
+ *   { margindb: 40 }      ok: true, the 3 dB default, a winner at 3.56 dB of worst headroom:
+ *                         the design the caller's own reserve exists to reject
+ *   { overlengthPct: 10 } designM 2088.1 m
+ *   { overlengthpct: 10 } designM 1955.2 m - the 3% default, 132.9 m of cable short on a BOM
+ *
+ * The budget design object, the link design and the cable calculation have refused a near miss by
+ * name since #137/#157/#192. This is the same rule at the one entry point whose answer is a plant,
+ * a ranking and a purchase order, so it is refused here too rather than skipped.
+ */
+const DESIGN_OPTION_FIELDS = ['headEnd', 'technology', 'routeFactor', 'marginDb', 'network',
+  'maxSnapM', 'joinToleranceM', 'pon', 'active', 'ladder', 'overlengthPct', 'costs',
+  'kmeansIterations', 'includeAllPlants'];
+
 function options(input, registry) {
   const o = input || {};
+  designFields.assertKnownFields(o, DESIGN_OPTION_FIELDS, 'the design', {
+    noun: 'option',
+    consequence: 'A design option the engine ignores does not narrow or widen anything: the default ' +
+      'runs, and every metre, drum and verdict in the answer is computed on a setting the caller did ' +
+      'not name, so a near miss is refused rather than skipped.'
+  });
   // A reserve is read straight into the verdict of every ONT in the design, so a value the budget
   // cannot use is refused here rather than defaulted: `marginDb: '3'` was replaced by 3 (right by
   // luck), and `marginDb: -5` passed through to every candidate - which then came back infeasible,
