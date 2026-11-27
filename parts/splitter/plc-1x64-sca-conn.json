@@ -1,0 +1,18 @@
+{
+  "kind": "splitter",
+  "model": "plc-1x64-sca-conn",
+  "vendor": "generic",
+  "label": "PLC 1x64 SC/APC connectorised shelf module",
+  "ratio": 64,
+  "splitLossDb": 18.06,
+  "excessLossDb": 2.44,
+  "termination": "connectorised",
+  "technology": "plc",
+  "notes": "The connectorised form of plc-1x64-sca: the same 1:64 PLC chip in an LGX/1RU shelf module with 64 SC/APC adapters, the ratio a single-shelf 64-ONT PON is built at. The chip figures are that row's, unchanged and from the same place: 18.06 dB ideal split (10*log10(64)) plus 2.44 dB excess = 20.5 dB, inside the band ITU-T G.671 sets for a 1x64 branching component on a normal-reach span (WR1, 16.1 dB min / 20.9 dB max - the band plc-1x64-sca quotes). Both chip numbers are typical values, the excess being the difference between the observed total and the ideal split, not a figure from a vendor sheet. What the termination changes is only the input: connectorised bills two SC/APC matings (the catalogue's own sc-apc row, 2 x 0.3 = 0.6 dB) where the spliced cassette bills one fusion splice (fusion, 0.1 dB), so this row reads 0.5 dB more ODN than the same chip spliced, which is the about 0.5 dB the spliced row's notes promise and the two connectors the shelf input has. The trap when replacing this row: a shelf module sheet prints ONE insertion-loss figure that already includes the module's own adapters - Gigalight gives 21.3 dB max (S grade) and 20.8 dB max (P grade) for a 1x64 LGX box, LG Optic 20.8 dB standard grade - so that figure is compared against 18.06 + 2.44 + 0.6 = 21.1 dB and is never loaded into excessLossDb, which would charge the connectors twice. Read that way this row is about 0.2 dB pessimistic against a module that meets WR1 with its connectors fitted; the pessimism is deliberate, because the engine can only express a chip figure plus separately charged matings, and a 1:64 has no room to spend a guess. Why this row exists: the catalogue carried connectorised twins for 1x4, 1x8 and 1x16 but not for 1x64, so a one-shelf 64-way CO splitter could only be budgeted as a spliced chip - one splice and no patch field for a module whose design is 64 adapters. The rest of the ladder stays spliced because buildPon resolves a splitter as plc-1x<ratio>-sca, so auto-design never picks this row: it is for a plant drawn by hand, or for a shelf whose cassettes arrive pre-terminated. Replace with the bought module's datasheet before construction.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.671/en",
+  "tags": [
+    "plc",
+    "1x64",
+    "connectorised"
+  ]
+}
