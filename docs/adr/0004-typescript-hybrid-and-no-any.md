@@ -40,9 +40,11 @@ real types at its boundary anyway (`distanceM(a: unknown, b: unknown)` validates
 ## Consequences
 
 - The compiler is the project's only dependency, and it is a devDependency: runtime stays zero-dependency.
-- Two languages coexist, so `npm test` (no install) stays the fast local gate and `npm run verify`
-  (install + build + every guard) is what CI runs. A lane without `node_modules` can still run the
-  suites; it just cannot typecheck.
+- Two languages coexist, so `npm test` (no install) stays the fast local gate and `npm run verify` is the
+  one command that runs CI's test-job guards, plus `scripts/check-dockerfile.js` and the compiler. CI runs
+  those guards as separate workflow steps and never calls `verify`, and it adds the porcelain assertion
+  on the emitted `.js` (`npm run build && test -z "$(git status --porcelain -- '*.js' '*.d.ts')"`), which
+  `verify` does not. A lane without `node_modules` can still run the suites; it just cannot typecheck.
 - Migrating a module means deleting its `.js` in the same commit as adding the `.ts`, or the compile
   refuses to overwrite its own input.
 - Tests stay `.js` for now: `scripts/run-tests.js` discovers `*.test.js`, and a test that exists only as

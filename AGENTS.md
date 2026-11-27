@@ -28,7 +28,7 @@ Read `docs/SPEC.md` for the model and `GLOSSARY.md` for the vocabulary before ch
 ## Work
 
 ```bash
-npm run verify                             # CI's test job + the Dockerfile check - not the smoke job
+npm run verify                             # the test job's guards + the Dockerfile check - not the smoke job
 npm test                                   # the no-install subset: counts, control bytes, node surface, suites
 npm run build                              # tsc: engine/x.ts -> engine/x.js (commit the output)
 node scripts/smoke-http.js                 # boots the server on a real socket - CI's own job, not in verify
@@ -36,9 +36,12 @@ node scripts/audit-parts.js                # catalogue validation
 node server/index.js                       # :8000, GF_DATA for the data root
 ```
 
-`npm run verify` is CI's **test** job (part counts, control bytes, Node 18 surface, canonical URLs,
-no-any, every suite) plus `scripts/check-dockerfile.js`, and it runs the compiler. It is **not the whole
-matrix**. Two CI steps it does not reproduce:
+`npm run verify` runs every guard of CI's **test** job — `scripts/syntax-check.js`,
+`scripts/check-no-any.js`, `scripts/check-control-bytes.js`, `scripts/check-node-surface.js`,
+`scripts/check-canonical-urls.js`, `scripts/count-parts.js --check`, `scripts/audit-parts.js` and every
+suite — and the compiler (`npm run build`). It also runs `scripts/check-dockerfile.js`, which CI keeps in
+its **docker** job, so `verify` is the test job's guards plus a docker-job check rather than any one CI
+job, and it is **not the whole matrix**. Two CI steps it does not reproduce:
 
 - **The smoke job.** `node scripts/smoke-http.js` spawns the real server on a free port and drives the
   API; it is its own CI job, so run it yourself when `server/` or `web/` changed.
