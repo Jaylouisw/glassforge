@@ -166,7 +166,13 @@ function apply(project, operation, opts) {
         to: input.to,
         cable: input.cable,
         lengthM: input.lengthM,
-        strands: Array.isArray(input.strands) ? input.strands.slice() : [],
+        // A strand list is a list, or absent. The array is copied; anything else goes through
+        // untouched so the write gate names it - coercing it to `[]` here was a 200 that dropped
+        // the caller's strands in silence, and `PUT` stored the same value raw. One rule, one
+        // sentence, whichever writer met it first.
+        strands: input.strands === undefined
+          ? []
+          : Array.isArray(input.strands) ? input.strands.slice() : input.strands,
         splices: splices,
         closures: closures,
         route: Array.isArray(input.route) ? input.route : null

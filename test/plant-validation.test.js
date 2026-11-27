@@ -217,4 +217,27 @@ test('a bundles count that is not a positive whole number is refused at the writ
   assert.deepStrictEqual(engine.network.validate(good, registry).errors, []);
 });
 
+test('a strands value that is not a list is refused, naming the span and the value', function () {
+  // `spans[].strands` is the list of strand numbers in use on the span, and every reader walks it as
+  // one: the strand ledger counts its length (`used`), the splice schedule addresses each entry, and
+  // `runs[].strands` in a design is `.length`. A value that is not a list is not zero strands - it is
+  // a field nobody can read, and before this gate `PUT` stored it raw and validated clean: the tab
+  // said the span carried nothing while `"1,2".length` read 3. Refused by span and by field, like
+  // the splices and bundles counts above, because a hand-edited file never passes through `apply()`.
+  const p = base();
+  p.spans[0].strands = '1,2';
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors,
+    ['span "s1" has an invalid strands list "1,2" - strands is a list of the strand numbers in use, ' +
+     'and a value that is not a list is refused rather than read as no strands']);
+  p.spans[0].strands = 2;
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors,
+    ['span "s1" has an invalid strands list "2" - strands is a list of the strand numbers in use, ' +
+     'and a value that is not a list is refused rather than read as no strands']);
+  p.spans[0].strands = [1, 2];
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors, []);
+  delete p.spans[0].strands;
+  assert.deepStrictEqual(engine.network.validate(p, registry).errors, [],
+    'absent still means the span carries nothing, which is a legitimate spare cable');
+});
+
 done();

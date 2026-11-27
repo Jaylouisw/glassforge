@@ -348,6 +348,19 @@ and the checks, and a PNG of the drawing at a stated scale.
   the duplicate closure's splice is gone. Tests: `design-root-coincident-house` (4 cases) plus five
   suites whose pinned figures moved with it.
 
+- **A span's `strands` has to be a list, not a value every reader reads as none.** `engine.network.validate`
+  never looked at the shape of `spans[].strands`, so `PUT` stored a caller's value raw and answered
+  `200` with `derived.errors: []`: `{"strands": "1,2"}` on a 12-fibre span read **0 of 12 used** in
+  the strand ledger, listed **no strands** in the splice schedule, and a design's `runs[].strands` -
+  `.length` - read **3**. `/ops` did the other half of the same bug, coercing anything that was not an
+  array to `[]`, so the caller's two strands were dropped by a `200` instead of named. Both writers
+  now meet the gate the splices, closures and bundles counts already had: a list, or absent (SPEC §6 -
+  absent means nothing in use), and `null` is refused like `bundles: null`. The refusal names the span
+  and the value - `span "s1" has an invalid strands list "1,2" - strands is a list of the strand
+  numbers in use, and a value that is not a list is refused rather than read as no strands`. Tests:
+  `plant-validation` (+1 case: text, a bare number, a list and absent) and `api-ops-validation`
+  (+4: `PUT` and `add-span` both a 400, and neither saved).
+
 ### Changed
 
 - `docs/API.md` documents the print route and the PNG scale arithmetic; the README lists plan export
