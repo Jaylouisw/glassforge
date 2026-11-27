@@ -1,7 +1,8 @@
 'use strict';
 // The money objective: what a design costs is what you hand over for the drums, and the ranked number
 // must be reviewable - a cable term, a splice term, a closure term, a splitter term, and their sum.
-const { test, assert, close, done } = require('./harness');
+const { test, assert, close, throws, done } = require('./harness');
+function isNum(v) { return typeof v === 'number' && isFinite(v); }
 const engine = require('../engine');
 
 const registry = engine.createRegistry();
@@ -86,7 +87,12 @@ test('a design that fits a single drum ties on cable cost, and the next term bre
   // Two drops on one 1 km drop drum: both buy 1000 m of g657a2-drop-1 at 0.4/m = 400, whatever
   // their measured metres. Pricing design metres made the shorter run look cheaper by the metres it
   // saved on a drum that is bought whole; the cost now ties and cable metres decide.
-  const costs = { cablePerM: { 'g657a2-drop-1': 0.4, 'g657a2-drop-2': 0.6, 'g652d-loose-12': 1.1, 'g652d-loose-24': 2.0 } };
+  // The three non-cable terms are written as 0 on purpose: a term the model leaves unsaid is refused
+  // by name below, and a design with no splitter is priced without a splitter price (the next test).
+  const costs = {
+    splice: 0, closure: 0, splitter: 0,
+    cablePerM: { 'g657a2-drop-1': 0.4, 'g657a2-drop-2': 0.6, 'g652d-loose-12': 1.1, 'g652d-loose-24': 2.0 }
+  };
   const out = engine.design.synthesise(street(4, 0.0008), { headEnd: HEAD_END, costs: costs, technology: 'pon' }, registry);
   const feasible = out.candidates.filter(function (c) { return c.feasible; });
   assert.ok(feasible.length >= 1, 'at least one PON candidate');
@@ -98,6 +104,58 @@ test('a design that fits a single drum ties on cable cost, and the next term bre
     assert.strictEqual(c.metrics.costBreakdown.cable, cable,
       c.label + ': cable is ' + drums + ' drum(s) priced, not ' + c.metrics.designM + ' m');
   }
+});
+
+test('a cost model that leaves a term unsaid is refused, not charged as zero', function () {
+  // 20 houses on one straight street. The engine used to multiply each unsaid term by its count and
+  // call the result a money verdict: `objective: "cost"`, `cost: 5400`, and `costBreakdown.closures: 0`
+  // for a candidate that builds 23 closures. The same estate priced at 8/splice, 120/closure and
+  // 40/splitter is 8488 = 5400 + 23 x 120 + 26 x 8 + 3 x 40 (3088 of purchase the cable term never saw).
+  const demand = street(20, 0.0008);
+  const err = throws(function () {
+    engine.design.synthesise(demand, { headEnd: HEAD_END, costs: { cablePerM: COSTS.cablePerM } }, registry);
+  }, 'costs.closure', 'a cable-only money model');
+  assert.ok(err.message.indexOf('costs.splice') !== -1, err.message);
+  assert.ok(err.message.indexOf('costs.splitter') !== -1, err.message);
+  assert.ok(err.message.indexOf('not priced') !== -1, err.message);
+
+  // Writing 0 is a figure this model can rank on: the caller says the term costs nothing, and the
+  // answer is the cable term alone - visibly, not by a silent default.
+  const zeros = engine.design.synthesise(demand, {
+    headEnd: HEAD_END,
+    costs: { cablePerM: COSTS.cablePerM, splice: 0, closure: 0, splitter: 0 }
+  }, registry);
+  const candidate = zeros.candidates.filter(function (c) { return c.feasible; })[0];
+  assert.strictEqual(candidate.metrics.costUnpriced.length, 0, 'nothing was left unsaid');
+  assert.strictEqual(candidate.metrics.cost, candidate.metrics.costBreakdown.cable,
+    'the total is the cable term when every other term is stated as 0');
+
+  // And the priced build charges the terms it builds: the 3088 above, term by term.
+  const priced = engine.design.synthesise(demand, {
+    headEnd: HEAD_END,
+    costs: { cablePerM: COSTS.cablePerM, splice: 8, closure: 120, splitter: 40 }
+  }, registry);
+  const built = priced.candidates.filter(function (c) { return c.feasible; })[0];
+  assert.strictEqual(built.label, candidate.label, 'both models rank the same topology, so the two totals compare');
+  assert.strictEqual(built.metrics.costBreakdown.closures, 120 * built.metrics.closures);
+  assert.strictEqual(built.metrics.costBreakdown.splices, 8 * built.metrics.splices);
+  assert.strictEqual(built.metrics.costBreakdown.splitters, 40 * built.metrics.splitters);
+  close(built.metrics.cost - candidate.metrics.cost,
+    120 * built.metrics.closures + 8 * built.metrics.splices + 40 * built.metrics.splitters, 0.01,
+    'the unpriced model was short by exactly the three plant terms');
+});
+
+test('a term the design never builds needs no price', function () {
+  // An active home-run has no splitter anywhere, so a price list without `splitter` is complete for
+  // it. Requiring the entry would refuse a model that has nothing wrong with it.
+  const out = engine.design.synthesise(street(3, 0.0004), {
+    headEnd: HEAD_END,
+    technology: 'active',
+    costs: { cablePerM: COSTS.cablePerM, splice: 8, closure: 120 }
+  }, registry);
+  assert.strictEqual(out.best.metrics.splitters, 0, 'the chosen topology has no splitter');
+  assert.deepStrictEqual(out.best.metrics.costUnpriced, [], JSON.stringify(out.best.metrics.costUnpriced));
+  assert.ok(isNum(out.best.metrics.cost), 'a complete price list for this design still prices it');
 });
 
 done();
