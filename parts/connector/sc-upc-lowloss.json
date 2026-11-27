@@ -1,0 +1,18 @@
+{
+  "kind": "connector",
+  "model": "sc-upc-lowloss",
+  "vendor": "generic",
+  "label": "SC/UPC connector pair (grade B, low loss)",
+  "lossDb": 0.15,
+  "maxLossDb": 0.25,
+  "notes": "0.15 dB is a typical loss for a mated grade-B SC/UPC pair; 0.25 dB is the ceiling the grade sets, not one vendor's test report. The grade is the same published class the APC rows quote: IEC 61753-1:2007 Table A.12, reprinted as Table 9-1 of ITU-T L.36 (01/2015), grades random-mated single-mode connectors B at 0.12 dB mean and 0.25 dB max for more than 97% of samples, C at 0.25 dB mean and 0.50 dB max, D at 1.00 dB max. It is a limit on a mated pair and says nothing about which ferrule is in it, so an SC/UPC pair is held to it exactly as an SC/APC one is. Why this row exists: the catalogue sold grade B only in the APC polish (sc-apc-lowloss, lc-apc-lowloss) while sc-upc - the row an ONT pigtail or an ODF panel is patched with when the optic declares UPC - had grade C only, so a plant that contracted graded SC/UPC patch cords could not name them and was budgeted 0.15 dB worse per mating than it was buying. Measured through budget.pointToPoint on two SFP+ 10GBASE-LR optics: two sc-upc matings charge 2 x 0.30 = 0.60 dB and two of these charge 0.30 dB, a 0.30 dB saving across the pair - which on a 10GBASE-LR link's 6.2 dB budget is worth more than it looks, because 10 km of G.652.D already spends 3.50 dB of it. Both ends of the path have to be the graded part: one grade-C patch cord in the chain caps the end-to-end figure at grade C, and the 0.05 dB spread between this row and lc-upc (0.25 grade-C mean) is why the SC and LC rows do not save the same amount. Polish is not interchangeable - an SC/UPC ferrule will not mate with SC/APC and mixing them loses several dB and can damage both endfaces - so a plant specified to this row must be UPC throughout. No figure already budgeted moves: sc-apc remains the default connector model and this row is chosen with connectors: { model: 'sc-upc-lowloss', count }. Replace 0.15 with the loss measured on the patch cords you buy; 0.25 is a maximum and 0.15 a typical.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.36/en",
+  "tags": [
+    "connector",
+    "sc",
+    "upc",
+    "low-loss",
+    "grade-b"
+  ],
+  "polish": "upc"
+}
