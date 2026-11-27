@@ -1,0 +1,28 @@
+{
+  "kind": "cable",
+  "model": "g657a2-indoor-24",
+  "vendor": "belden",
+  "label": "Belden GIMTF24 indoor tight-buffer 24F G.657.A2 LSZH",
+  "fiberCount": 24,
+  "fibersPerTube": 12,
+  "construction": "tight-buffer",
+  "fiberStandard": "G.657.A2",
+  "use": [
+    "indoor"
+  ],
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "sourceUrl": "https://catalog.belden.com/techdata/EN/GIMTF24_techdata.pdf",
+  "notes": "Belden GIMTF24 technical data sheet, revision 0.58 dated 2024-09-17: indoor tight-buffered distribution cable, 24 fibres OS2 to ITU-T G.657.A2, 0.9 mm tight buffer, LSZH jacket, nominal 9.0 mm, GRP central strength member, waterblocking aramid yarns, TIA colour coding with ringmark (blue, orange, green, brown, grey, white, red, black, yellow, violet, pink, aqua, then the same twelve ringmarked - which is why fibersPerTube is 12 and a 24F riser addresses T01 and T02 rather than one tube of 24), CPR Euroclass Dca-s1,d1,a1, built to the IEC 60794-2-20 indoor multi-fibre family specification, 180 mm installation / 90 mm operating bend radius, 900 N short-term and 300 N long-term tensile, 68 kg/km, -5 to +40 degrees C. Why this row exists: the catalogue's only indoor row was the 12F GIMTF12, and the only 24F cable it sold was g652d-loose-24 - an outdoor loose-tube, gel-filled, with no reaction-to-fire class, which is not a cable to pull down a shaft. A 20-flat tower riser needs 24 fibres and had nothing but that outdoor row to name, exactly the gap the 12F row was opened for one size down; 48F is the rung above it, g657a2-indoor-48. Attenuation: the sheet publishes MAXIMUM 0.40 dB/km at 1310 nm and 0.30 dB/km at 1550 and 1625 nm. This row carries 0.35 / 0.22 / 0.21, the same typical installed figures the feeder, drop and 12F indoor rows carry, deliberately: budgeting a riser at the maxima prices every building as the worst cable ever shipped out of the factory. 1490 nm is interpolated and is not a citation - neither Belden nor the ITU-T/IEC documents this catalogue cites publish a 1490 nm figure, so 0.22 bridges the two published windows exactly as the G.652.D rows do; for a riser budget that gets signed, take the as-built OTDR trace. The row publishes NO drumM, and that is a decision rather than an omission: the 12F row's 4,100 m reel is the specific variant GIMTF12.044100 and Belden's GIMTF24 sheet carries no putup or variant table, so borrowing it would quote a reel nobody sells. With no drumM the BOM falls back to engine/length.js's 2,000 m default and prints it - that figure is the engine's assumption, not a Belden putup, and the purchaser replaces it with the reel the ordered part ships on. Two traps travel with the 12F row and are worse here. A ladder that names both this row and g652d-loose-24 resolves a 24-fibre span on the SMALLEST cable that fits and then on model id, and g652d- sorts before g657a2-, so the outdoor row wins a tie: name the indoor row in ladder without its outdoor twin, or the design will bill loose tube for a shaft. And Dca is a reaction-to-fire class, not a water or UV rating - the sheet's own application text is building backbone inside one building, so nothing in the engine stops this model being named on an outdoor span and the design will do exactly as it is told. Replace with the cable actually purchased and its as-built attenuation before construction.",
+  "tags": [
+    "belden",
+    "indoor",
+    "riser",
+    "g.657.a2",
+    "24f",
+    "lszh"
+  ]
+}
