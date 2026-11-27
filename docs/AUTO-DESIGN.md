@@ -206,10 +206,19 @@ difference is almost exactly the detour to the junction, which is the whole poin
             "launchWindowOnts": 0 } },
   "candidates": [ { "label": "...", "feasible": false, "reasons": ["..."], "metrics": {...} } ],
   "plant": { "nodes": [...], "spans": [...] },   // the winner, ready for network.validate
-  "runs": [ { "id": "s-feed-1", "purpose": "feeder", "cable": "g652d-loose-12", "lengthM": 421.3, "feedsSplitters": 3 } ],
+  "runs": [ { "id": "f-root-site-1", "from": "n-headend", "to": "fc-site-1", "purpose": "feeder",
+              "cable": "g652d-loose-12", "lengthM": 421.3, "bundles": 1, "strands": 12,
+              "feedsOnts": null, "method": "straight-line x1.2",
+              "route": [ { "lat": 51.4985, "lon": -0.1004 }, { "lat": 51.5008, "lon": -0.1 } ] } ],
   "rationale": [ "Chosen: ...", "Rejected ...: feasible but needs ... (1.04x)" ]
 }
 ```
+
+`runs[]` is the flattened span list a drawing or a stored design reads: `lengthM`, `bundles`,
+`strands` (a count, not the indices), `purpose`, `feedsOnts` (the ONT count recorded against a
+distribution, tree, home-run or drop span; `null` on a feeder or splitter tail), `method` and `route`.
+A feeder span's splitter count is **`feedsSplitters` on the winner's `plant.spans`**, not on `runs`:
+`runsOf` does not copy it.
 
 `metrics.marginalOnts` counts the ONTs whose verdict is `marginal` — a design that passes, but with under
 2 dB above the design margin or under 1 dB of its class budget left (SPEC §4) — and `warnings` names the
