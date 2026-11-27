@@ -1,0 +1,25 @@
+{
+  "kind": "cable",
+  "model": "g652d-ribbon-216",
+  "vendor": "generic",
+  "label": "G.652.D ribbon 216F",
+  "fiberCount": 216,
+  "fibersPerTube": 12,
+  "construction": "ribbon",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Ribbon construction, not loose tube: 18 ribbons of 12 fibres, one ribbon per tube position, which is how the Belden FS2L216ND sheet describes the same cable (18 active subunits of 12F), and the addressing this model assumes. A construction that bundles three ribbons into a 36-fibre tube is the same 216 fibres counted differently and would need its own row - this one does not describe it. Attenuation here is typical installed performance, not a G.652.D limit: 0.35 dB/km at 1310 nm sits under the recommendation's 0.40 dB/km maximum (1310-1625 nm), and 0.21 dB/km at 1550 nm under its 0.30 dB/km maximum (1530-1565 nm). 1490 nm is a typical, interpolated value: no ITU-T recommendation publishes a 1490 nm attenuation figure of its own (G.652.D's 0.40 dB/km maximum spans 1310-1625 nm but is not a 1490 nm specification), so 0.22 dB/km bridges the two published windows and is not a citation. Why this rung exists: above 144F the engine bundles - a span is ceil(fibres / cable.fiberCount) whole cables - because the default ladder's richest entry is g652d-loose-144, so a 200-fibre trunk is measured by design.cableFor(200, DEFAULT_LADDER, registry) as g652d-loose-144 and built as two 144F pulls, 288 fibres bought plus a second cable and its closures, where one 216F ribbon carries 200. 216F is a stocked ribbon size, not an invented one: Prysmian's A-D(SR)(Z)2Y 18x12 AccuRibbon sheet prints 216 fibres / 18 ribbons and standard lengths of 2,000 / 4,000 / 6,000 m, Belden FS2L216ND is 216F in 18 subunits of 12, and STL's DT0216FSN18TFP1US prints 216F / 18 ribbons at 15.7 mm - so the drum below has a published 2 km option, unlike the 288F ribbon row's original 1 km figure. This row is not in DEFAULT_LADDER either (nor is g652d-ribbon-288), so it reaches a design through the ladder option or an engine change to the default ladder; the part alone does not re-rank existing designs. drumM keeps the 2,000 m floor for the reason g652d-ribbon-288 gives: the sheet also prints 4 km and 6 km, and a 3 km run should be quoted two 2 km drums rather than a whole 4 km reel it cannot pull in one go, while two ribbon spans through a cabinet should not become two 4 km reels. The reel actually ordered wins; set drumM to it. Replace all three attenuation figures with the bought cable's test report for a construction-grade budget.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.652/en",
+  "tags": [
+    "generic",
+    "g.652.d"
+  ]
+}
