@@ -257,10 +257,23 @@ test('a cable that cannot carry the fibres asked for is refused, not bought shor
   }, 'carries 144 fibres but this link asks for 200');
   assert.ok(String(over.message).indexOf('g652d-ribbon-288') !== -1, over.message);
 
+  // 400 fibres on the default 144-fibre ladder is still a refusal, but it now names a cable that
+  // carries the count: this assertion used to be the "nothing in the catalogue is big enough" case,
+  // when the top rung was the 288-fibre ribbon. g652d-ribbon-432 is that answer now (432 is the
+  // highest count a closure here can joint - the FOSC 600-D holds 504 splices), and naming a cable
+  // by hand designs the link.
+  const over400 = throws(function () {
+    link.design({ sites: { a: A, b: B }, optics: ER, fibres: 400 }, registry);
+  }, 'carries 144 fibres but this link asks for 400');
+  assert.ok(String(over400.message).indexOf('g652d-ribbon-432') !== -1, over400.message);
+  const big = link.design({ sites: { a: A, b: B }, optics: ER, fibres: 400, cable: 'g652d-ribbon-432' }, registry);
+  assert.strictEqual(big.ok, true, String(big.reasons));
+  assert.strictEqual(big.legs[0].fiberCount, 432, '400 fibres on the 432-fibre ribbon');
+
   // Nothing in the catalogue is big enough: say so instead of inventing a suggestion.
   throws(function () {
-    link.design({ sites: { a: A, b: B }, optics: ER, fibres: 400 }, registry);
-  }, 'no cable in the catalogue carries 400 fibres');
+    link.design({ sites: { a: A, b: B }, optics: ER, fibres: 500 }, registry);
+  }, 'no cable in the catalogue carries 500 fibres');
 
   // Fewer strands than the cable carries is normal - a 24-fibre cable used for 24 fibres passes.
   const fits = link.design({ sites: { a: A, b: B }, optics: ER, fibres: 24, cable: 'g652d-loose-24' }, registry);
