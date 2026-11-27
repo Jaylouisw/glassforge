@@ -179,4 +179,7 @@ and names the field that was meant, because a silently ignored key removes the l
 splitter sent as `splitter` budgeted a 15 km GPON B+ ODN at 4.3 dB instead of 14.8 dB, and the
 verdict was computed on fibre that will not light. A key that is not a near miss — `name`, `notes`, a
 caller's own bookkeeping — is still ignored, because refusing it would refuse a caller who is not
-wrong. Over HTTP it is a `400` from `POST /api/design/budget`.
+wrong. The same rule guards the cable calculation's options, the bill of materials', the design's
+own top-level options and the site-to-site link's options (`engine/link.js`
+`LINK_OPTION_FIELDS`), each against its own list. Over HTTP it is a `400` from
+`POST /api/design/budget`, `/api/design/length`, `/api/design/synthesise` and `/api/design/link`.

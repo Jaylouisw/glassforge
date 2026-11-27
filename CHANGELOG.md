@@ -37,6 +37,19 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A near-miss option on the site-to-site link is refused by name, not silently defaulted.**
+  `link.options` checked the *values* of the knobs it read and none of the *names*, so it was the one
+  entry point with no key list at all — and the one whose answer is a circuit's purchase order.
+  Measured on the two-leg grid fixture (1164.22 m of leg): `{ overlengthPct: 10 }` answers `designM`
+  1280.64; `{ overlenghtPct: 10 }` and `{ overlengthpct: 10 }` answered **1199.15** — the 3% default,
+  **81.49 m of cable short** on the BOM — and `{ marignDb: 10 }` budgeted both legs at `marginDb` 3,
+  where a 10 dB reserve turns their 10.39 / 10.37 dB of headroom from `ok` into `marginal`.
+  `LINK_OPTION_FIELDS` is read off `options` itself (25 names, including the `a`/`b`/`from`/`to` site
+  shorthands and `opticA`/`opticB`) and checked with the same narrow `assertKnownFields` rule the
+  budgets, the cable calculation, the bill of materials and the design's options use, so a caller's
+  `name`/`notes` still pass. Over the wire it is a `400` naming the field, not a `200` with a BOM.
+  Tests: `link-design` (6 cases: case slip, singular, prefix, deletion, the message, and bookkeeping
+  keys answering unchanged) and `api-http` (1: the refusal is a 400 over `/api/design/link`).
 - **A design option spelled one case off is refused by name, not replaced by its default.** The
   budget design object, the site-to-site link and the cable calculation have refused a near miss
   since #137/#157/#192; the design's own top-level options were the last list read without a key
