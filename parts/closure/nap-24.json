@@ -1,0 +1,18 @@
+{
+  "kind": "closure",
+  "model": "nap-24",
+  "vendor": "comtec",
+  "label": "NAP 24-port (COMtec FDB-2-24A)",
+  "type": "nap",
+  "ports": 26,
+  "spliceCapacity": 48,
+  "trays": 2,
+  "notes": "COMtec FDB-2-24A outdoor fibre distribution box, datasheet CM-ODF-FDB-24 (comtec-sol.com): terminates up to two fibre cables, allocates 24 SC simplex adapters, takes up to 24 simplex drop cables at 2x3 mm flat-drop entries, offers space for up to 48 fusions in a double-layer body (lower layer for splitters and slack storage, upper layer for splicing and cross-connect), and holds two blockless 1:8 PLC splitters; 330 x 225 x 90 mm, 2 kg, -40 to +60 C. `ports` counts cabling, not adapters - engine/network.js warns when the spans touching a node outnumber its `ports`, and docs/PARTS.md states the same - so this row is 26: the 24 SC adapters plus the two feeder entries the sheet allows. A cascaded box (feeder in, feeder out to the next NAP) spends both entries and still serves 24 drops; the last box on a run spends one and leaves the other sealed, which is why the column reads 26 and not 25 - the second entry is a port on the box whether or not a given design uses it. `spliceCapacity` 48 is the sheet's own fusion capacity, not twice the drop count: the 24 subscribers land on SC adapters, and a splice is spent only where the crew terminates a drop on a pigtail or joints the feeder straight through the box. `trays` 2 is the sheet's two-layer layout (splitter/slack layer, splice layer); the sheet publishes no tray count, so the number is the layer count and not a D-tray count - replace it with the box actually bought. Why this row exists: the NAP family stopped at 16 (nap-16, 17 cable ports), so a 17-24 drop site had two bad shapes - two 16-port boxes with the feeder span and the joint between them, or `mufa-inline-24`, which engine/design.js falls back to above degree 16 and which is a 24-splice butt joint with no drop adapters at all, a product that cannot serve a single customer. It does not change auto-design's pick: `closureForDegree` still answers nap-8 / nap-16 / mufa-inline-24 by degree, so this row is for a plant drawn by hand or a closure chosen by name, the same reason the connectorised splitter rows exist. The sheet's ingress figure is inconsistent with itself - the same two pages print IP55 in the description text and IP65 in the heading - so nothing here is priced on it; the engine budgets optics, not weatherproofing. Replace these figures with the datasheet of the box actually purchased before ordering.",
+  "sourceUrl": "https://www.comtec-sol.com/downloads/COMtec_Outdoor_Fiber_Box_up_to_24C_(CM-ODF-FDB-24).pdf",
+  "tags": [
+    "nap",
+    "24-port",
+    "fdb",
+    "comtec"
+  ]
+}
