@@ -47,10 +47,15 @@ test('the FR1 row carries its 2 km class figures and says FEC is part of the cla
   assert.strictEqual(fr1.speedMbps, 100000);
   assert.strictEqual(fr1.wavelengthNm, 1310);
   assert.strictEqual(fr1.reachM, 2000, 'FR1 is the 2 km rung');
-  assert.strictEqual(fr1.txPowerDbmMin, -2.4, 'average launch MIN is -2.4 dBm');
+  // Clause 140's averages, not the 100G Lambda MSA 100G-FR values the row was built from: it
+  // asserted -2.4 / -6.4 / +4.5 until 2026-11-27 while its sourceUrl was the clause, and the clause
+  // prints -3.1..+4.0 launch and -7.1..+4.0 receive. The budget is 4.0 dB on either pair, which is
+  // why the link assertions below never caught it; what it was wrong about is 0.7 dB of absolute
+  // level and the +4.0 receive ceiling a pad is sized against.
+  assert.strictEqual(fr1.txPowerDbmMin, -3.1, 'average launch MIN is -3.1 dBm (clause 140)');
   assert.strictEqual(fr1.txPowerDbmMax, 4, 'average launch MAX is +4.0 dBm');
-  assert.strictEqual(fr1.rxSensitivityDbm, -6.4, 'average receive MIN is -6.4 dBm');
-  assert.strictEqual(fr1.rxOverloadDbm, 4.5, 'average receive MAX is +4.5 dBm');
+  assert.strictEqual(fr1.rxSensitivityDbm, -7.1, 'average receive MIN is -7.1 dBm (clause 140)');
+  assert.strictEqual(fr1.rxOverloadDbm, 4, 'average receive MAX is +4.0 dBm, the launch ceiling too');
   assert.ok(fr1.notes.indexOf('FEC') !== -1, 'the row must say FEC is required: ' + fr1.notes);
   assert.ok(fr1.notes.indexOf('replace the row with the module actually purchased') !== -1, fr1.notes);
 });
@@ -86,7 +91,8 @@ test('LR1 spends the 6.3 dB channel insertion loss, not the 10.6 dB power budget
 });
 
 test('FR1 leaves less spare than the default margin at its own 2 km', function () {
-  // -2.4 - (-6.4) = 4.0 dB; 2 km x 0.35 = 0.7 dB of fibre leaves 3.3 dB
+  // -3.1 - (-7.1) = 4.0 dB; 2 km x 0.35 = 0.7 dB of fibre leaves 3.3 dB (the same 4.0 the row's
+  // old -2.4 / -6.4 pair gave, which is why no verdict here changed when the figures were corrected)
   const bare = link(FR1, FR1, 2000);
   assert.strictEqual(bare.budgetDb, 4, 'the tightest optical budget in the catalogue');
   close(bare.odnLossDb, 0.7, 0.001, 'ODN loss at 2 km');
