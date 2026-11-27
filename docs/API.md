@@ -3,9 +3,14 @@
 Everything the UI does goes through these endpoints, so anything the UI can do can be scripted.
 All responses are JSON unless noted. Errors are `{ "error": "..." }` with `400` (bad input), `404`
 (unknown thing) or `405` (wrong method); a `500` means the server broke, not that your design is wrong.
-A body over the limit is a **`413` naming the limit** — 2 MiB for a JSON body, 25 MiB for an import
-upload — answered with `Connection: close`. Read the refusal and start a new request rather than finish
-an upload the server has already refused.
+A body over the limit is a **`413` naming the limit** — 2 MiB (`2097152` bytes) for a project write,
+`/api/projects/:id/budget`, `/api/design/budget` or `/api/design/length`, and 25 MiB for the five
+endpoints that carry a demand list or a street/duct graph: `/api/design/synthesise`, `/api/design/link`,
+`/api/import/demand`, `/api/import/network` and `/api/import/kml`. It is answered with `Connection: close`
+**once the body has finished arriving** — the server keeps reading the rest and throws it away, because a
+refusal written while megabytes of the upload are still in flight closes the socket with data in its
+receive buffer, and the kernel answers the remainder with RST: the caller then discards the 413 it was
+just sent and reports `ECONNRESET`. Wait for the answer; do not half-close the request.
 
 A `405` names the path and the methods it does answer, and carries them in `Allow` — `GET
 /api/design/synthesise` is refused with `405 … it answers POST`, never `404`, because the endpoint

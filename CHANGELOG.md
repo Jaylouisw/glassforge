@@ -37,6 +37,18 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **An over-limit upload keeps its 413.** `readBody` answered the refusal the instant the body
+  crossed the limit, so the response closed a socket whose receive buffer still held megabytes of the
+  upload — and the kernel answers that remainder with RST: the caller discarded the 413 it had just
+  been sent and reported `ECONNRESET`. Measured on the previous version, **3 of 10 × 2.5 MiB uploads**
+  to `/api/projects` lost the refusal, and a 10 MiB one lost it about half the time. The refusal now
+  waits for the body to finish arriving (the rest is read and thrown away, not buffered), so the
+  sentence names the limit it always promised. The paragraph in `docs/API.md` also states both limits —
+  2 MiB for a project or design body, 25 MiB for the five endpoints that carry a demand list or a
+  street/duct graph — which is what the server does and what a caller sizes an upload against.
+  Tests: `api-http` adds 2 (no answer while the declared body is still in flight and the 413 plus
+  `Connection: close` once it ends; the same 2.5 MiB body refused on `/api/design/budget` and accepted
+  by `/api/design/synthesise`).
 - **A design field the budget does not read is refused, not skipped.** `opticalBudget` and
   `pointToPoint` read a fixed list of fields, so a key that is a near miss of one of them — a singular
   `splitter` for `splitters`, `margin` for `marginDb`, `headend` for `headEnd`, one letter out — was

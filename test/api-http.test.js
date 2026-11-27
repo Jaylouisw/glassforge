@@ -610,6 +610,70 @@ async function main() {
     assert.ok(oversizeAnswer.body.error.indexOf('2097152') !== -1, oversizeAnswer.body.error);
   });
 
+  // #179 made the 413 reachable, but it was still written the instant the body crossed the limit -
+  // and a response written while megabytes of the upload are still inbound closes the socket with
+  // data in its receive buffer, which the kernel answers with RST. The caller then throws away the
+  // 413 it was just sent and reports ECONNRESET ("socket hang up"): measured on that version, 3 of
+  // 10 x 2.5 MiB uploads to `/api/projects` lost the refusal, and 10 MiB lost it about half the time.
+  // The refusal now waits for the upload to finish arriving (the rest is read and discarded, not
+  // buffered), so this test asserts the order rather than the race: nothing is answered while the
+  // declared body is still in flight, and the 413 with its limit arrives when it ends.
+  const declared = 3 * 1024 * 1024;
+  const uploadBody = Buffer.alloc(declared, 0x78);
+  let answeredMidUpload = false;
+  let uploadEnded = false;
+  const finishedUpload = await new Promise(function (resolve) {
+    const upReq = http.request(base + '/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': uploadBody.length }
+    }, function (res) {
+      if (!uploadEnded) answeredMidUpload = true;
+      const chunks = [];
+      res.on('data', function (c) { chunks.push(c); });
+      res.on('end', function () {
+        resolve({ status: res.statusCode, connection: res.headers.connection, text: Buffer.concat(chunks).toString('utf8') });
+      });
+    });
+    upReq.on('error', function (err) { resolve({ dropped: err.code }); });
+    // 2 MiB + 1 KiB is over the limit; the last megabyte is held back, so the server sees an
+    // over-limit body with a declared remainder still to come.
+    upReq.write(uploadBody.slice(0, 2 * 1024 * 1024 + 1024), function () {
+      setTimeout(function () {
+        uploadEnded = true;
+        upReq.end(uploadBody.slice(2 * 1024 * 1024 + 1024));
+      }, 200).unref();
+    });
+  });
+  test('the 413 waits for the upload to finish, so the refusal is not lost to a TCP reset', function () {
+    assert.strictEqual(answeredMidUpload, false,
+      'the server answered while the declared body was still arriving - that close is the reset the caller loses the 413 to');
+    assert.ok(!finishedUpload.dropped, 'the refusal was lost to ' + finishedUpload.dropped);
+    assert.strictEqual(finishedUpload.status, 413,
+      'status ' + finishedUpload.status + ': ' + finishedUpload.text);
+    assert.strictEqual(finishedUpload.connection, 'close');
+    // 2097152 is MAX_BODY_BYTES: the caller is told the number it has to get under.
+    assert.ok(finishedUpload.text.indexOf('2097152') !== -1, finishedUpload.text);
+  });
+
+  // The limit is not one number for every endpoint, and docs/API.md names both: 2 MiB for a design or
+  // project body, 25 MiB for the five that carry a demand list or a street/duct graph (a duct graph is
+  // a whole KML, and an estate is thousands of rows, so the smaller limit would refuse real work).
+  // Asserted from both sides so the paragraph cannot drift back to "2 MiB for a JSON body": the same
+  // 2.5 MiB valid JSON is refused on `/api/design/budget` and reaches the handler on
+  // `/api/design/synthesise`, which answers about its missing `demand` rather than its size.
+  const twoAndAHalf = Buffer.from(JSON.stringify({ pad: 'x'.repeat(Math.round(2.5 * 1024 * 1024)) }));
+  const smallLimit = await request('POST', '/api/design/budget', twoAndAHalf);
+  const bigLimit = await request('POST', '/api/design/synthesise', twoAndAHalf);
+  test('the 2 MiB limit is a JSON body limit; the endpoints that carry a graph or a demand list take 25 MiB', function () {
+    assert.strictEqual(smallLimit.status, 413,
+      'status ' + smallLimit.status + ': ' + JSON.stringify(smallLimit.body));
+    assert.ok(smallLimit.body.error.indexOf('2097152') !== -1, smallLimit.body.error);
+    assert.strictEqual(bigLimit.status, 400,
+      'status ' + bigLimit.status + ': ' + JSON.stringify(bigLimit.body));
+    assert.ok(bigLimit.body.error.indexOf('demand is required') !== -1,
+      'the body was refused for its size instead of reaching the handler: ' + bigLimit.body.error);
+  });
+
   const splitOk = await request('GET', '/api/design/splitter?ratio=8');
   const splitZero = await request('GET', '/api/design/splitter?ratio=0');
   const splitText = await request('GET', '/api/design/splitter?ratio=abc');

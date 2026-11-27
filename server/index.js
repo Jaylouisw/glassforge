@@ -146,24 +146,29 @@ function readBody(req, limit) {
   return new Promise(function (resolve, reject) {
     const chunks = [];
     let size = 0;
-    let refused = false;
+    let over = null;
     req.on('data', function (chunk) {
-      if (refused) return;
+      // Past the limit nothing under it is useful to a refused request, so the buffer is released
+      // and the rest of the upload is read and thrown away rather than kept.
+      if (over) return;
       size += chunk.length;
       if (size > limit) {
-        refused = true;
-        // The refusal is a 413, and it has to be able to reach the caller: `req.destroy()` here tore
-        // down the socket the response travels on, so every over-limit body answered the client with
-        // ECONNRESET ("socket hang up") and the reason ("request body exceeds N bytes") was never
-        // said. Pausing is no better - the unread bytes stay in the socket, the close turns into a
-        // TCP reset, and a reset makes the client throw the response away. Keep reading and discard,
-        // so the 413 arrives and the connection closes in an orderly way.
-        reject(Object.assign(new Error('request body exceeds ' + limit + ' bytes'), { status: 413 }));
+        over = Object.assign(new Error('request body exceeds ' + limit + ' bytes'), { status: 413 });
+        chunks.length = 0;
         return;
       }
       chunks.push(chunk);
     });
-    req.on('end', function () { resolve(Buffer.concat(chunks)); });
+    // The 413 is answered when the upload **has finished**, not when it crosses the limit. Answering
+    // mid-upload ends the response's socket with the rest of the body still in its receive buffer,
+    // and the kernel answers that with RST - the caller then throws away the 413 it was just sent and
+    // reports ECONNRESET ("socket hang up"), so the reason is never read. `req.destroy()` did the
+    // same thing more reliably (#179) and rejecting here at the limit left a race: measured on that
+    // version, 3 of 10 x 2.5 MiB uploads to `/api/projects` lost their refusal, and a 10 MiB one lost
+    // it about half the time. Waiting costs one body read of bandwidth and nothing else - the bytes
+    // are already on the wire, the buffer is not kept, and Node's `requestTimeout` still ends a body
+    // that stops arriving.
+    req.on('end', function () { if (over) reject(over); else resolve(Buffer.concat(chunks)); });
     req.on('error', reject);
   });
 }
