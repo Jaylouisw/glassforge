@@ -560,6 +560,25 @@ async function handle(req, res, ctx) {
     // `design.options` refuses the value it cannot use, and now also a key that is a near miss of one
     // it reads: `{"margindb": 40}` used to answer `ok: true` at the 3 dB default while
     // `{"marginDb": 40}` refuses the estate.
+
+    // `applyToProject` names a project, and a value that does not name one is the caller's mistake -
+    // not "no project was named". The handler tested it for truthiness, so measured on 3007a02:
+    // `""`, `0` and `false` answered 200 with no `applied` and the project untouched (a caller whose
+    // project id went missing was told the design was applied, to nothing); `true` and `{}` fell
+    // through to the store and answered 404 `no project with id "true"` - a type error dressed as a
+    // missing project, which sends the caller hunting for one they deleted; and `["p1a2b3"]` answered
+    // 200 and *replaced the plant*, because String(["p1a2b3"]) is "p1a2b3" - the same coercion that
+    // made /budget look up "n3" for `["n3"]`. The field is checked for shape first, as `ontId` is,
+    // and before the design runs: a misspelt id must not be reported as "the design produced no
+    // feasible plant to apply". `null` stays design-only - it is how JSON says an optional field has
+    // no value, and the same reading `overlengthPct: null` gets.
+    const applyTo = body.applyToProject;
+    if (applyTo !== undefined && applyTo !== null && (typeof applyTo !== 'string' || applyTo === '')) {
+      const got = applyTo === '' ? 'an empty string' : describeJsonBody(applyTo);
+      return fail(req, res, 400, 'applyToProject must be the id of the project the design replaces and got ' +
+        got + ' - omit the field to design without writing');
+    }
+
     const designOpts = Object.assign({}, body);
     delete designOpts.demand;
     delete designOpts.applyToProject;
@@ -570,7 +589,7 @@ async function handle(req, res, ctx) {
       throw asBadRequest(err);
     }
 
-    if (!body.applyToProject) return sendJson(req, res, 200, result);
+    if (applyTo === undefined || applyTo === null) return sendJson(req, res, 200, result);
 
     // Applying a design is a separate, explicit step: the caller asked for a design, and a design
     // that silently overwrote their project would be the worst kind of helpful.
@@ -583,7 +602,7 @@ async function handle(req, res, ctx) {
     }
     let project;
     try {
-      project = store.readProject(body.applyToProject, ctx.dataRoot);
+      project = store.readProject(applyTo, ctx.dataRoot);
     } catch (err) {
       return fail(req, res, 404, err.message);
     }

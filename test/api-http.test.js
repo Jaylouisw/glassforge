@@ -432,6 +432,57 @@ async function main() {
     assert.strictEqual(applied.body.applied.projectId, id);
   });
 
+  // `applyToProject` names a project, and the handler read it by truthiness and handed whatever it
+  // got to the store. Measured on 3007a02, with the estate above:
+  //   `""`, `0`, `false`  answered 200 with no `applied` and the project untouched - a caller whose
+  //                       project id went missing was told the design was applied, to nothing;
+  //   `["<id>"]`          answered 200 and *did* replace the plant, because String(["p1a2b3"]) is
+  //                       "p1a2b3" - the same coercion that made /budget look up "n3" for `["n3"]`;
+  //   `true`, `{}`        answered 404 `no project with id "true"` - a type error dressed as a
+  //                       missing project, which sends the caller hunting for a project they deleted.
+  // The field is checked for shape first, as `ontId` is. `null` stays design-only: it is how JSON
+  // says an optional field has no value, and it is the reading `overlengthPct: null` already gets.
+  // The saved project right after the applied design, so a write under a refused id is detectable.
+  const savedAfterApply = await request('GET', '/api/projects/' + id);
+  const appliedAt = savedAfterApply.body.updatedAt;
+  const appliedHistory = savedAfterApply.body.history.length;
+  const emptyApply = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv, headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' }, applyToProject: ''
+  });
+  const boolApply = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv, headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' }, applyToProject: true
+  });
+  const listApply = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv, headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' }, applyToProject: [id]
+  });
+  const nullApply = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv, headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' }, applyToProject: null
+  });
+  const unknownApply = await request('POST', '/api/design/synthesise', {
+    demand: demandCsv, headEnd: { lat: 51.499, lon: -0.1004, name: 'PoP' }, applyToProject: 'nope-project'
+  });
+  test('an applyToProject that is not a project id is a 400 naming the field, not a silent no-op or a 404', function () {
+    for (const [label, res] of [['an empty string', emptyApply], ['a boolean', boolApply], ['a list', listApply]]) {
+      assert.strictEqual(res.status, 400, 'applyToProject ' + label + ' answered ' + res.status + '; a design-only call is the field omitted, not a value the server cannot name');
+      assert.ok(res.body.error.indexOf('applyToProject') !== -1, res.body.error);
+      assert.ok(res.body.error.indexOf('omit the field') !== -1, res.body.error);
+    }
+  });
+  const afterRefusals = await request('GET', '/api/projects/' + id);
+  test('a refused applyToProject leaves the saved project untouched', function () {
+    assert.strictEqual(afterRefusals.status, 200);
+    // A write stamps `updatedAt`, so an apply the guard refused cannot hide behind an identical plant.
+    assert.strictEqual(afterRefusals.body.updatedAt, appliedAt,
+      'the project was saved again by a refused applyToProject');
+    assert.strictEqual(afterRefusals.body.history.length, appliedHistory, 'a refused apply added an undo step');
+  });
+  test('null means design without writing, and an id that names no project is still a 404', function () {
+    assert.strictEqual(nullApply.status, 200, JSON.stringify(nullApply.body).slice(0, 200));
+    assert.strictEqual(nullApply.body.applied, undefined, 'null applyToProject wrote to the project');
+    assert.strictEqual(unknownApply.status, 404, 'status ' + unknownApply.status + ': ' + JSON.stringify(unknownApply.body).slice(0, 200));
+    assert.ok(unknownApply.body.error.indexOf('nope-project') !== -1, unknownApply.body.error);
+  });
+
   // `ladder` is the other option the design reads, and the handler dropped it the way it dropped
   // `overlengthPct`: the body named a 48-fibre ladder and the plant still carried
   // g652d-loose-12 on its two trunk spans, so the cable ordered was one the caller excluded.
