@@ -41,7 +41,8 @@ Rules the engine enforces:
 - **Nodes and spans have unique ids.** The project layer generates `n1`, `n2`, `s1`, …; the API
   accepts supplied ids and refuses duplicates.
 - **A cycle or an extra span is a warning, not a refusal.** You may be mid-drawing. A *contradiction*
-  (two OLTs, an unknown splitter model, a split ratio over the class limit) is an error.
+  (two OLTs, an unknown splitter model, a split ratio over the class limit, more strands on a span than
+  its cable carries - §6) is an error.
 - **A splitter has as many branches as it has ports.** The port count is the part's ratio, counted per
   site: a downstream splitter costs its parent one port, and a ninth drop on a 1:8 is a contradiction,
   because the OLT-level checks (deepest cascade, total ONTs) cannot see it — nine ONTs behind one 1:8
@@ -156,8 +157,12 @@ each, which is what the crew reads off the two trays. A span naming a cable the 
 falls back to the standard twelve rather than hiding the strand from the sheet.
 
 `spans[].strands` lists the strand indices **in use** on that span. The ledger reports used, spare and
-utilisation per span, and flags overbooking: 14 strands assigned to a 12-fibre cable is a real drum
-somebody cannot splice, not a cosmetic warning.
+utilisation per span, and an overbooked span is **refused**, not coloured: 14 strands assigned to a
+12-fibre cable is a real drum somebody cannot splice, so `network.validate` returns it as an error
+(`span "s1" uses 14 strands of a 12-fibre cable`) and the save gate answers `400 the edit would leave
+the plant invalid: span "s1" uses 14 strands of a 12-fibre cable`. The refusal reuses the ledger row's
+own `error` sentence, so the tab and the save cannot disagree about what is overbooked;
+`test/strand-overbooking-gate.test.js` is that refusal.
 
 An absent `strands` array means *nothing in use* — spare capacity, not zero capacity.
 
