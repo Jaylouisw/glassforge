@@ -169,7 +169,13 @@ graph** — there is no straight-line fallback while a graph is present. With `p
 legs are the minimum-cost edge-disjoint pair (Suurballe) where the graph allows one; where it does not,
 the second leg is the path that shares the fewest metres and `diversity.shared` names every shared
 segment with its metres (`diversity.sharedM` is `null` when there is only one leg: there is nothing to
-compare). Each leg carries its own `budget` from `budget.pointToPoint`, so reach, loss
+compare). **0 m shared is not the same claim as diverse**: two legs can share no duct at all and still
+pass through one chamber, so `diversity.sharedNodes` lists every interior vertex on both legs as
+`{ nodeId, lat, lon }` (`sharedNodeCount` repeats the length; the two sites are excluded, since every
+leg starts and ends at them) and `protection.achieved` requires the list to be empty. The sentence
+carries it in words - `no duct is shared, but both legs pass through 1 shared joint node
+(51.500000,-0.099000): one failure in that chamber takes out both legs` - and names a chamber by
+coordinate, because a vertex id is `planarize`'s numbering, not something on the drawing. Each leg carries its own `budget` from `budget.pointToPoint`, so reach, loss
 budget and overload are three verdicts per leg. `direction` picks which half of the circuit
 `budget` and `verdict` describe (default `"down"`, A launching into B); any value other than
 `"up"`/`"down"` is a 400, because the two directions are different receivers at different

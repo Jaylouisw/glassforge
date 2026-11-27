@@ -201,6 +201,11 @@ cycle, and §1 says a plant is a tree with one head-end. `link.design` returns a
 - **the pair is the minimum-cost edge-disjoint pair** the graph allows (Suurballe), and when the graph
   allows none, the second leg is the path that shares the fewest metres — with every shared segment
   reported and its metres, because "diverse except 180 m at the building entry" is the true answer;
+- **a shared joint is reported beside the shared metres.** Edge-disjoint legs can still meet in one
+  chamber — two ducts on either side of one manhole, or a side street drawn from the middle of the
+  main road, which `planarize` correctly turns into a junction — and one excavation there takes out
+  both legs. `diversity.sharedNodes` names those interior vertices (the two sites are excluded) and a
+  protected pair that still has one is **not** `achieved`, however clean the metre count reads;
 - **each leg is budgeted separately** by `budget.pointToPoint`: reach, loss budget and overload are
   three verdicts per leg, and a reason is prefixed with the leg it belongs to;
 - **a leased segment is fibre somebody else owns**: its stated length and loss are charged to the

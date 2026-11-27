@@ -265,6 +265,23 @@ function cableForFibres(cable, fibres, registry) {
       : '; no cable in the catalogue carries ' + fibres + ' fibres'));
 }
 
+/**
+ * The joints both legs pass through, as one clause: `both legs pass through 2 shared joint nodes
+ * (51.500000,-0.099000; 51.500000,-0.098000): one failure in any of those chambers takes out both
+ * legs`.
+ *
+ * A metre figure cannot express this - it is 0 m of shared duct - so the clause names the chambers, by
+ * coordinate, which is how a planner finds them on the drawing. Ids are not printed: a vertex id is
+ * `planarize`'s own numbering, not something on a map or in a duct record.
+ */
+function describeSharedJoints(joints) {
+  if (!joints || !joints.length) return null;
+  const one = joints.length === 1;
+  return 'both legs pass through ' + joints.length + ' shared joint ' + (one ? 'node' : 'nodes') +
+    ' (' + joints.map(function (joint) { return latLon(joint); }).join('; ') + '): one failure in ' +
+    (one ? 'that chamber' : 'any of those chambers') + ' takes out both legs';
+}
+
 function describeShared(segment) {
   if (segment.kind === 'site-spur') return segment.lengthM + ' m of site drop shared by both legs';
   return segment.lengthM + ' m of duct ' + latLon(segment.from) + ' -> ' + latLon(segment.to) +
@@ -347,6 +364,8 @@ function refusal(opts, context, reason) {
       legs: 0,
       sharedM: null,
       shared: [],
+      sharedNodes: [],
+      sharedNodeCount: 0,
       leasedSharedM: 0,
       leasedShared: [],
       sentence: 'no route was found: ' + reason
@@ -491,7 +510,8 @@ function design(input, registry) {
         method: routed.method,
         disjoint: routed.disjoint,
         shared: routed.shared,
-        sharedM: routed.sharedM
+        sharedM: routed.sharedM,
+        sharedNodes: routed.sharedNodes || []
       };
       if (routed.method === 'single-route') {
         notes.push('The graph offers exactly one route between the sites, so there is one leg and no protection.');
@@ -504,7 +524,7 @@ function design(input, registry) {
       }
       routedLegs = [path];
       context.method = 'shortest-path';
-      diversity = { requested: 'single', method: 'shortest-path', disjoint: false, shared: [], sharedM: null };
+      diversity = { requested: 'single', method: 'shortest-path', disjoint: false, shared: [], sharedM: null, sharedNodes: [] };
     }
   } else {
     const chord = round(geo.distanceM(opts.sites.a, opts.sites.b) * opts.routeFactor, 2);
@@ -514,7 +534,7 @@ function design(input, registry) {
       lengthM: chord,
       route: [{ lat: opts.sites.a.lat, lon: opts.sites.a.lon }, { lat: opts.sites.b.lat, lon: opts.sites.b.lon }]
     }];
-    diversity = { requested: opts.protection, method: 'straight-line', disjoint: false, shared: [], sharedM: null };
+    diversity = { requested: opts.protection, method: 'straight-line', disjoint: false, shared: [], sharedM: null, sharedNodes: [] };
   }
 
   const spurA = graph ? snaps.a.spurM : 0;
@@ -642,7 +662,12 @@ function design(input, registry) {
   }
   const leasedShared = legs.length > 1 ? opts.thirdParty.filter(function (seg) { return seg.leg === 'both'; }) : [];
   const leasedSharedM = round(sum(leasedShared, function (seg) { return seg.lengthM; }), 2);
-  const achieved = legs.length > 1 && sharedM === 0 && leasedSharedM === 0;
+  // The joints both legs pass through (`street.diversePaths` reports them). Edge-disjoint is not the
+  // same as diverse: two legs can share no duct at all and still meet in one chamber, and one fire or
+  // one excavation there takes out both. Zero shared metres with a shared joint is not protection
+  // achieved, so it counts here and the sentence names it.
+  const sharedNodes = legs.length > 1 ? (diversity.sharedNodes || []) : [];
+  const achieved = legs.length > 1 && sharedM === 0 && leasedSharedM === 0 && sharedNodes.length === 0;
 
   let sentence;
   if (legs.length < 2) {
@@ -662,7 +687,14 @@ function design(input, registry) {
       const providers = leasedShared.map(function (seg) { return seg.provider; });
       bits.push('a ' + leasedSharedM + ' m leased segment (' + providers.join(', ') + ') carried on both legs');
     }
-    sentence = 'diverse except ' + bits.join(' and ');
+    const joints = describeSharedJoints(sharedNodes);
+    if (bits.length) {
+      sentence = 'diverse except ' + bits.join(' and ') + (joints ? ', and ' + joints : '');
+    } else {
+      // No duct and no lease shared, but the legs still meet: the metres read clean and the circuit
+      // is not diverse, which is exactly the case that used to be answered as fully protected.
+      sentence = 'no duct is shared, but ' + joints;
+    }
   }
 
   if (opts.protection === 'diverse' && !achieved) {
@@ -752,6 +784,8 @@ function design(input, registry) {
       legs: legs.length,
       shared: shared,
       sharedM: legs.length > 1 ? round(sharedM, 2) : null,
+      sharedNodes: sharedNodes,
+      sharedNodeCount: sharedNodes.length,
       leasedShared: leasedShared,
       leasedSharedM: leasedSharedM,
       sentence: sentence

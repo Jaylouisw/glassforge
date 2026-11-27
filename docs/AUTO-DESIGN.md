@@ -316,7 +316,17 @@ that no protected pair can be drawn — it does not pretend otherwise.
 
 The pair is the minimum-cost edge-disjoint pair the graph allows (Suurballe: shortest path, reverse its
 arcs at negative cost, shortest path in the residual graph, cancel the arcs used in opposite
-directions). A ring gives two legs of half the ring each and `sharedM: 0`.
+directions). A ring gives two legs of half the ring each and `sharedM: 0`, and `sharedNodes: []`.
+
+Edge-disjoint is not the same claim as diverse. Two legs can share no duct at all and still pass
+through one chamber — two ducts on either side of one manhole, or a side street drawn from the middle
+of the main road, which `planarize` turns into a junction — and a fire or one excavation there takes
+out both. `diversity.sharedNodes` names those interior vertices as `{ nodeId, lat, lon }` (sorted by
+id; `sharedNodeCount` repeats the length) and the two sites are excluded, because both legs start and
+end at them. A pair with a shared joint is not `achieved` however clean the metres read, and the
+sentence says so: `no duct is shared, but both legs pass through 1 shared joint node
+(51.500000,-0.099000): one failure in that chamber takes out both legs`. It is reported, never routed
+around: the pair stays the minimum-cost edge-disjoint pair, which is the documented method.
 
 Where the graph offers no second route — one corridor into the building, the normal case — the second
 leg is the path that **shares the fewest metres**, and the sharing is reported rather than hidden:

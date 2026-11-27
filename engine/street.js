@@ -805,6 +805,37 @@ function pathOverArcs(arcs, fromId, toId) {
   return path.reverse();
 }
 
+/**
+ * The joints both legs pass through, as `{ nodeId, lat, lon }` sorted by id.
+ *
+ * Edge-disjoint is not diverse. Two legs can share no duct at all and still both run through the same
+ * chamber, and that is an everyday shape rather than a contrived one: two ducts on either side of one
+ * manhole, or a side street drawn from the middle of the main road (which `planarize` correctly turns
+ * into a junction) both give two edge-disjoint legs and one shared joint. A fire, a flood or a single
+ * excavation in that chamber takes out both legs, so "0 m shared" on its own is a diversity claim a
+ * planner cannot sign off.
+ *
+ * The terminals are excluded: both legs must start at one site and end at the other, so the two sites
+ * are shared by definition and saying so would refuse every circuit.
+ */
+function sharedJoints(graph, legs, fromId, toId) {
+  if (legs.length < 2) return [];
+  const seen = new Map();
+  for (const leg of legs) {
+    for (const nodeId of new Set(leg.nodes)) {
+      if (nodeId === fromId || nodeId === toId) continue;
+      seen.set(nodeId, (seen.get(nodeId) || 0) + 1);
+    }
+  }
+  const joints = [];
+  for (const nodeId of Array.from(seen.keys()).sort(cmp)) {
+    if (seen.get(nodeId) < 2) continue;
+    const point = nodePoint(graph, nodeId);
+    joints.push({ nodeId: nodeId, lat: point.lat, lon: point.lon });
+  }
+  return joints;
+}
+
 function legOrderKey(leg) {
   return leg.lengthM.toFixed(3) + '|' + leg.edges.map(function (e) { return e.edgeId; }).join(',');
 }
@@ -828,6 +859,12 @@ function orderLegs(legs) {
  * that minimises *shared metres* (shared edges carry a penalty larger than the whole network) and the
  * shared segments are returned by name with their metres. "Diverse until the last duct" is a real
  * answer and it is printed, not hidden.
+ *
+ * `sharedNodes` is the other half of the diversity answer: the joints (interior vertices, both
+ * terminals excluded) that both legs pass through. Edge-disjoint routes can still meet in one chamber
+ * - two ducts on either side of one manhole is the everyday case - and a single failure there takes
+ * out both legs, so the metres alone do not describe the protection. It is reported, never routed
+ * around: the pair stays the minimum-cost edge-disjoint pair, which is the documented method.
  *
  * Returns null when the graph does not connect the two nodes at all.
  */
@@ -897,7 +934,16 @@ function diversePaths(graph, fromId, toId, opts) {
           }
         }
         if (disjoint) {
-          return { legs: legs, shared: [], sharedM: 0, disjoint: true, method: 'suurballe' };
+          // Edge-disjoint, but check the joints: two legs that share no duct can still meet in one
+          // chamber, and that is a common point of failure the metres do not show.
+          return {
+            legs: legs,
+            shared: [],
+            sharedM: 0,
+            disjoint: true,
+            sharedNodes: sharedJoints(graph, legs, fromId, toId),
+            method: 'suurballe'
+          };
         }
       }
     }
@@ -914,7 +960,14 @@ function diversePaths(graph, fromId, toId, opts) {
   }
   const alternate = shortestArcs(graph, weighted, fromId, toId);
   if (!alternate) {
-    return { legs: [legFromArcs(graph, fromId, first.arcs)], shared: [], sharedM: 0, disjoint: false, method: 'single-route' };
+    return {
+      legs: [legFromArcs(graph, fromId, first.arcs)],
+      shared: [],
+      sharedM: 0,
+      disjoint: false,
+      sharedNodes: [],
+      method: 'single-route'
+    };
   }
 
   const alternateEdges = new Set(alternate.arcs.map(function (a) { return a.edgeId; }));
@@ -934,11 +987,13 @@ function diversePaths(graph, fromId, toId, opts) {
     sharedM += edge.lengthM;
   }
 
+  const legs = orderLegs([legFromArcs(graph, fromId, first.arcs), legFromArcs(graph, fromId, alternate.arcs)]);
   return {
-    legs: orderLegs([legFromArcs(graph, fromId, first.arcs), legFromArcs(graph, fromId, alternate.arcs)]),
+    legs: legs,
     shared: shared,
     sharedM: round(sharedM, 2),
     disjoint: sharedM === 0,
+    sharedNodes: sharedJoints(graph, legs, fromId, toId),
     method: o.method || 'fewest-shared-metres'
   };
 }

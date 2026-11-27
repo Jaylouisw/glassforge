@@ -114,8 +114,10 @@ the same string as its own `method`.
 **Route factor** — the multiplier applied to straight-line distance when there is no geometry to walk.
 
 **Diversity** — for a two-site link, how much of the second leg shares geometry with the first, reported
-in metres and naming every shared segment. A third-party segment is a leased circuit: it carries a stated
-length and loss, and stays out of the cable-to-buy.
+in metres and naming every shared segment, plus the **shared joints**: interior vertices both legs pass
+through (`sharedNodes`, by coordinate). Edge-disjoint legs can still meet in one chamber, and 0 m shared
+with a shared joint is not a diverse pair - `achieved` requires an empty joint list. A third-party
+segment is a leased circuit: it carries a stated length and loss, and stays out of the cable-to-buy.
 
 ## Links and circuits
 

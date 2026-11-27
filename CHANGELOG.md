@@ -37,6 +37,19 @@ and the checks, and a PNG of the drawing at a stated scale.
 
 ### Fixed
 
+- **A link whose legs share no duct but meet in one chamber is not called diverse.** Suurballe's pair
+  is edge-disjoint, and `diversity.sharedM` read `0` for two legs that still both turn at the same
+  manhole - two ducts either side of one chamber, or a side street drawn from the middle of the main
+  road - so a fire or one excavation there took out a circuit reported as fully protected.
+  `street.diversePaths` now returns `sharedNodes`, the interior vertices on both legs (`{ nodeId, lat,
+  lon }`, sorted by id, terminals excluded), `link.design` carries them as `diversity.sharedNodes` /
+  `sharedNodeCount`, and `protection.achieved` requires the list to be empty. The sentence names the
+  chamber by coordinate (`no duct is shared, but both legs pass through 1 shared joint node
+  (51.500000,-0.099000): one failure in that chamber takes out both legs`) and a `diverse` request that
+  hits one carries the usual "not diverse" warning. Tests: `link-shared-joint` adds 4 (the
+  edge-disjoint pair through one chamber, shared metres named beside the joint, a ring with `[]` and
+  the two sites excluded, a whole-corridor pair with no interior vertex).
+
 - **A link's cable ladder is a list of catalogue models, refused rather than silently defaulted.**
   `engine/link.js` normalised every other BOM knob through `design-fields` and left `ladder` as
   `Array.isArray(o.ladder) && o.ladder.length ? o.ladder : DEFAULT_LADDER`. A bare model name was read
