@@ -4,6 +4,7 @@
 const zlib = require('zlib');
 const { test, assert, throws, close, done } = require('./harness');
 const kml = require('../engine/kml');
+const street = require('../engine/street');
 
 const SAMPLE = '<?xml version="1.0" encoding="UTF-8"?>\n' +
   '<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Barrio Norte</name>' +
@@ -101,6 +102,40 @@ test('duplicate coordinates are deduplicated and counted', function () {
     '<Placemark><name>NAP 12 copy</name><Point><coordinates>-0.1010,51.5010,0</coordinates></Point></Placemark></Document>');
   const result = kml.classify(kml.parseKml(doubled));
   assert.strictEqual(result.points.length, 1);
+  assert.strictEqual(result.duplicates, 1);
+});
+
+test('two routes that share both ends but not their middle are both streets', function () {
+  // A side street leaves the main road at one junction and returns at the next: the two routes have
+  // the same first and last coordinate and no other vertex in common. Keying a duplicate on the ends
+  // alone dropped the second line as if it were the same export twice, so `street.buildGraph` never
+  // saw an edge that is drawn on the map and the planner routed around a street that exists.
+  const two = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>' +
+    '<Placemark><name>Main road</name><LineString><coordinates>' +
+    '-0.1000,51.5000,0 -0.1010,51.5000,0 -0.1010,51.5010,0</coordinates></LineString></Placemark>' +
+    '<Placemark><name>Parallel street</name><LineString><coordinates>' +
+    '-0.1000,51.5000,0 -0.0990,51.5010,0 -0.1010,51.5010,0</coordinates></LineString></Placemark>' +
+    '</Document></kml>';
+  const result = kml.classify(kml.parseKml(two));
+  assert.strictEqual(result.routes.length, 2, 'both streets survive classification');
+  assert.strictEqual(result.duplicates, 0);
+  assert.ok(result.routeM > 200, 'both route lengths are counted, got ' + result.routeM);
+  // The import is the graph: 2 edges per street, 4 nodes, nothing merged away.
+  assert.strictEqual(street.buildGraph(two).stats().edges, 4, 'the routing graph has both streets (2 edges each)');
+});
+
+test('a route exported twice is still skipped as a duplicate', function () {
+  // The old rule is still a rule: the same line, vertex for vertex, is one street, not two.
+  const xml = '<?xml version="1.0" encoding="UTF-8"?>' +
+    '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>' +
+    '<Placemark><name>Feeder</name><LineString><coordinates>' +
+    '-0.1000,51.5000,0 -0.1010,51.5010,0</coordinates></LineString></Placemark>' +
+    '<Placemark><name>Feeder copy</name><LineString><coordinates>' +
+    '-0.1000,51.5000,0 -0.1010,51.5010,0</coordinates></LineString></Placemark>' +
+    '</Document></kml>';
+  const result = kml.classify(kml.parseKml(xml));
+  assert.strictEqual(result.routes.length, 1);
   assert.strictEqual(result.duplicates, 1);
 });
 
