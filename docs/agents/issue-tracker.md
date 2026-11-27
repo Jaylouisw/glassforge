@@ -1,66 +1,56 @@
 # Issue Tracker
 
-Issues and pull requests live on the Forgejo instance that hosts this repo. There is no GitHub tracker
-for Glassforge; GitHub is not a mirror target either.
+Issues and pull requests live on GitHub, in this repository. The project spent a few weeks on a
+self-hosted Forgejo instance and came back; that instance still exists as an archive, but nothing is
+filed, reviewed or merged there any more.
 
-- Web: `https://git.jayw.uk/jaylouisw/glassforge`
-- API: `http://odin:3000/api/v1/repos/jaylouisw/glassforge`
-- Auth: an application token. Never inline it in a document or a commit; the development agents read it
-  from `C:/Users/jay/AppData/Local/hermes/secrets/forgejo.token`.
+- Repository: `https://github.com/jaylouisw/glassforge`
+- Issues: `https://github.com/jaylouisw/glassforge/issues`
+- Pull requests: `https://github.com/jaylouisw/glassforge/pulls`
+- CLI: `gh` (already authenticated on the development host; no token file to manage)
 
 ## Reading
 
 ```bash
-TOK=$(tr -d '\r\n' < C:/Users/jay/AppData/Local/hermes/secrets/forgejo.token)
-# open issues, newest first
-curl -sS -H "Authorization: token $TOK" \
-  'http://odin:3000/api/v1/repos/jaylouisw/glassforge/issues?state=open&type=issues&limit=50'
-# one issue, with its body
-curl -sS -H "Authorization: token $TOK" \
-  'http://odin:3000/api/v1/repos/jaylouisw/glassforge/issues/12'
+gh issue list --state open --limit 50
+gh issue view 42 --comments
+gh pr list --state open --json number,title,headRefName,headRefOid,mergeable,statusCheckRollup
+gh pr checks 43
 ```
+
+`gh pr list --json statusCheckRollup` is the authoritative check state. Do not infer it from
+`git ls-remote`: a branch can exist on the remote while its push is still landing, and a pull request
+can be green while a ref listing says nothing about it.
 
 ## Writing
 
 ```bash
-# create an issue from a JSON body file
-curl -sS -X POST -H "Authorization: token $TOK" -H 'Content-Type: application/json' \
-  --data-binary @issue.json http://odin:3000/api/v1/repos/jaylouisw/glassforge/issues
+# file an issue from a body file (write the body to a file rather than a shell string)
+gh issue create --title "..." --body-file /path/to/body.md --label needs-triage
 
 # comment, label, close
-curl -sS -X POST -H "Authorization: token $TOK" -H 'Content-Type: application/json' \
-  -d '{"body":"..."}' http://odin:3000/api/v1/repos/jaylouisw/glassforge/issues/12/comments
-# The label body takes a label **name** (or its id from `GET /labels`; the five triage labels are
-# ids 13-17, table in `docs/agents/triage-labels.md`). Prefer the name: label ids changed when the
-# labels were recreated, and a name or id that does not exist is answered `200` with nothing
-# applied - read the label list in the reply, not the status code.
-curl -sS -X POST -H "Authorization: token $TOK" -H 'Content-Type: application/json' \
-  -d '{"labels":["needs-triage"]}' http://odin:3000/api/v1/repos/jaylouisw/glassforge/issues/12/labels
-curl -sS -X PATCH -H "Authorization: token $TOK" -H 'Content-Type: application/json' \
-  -d '{"state":"closed"}' http://odin:3000/api/v1/repos/jaylouisw/glassforge/issues/12
+gh issue comment 42 --body "..."
+gh issue edit 42 --add-label ready-for-agent
+gh issue close 42 --reason "not planned"
 ```
 
 ## Pull requests
 
-`main` refuses direct pushes (`enable_push: false`). Every change is a branch, a pull request, a green
-CI run on the head SHA, then a squash merge:
+`main` is protected: direct pushes are refused and these checks must pass before a merge —
+`Test (Node 18)`, `Test (Node 20)`, `Test (Node 22)`, `Server smoke test`, `Docker build`. That is a
+real gate here, not just evidence: GitHub does not append `(push)`/`(pull_request)` to context names,
+so the required checks are stable (the Forgejo runner did append them, which is why status gating had
+to stay off there).
 
 ```bash
-bash scripts/push-branch.sh <branch>
-curl -sS -X POST -H "Authorization: token $TOK" -H 'Content-Type: application/json' \
-  -d '{"head":"jaylouisw:<branch>","base":"main","title":"...","body":"Closes #12"}' \
-  http://odin:3000/api/v1/repos/jaylouisw/glassforge/pulls
+git push -q origin HEAD:refs/heads/<branch>
+gh pr create --base main --head <branch> --title "..." --body-file /path/to/body.md
+gh pr merge <n> --squash --delete-branch
 ```
 
-`scripts/push-branch.sh` is the only supported push: it reads the token file, pushes
-`HEAD:refs/heads/<branch>` to the forge and prints the compare URL. Do **not** use
-`git -c credential.helper= push` — it clears the credential store and dies with
-`could not read Username for 'http://odin:3000'`, losing the work tail. `$TOK` is the one defined in
-the Reading section above.
-
-The `head` must be owner-qualified or Forgejo answers `bad revision`. Status-check gating is off on
-purpose: the runner appends `(push)` / `(pull_request)` to context names, so a fixed required-check
-string would freeze every pull request.
+`scripts/push-branch.sh <branch>` wraps the push, and `node scripts/repo-state.js` prints the whole
+queue — main SHA, every open pull request with its checks, every open issue with its labels — in one
+call.
 
 ## External PRs as a request surface
 

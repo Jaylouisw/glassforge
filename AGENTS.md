@@ -13,10 +13,10 @@ Read `docs/SPEC.md` for the model and `GLOSSARY.md` for the vocabulary before ch
 - **Two technologies, one loss model.** The root node type picks the budget: `olt` → PON, `headend` →
   active point-to-point. The passive loss is shared code, so the two verdicts cannot drift.
 - **`main` is PR-only.** Branch → pull request → green CI → squash merge. Nobody commits to `main`.
-  Branch protection sets `enable_push: false` but **`enable_status_check: false`**: the checks are not a
-  gate the server enforces, they are evidence a merger reads. The runner appends `(push)` or
-  `(pull_request)` to every context name, so a fixed required-check string would freeze every pull
-  request — that is why it is off. Read the run before merging; do not assume green is guaranteed.
+  Branch protection blocks direct pushes and requires the `Test (18/20/22)`, `Server smoke test` and
+  `Docker build` checks, so a red or pending run really does block a merge here. That is a change from
+  the Forgejo instance, where the runner appended `(push)`/`(pull_request)` to every context name and
+  status gating had to stay off.
 - **TypeScript for new modules, and never `any`.** New code is written `.ts`; legacy `.js` migrates as it
   is touched (`allowJs` is off, so a `.ts` module reaches a `.js` one with `require()` plus a local
   interface). The emitted `.js` is committed — build before you push, or CI fails on
@@ -53,8 +53,7 @@ job, and it is **not the whole matrix**. Two CI steps it does not reproduce:
 
 ### Issue tracker
 
-Issues and pull requests live on the Forgejo instance, not on GitHub. See
-`docs/agents/issue-tracker.md`.
+Issues and pull requests live on GitHub. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

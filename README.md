@@ -5,14 +5,14 @@ splice, check the optical power budget, and get the cable to buy. Or paste a lis
 it design the topology: PON with splitters, or active Ethernet over a shared cable tree. One project,
 on your own machine, with no account and no subscription.
 
-[![CI](https://git.jayw.uk/jaylouisw/glassforge/badges/workflows/ci.yml/badge.svg)](https://git.jayw.uk/jaylouisw/glassforge/actions?workflow=ci.yml)
+[![CI](https://github.com/jaylouisw/glassforge/actions/workflows/ci.yml/badge.svg)](https://github.com/jaylouisw/glassforge/actions/workflows/ci.yml)
 
 It is the open counterpart to the hosted FTTH planners: the same three artefacts a fibre deployment
 actually runs on — the **route**, the **splice diagram**, and the **optical budget** — built as a
 zero-dependency Node app you can run on a laptop in a site office.
 
 ```bash
-git clone https://git.jayw.uk/jaylouisw/glassforge.git
+git clone https://github.com/jaylouisw/glassforge.git
 cd glassforge
 node server/index.js          # then open http://127.0.0.1:8000
 ```
@@ -167,7 +167,7 @@ committed `.js` disagrees with its source, so build before pushing and commit th
 `any` is refused outright (`node scripts/check-no-any.js`): use `unknown` and narrow it, as
 `engine/geo.ts` does.
 
-Development happens on [the Forgejo instance](https://git.jayw.uk/jaylouisw/glassforge):
+Development happens on [GitHub](https://github.com/jaylouisw/glassforge):
 one issue ↔ one pull request, and the CI matrix has to be green before it merges.
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 

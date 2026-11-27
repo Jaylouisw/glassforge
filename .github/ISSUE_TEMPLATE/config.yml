@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: How the model works
-    url: https://git.jayw.uk/jaylouisw/glassforge/src/branch/main/docs/SPEC.md
+    url: https://github.com/jaylouisw/glassforge/blob/main/docs/SPEC.md
     about: Read the plant, budget and BOM rules before filing a behaviour question.

@@ -1,5 +1,5 @@
 'use strict';
-// The Docker build job needs a docker daemon, and the Forgejo runner's job image does not
+// The Docker build job needs a docker daemon, and GitHub's hosted job image does not
 // have one: `docker` is not on PATH inside node:20-bookworm and /var/run/docker.sock is not
 // mounted. So `docker build` failed on every pull request for reasons that had nothing to do
 // with the change - a permanently red check that blocks everything, which is how a CI gate

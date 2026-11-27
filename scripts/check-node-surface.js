@@ -2,7 +2,7 @@
 /**
  * The suite has to pass on Node 18, and the machine running it here is usually newer.
  *
- * CI tests 18, 20 and 22 (see the matrix in .forgejo/workflows/ci.yml). A developer on Node 24 -
+ * CI tests 18, 20 and 22 (see the matrix in .github/workflows/ci.yml). A developer on Node 24 -
  * which is what this repo's own dev machine runs - can use `Array.prototype.toSorted`,
  * `Object.groupBy` or `Promise.withResolvers`, watch a green suite, and push a commit that fails
  * only on the oldest job. The failure then appears twenty minutes later attributed to "Test (Node

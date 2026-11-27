@@ -2,8 +2,8 @@
 
 ## Reporting
 
-Report a vulnerability privately through the Forgejo instance:
-[open a confidential issue](https://git.jayw.uk/jaylouisw/glassforge/issues/new) or contact the
+Report a vulnerability privately through GitHub's advisory form:
+[open a draft security advisory](https://github.com/jaylouisw/glassforge/security/advisories/new) or contact the
 maintainer directly. Please do not open a public issue for something exploitable.
 
 Include the version (`/api/health`), what an attacker gains, and the smallest reproduction you have.
