@@ -164,7 +164,13 @@ the plant invalid: span "s1" uses 14 strands of a 12-fibre cable`. The refusal r
 own `error` sentence, so the tab and the save cannot disagree about what is overbooked;
 `test/strand-overbooking-gate.test.js` is that refusal.
 
-An absent `strands` array means *nothing in use* — spare capacity, not zero capacity.
+An absent `strands` array means *nothing in use* — spare capacity, not zero capacity. A value that is
+present and not a list — `"1,2"`, `2`, `{}`, `null` — is **refused** by span and by value, because
+every reader walks the list as one (`"1,2"` read as zero in the strands tab and as three in a design
+run): `span "s1" has an invalid strands list "1,2" - strands is a list of the strand numbers in use,
+and a value that is not a list is refused rather than read as no strands`. `PUT` answers
+`400 the design does not validate` and `/ops` answers `400 the edit would leave the plant invalid:`
+with that sentence.
 
 ## 7. Projects and undo
 
