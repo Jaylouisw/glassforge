@@ -1,0 +1,25 @@
+{
+  "kind": "cable",
+  "model": "g652d-ribbon-144",
+  "vendor": "generic",
+  "label": "G.652.D ribbon 144F",
+  "fiberCount": 144,
+  "fibersPerTube": 12,
+  "construction": "ribbon",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Ribbon construction, not loose tube: 12 ribbons of 12 fibres, one ribbon per tube position, the addressing g652d-ribbon-216 already assumes. Belden prints that cable as 18 active subunits of 12F (FS2L216ND), and this row is the same build one rung down - Belden FDSR144R2 is sold as '144 Fibers 12F Subs', twelve subunits of twelve. Attenuation here is typical installed performance, not a G.652.D limit: 0.35 dB/km at 1310 nm sits under the recommendation's 0.40 dB/km maximum (1310-1625 nm), and 0.21 dB/km at 1550 nm under its 0.30 dB/km maximum (1530-1565 nm). 1490 nm is a typical, interpolated value: no ITU-T recommendation publishes a 1490 nm attenuation figure of its own (G.652.D's 0.40 dB/km maximum spans 1310-1625 nm but is not a 1490 nm specification), so 0.22 dB/km bridges the two published windows and is not a citation. Two 144F ribbon sheets print different maxima for the same fibre count because they are different jackets, and neither is this row: STL's Celesta HD IBR 144F prints 0.40 dB/km at 1310 and 0.30 at 1550 (a dry single-tube intermittently-bonded ribbon, CPR B2ca), while Belden FDSR144R2 prints 0.50 dB/km at both windows because it is an indoor/outdoor flexible-ribbon riser. Budgeting a duct trunk at either maximum prices the worst cable ever shipped out of the factory; for a budget that gets signed, take the as-built OTDR trace. Why this rung exists: the ribbon ladder jumped 216 - 288 - 432, and the DEFAULT_LADDER's richest entry is g652d-loose-144, so a ribbon ladder resolved every span between 100 and 144 fibres to the 216F rung and bought 216 fibres for a 120-fibre demand - design.cableFor(120, ['g652d-ribbon-216','g652d-ribbon-288','g652d-ribbon-432']) answers 216F, 72 fibres of cable more than the span carries. 144F is a stocked ribbon size and not an invented one: Prysmian's AccuRibbon DC sheet offers 'up to eighteen 12-fiber AccuRibbon units (12 to 216 fibers)', so 12 x 12 is the same family as the 18 x 12 build the 216 row cites, and Prysmian's nbn F144S2RCTNNBNV2 is a 144F ribbon cable of 12 ribbons at 12 fibres. Caveat that travels with the addressing: that nbn cable carries its 12 ribbons inside ONE tube, while this row's fibersPerTube 12 puts each ribbon in its own tube position (the subunit reading). A plant drawn on a single-tube 12-ribbon cable numbers the same strands and labels the tube differently - read the construction sheet of the cable actually bought. drumM is 2,000 m: STL's Celesta sheet packs 2 km wooden drums and Prysmian's A-D(SR)(Z)2Y 12x12 build - the 144 sibling of the 18x12 sheet g652d-ribbon-216 cites - prints standard lengths of 2,000 / 4,000 / 6,000 m, so the floor is kept for the reason g652d-ribbon-288 gives: a 3 km run should be quoted two 2 km drums rather than a whole 4 km reel it cannot pull in one go. The reel actually ordered wins; set drumM to it. This row is not in DEFAULT_LADDER either, so it reaches a design through the ladder option or an engine change to the default ladder; the part alone does not re-rank existing designs. Replace all three attenuation figures with the bought cable's test report for a construction-grade budget.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.652/en",
+  "tags": [
+    "generic",
+    "g.652.d"
+  ]
+}
