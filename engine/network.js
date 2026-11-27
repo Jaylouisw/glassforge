@@ -188,14 +188,21 @@ function trace(plant, ontId) {
  * cables meeting the box, and the one cable touching it at the end of a path. That is why the last
  * handhole on a feeder fed by 12 fibres and closed by one drop holds one splice, not twelve.
  * A strand's own loss is a separate question and stays one splice per closure (see `designForOnt`).
+ *
+ * A span's `bundles` is how many whole cables run it, so every one of them enters the box: a
+ * `2 x 12` feeder is 24 fibres at the tray, not 12 (`spanFibreCapacity`, the same capacity the
+ * strand ledger counts). Reading only `fiberCount` put 24 fibres through a 12-splice handhole and
+ * reported it exactly full, so the over-stuffed box the note exists to name stayed silent.
  */
 function splicesAtClosure(nodeId, spans, registry) {
   let smallest = null;
   for (const span of spans) {
     if (span.from !== nodeId && span.to !== nodeId) continue;
-    const cable = registry.has('cable', span.cable) ? registry.get('cable', span.cable) : null;
-    if (!cable || !isNum(cable.fiberCount)) continue;
-    if (smallest === null || cable.fiberCount < smallest) smallest = cable.fiberCount;
+    const cap = spanFibreCapacity(span, registry);
+    if (cap.fiberCount === null) continue;
+    // Every cable in the bundle carries its own fibres into the tray.
+    const fibres = cap.fiberCount * cap.bundles;
+    if (smallest === null || fibres < smallest) smallest = fibres;
   }
   return smallest === null ? 0 : smallest;
 }
@@ -849,7 +856,15 @@ function validate(plant, registry) {
     (plant.nodes || []).forEach(function (node) {
       if (node.type !== 'closure' || !node.model || !registry.has('closure', node.model)) return;
       const closure = registry.get('closure', node.model);
-      const touching = spans.filter(function (s) { return s.from === node.id || s.to === node.id; }).length;
+      // A span is one route, not always one cable: `bundles` cables enter the box, which is what its
+      // `ports` counts (docs/PARTS.md). Counting spans read a `2 x 12` feeder as a single cable, so
+      // six cables into a four-port handhole passed silent while the warning's own sentence said
+      // "cables". `validate` only reaches here when every span's bundles count already passed the
+      // gate above, so the value is a positive whole number.
+      const touching = spans.reduce(function (n, s) {
+        if (s.from !== node.id && s.to !== node.id) return n;
+        return n + (s.bundles === undefined ? 1 : s.bundles);
+      }, 0);
       if (closure.ports && touching > closure.ports) {
         warnings.push('closure "' + (node.name || node.id) + '" has ' + touching + ' cables into ' + closure.ports + ' ports');
       }
