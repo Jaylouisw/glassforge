@@ -271,6 +271,33 @@ async function main() {
     assert.deepStrictEqual(badModel.body.errors, ['node "n2" uses unknown splitter model "plc-1x99-sca"']);
   });
 
+
+  // ------------------------------------------------------------------ a node's type is not an edit field
+  // `update-node` copied `type` out of the patch and the op's contract is name/model/lat/lon. The
+  // field is not cosmetic: `computeOdn` charges a splitter's loss only on a node of type splitter,
+  // so retyping this plant's 1:8 to a closure kept its model as a warning and dropped 10.5 dB out of
+  // the ODN with a 200 - a healthy estate answering "fail - too loud, fit a pad". Retyping the only
+  // ONT has the other shape: the customer leaves /budget and the BOM with no error at all.
+  const retyped = await op(id, { op: 'update-node', id: 'n2', patch: { type: 'closure' } });
+  test('retyping a node through update-node is a 400 naming the node and the field', function () {
+    assert.strictEqual(retyped.status, 400, brief(retyped));
+    assert.ok(retyped.body.error.indexOf('"n2"') !== -1, retyped.body.error);
+    assert.ok(retyped.body.error.indexOf('type') !== -1, retyped.body.error);
+  });
+
+  const afterRetype = await request('GET', '/api/projects/' + id);
+  const afterRetypeBudget = await request('POST', '/api/projects/' + id + '/budget', {});
+  test('the refused retype left the splitter a splitter, so its 10.5 dB is still in the budget', function () {
+    const splitter = afterRetype.body.nodes.filter(function (n) { return n.id === 'n2'; })[0];
+    assert.strictEqual(splitter.type, 'splitter', 'the 200 that retyped the plant is back');
+    assert.deepStrictEqual(afterRetype.body.derived.errors, []);
+    const row = afterRetypeBudget.body.budgets[0].result;
+    const split = row.breakdown.filter(function (b) { return b.kind === 'splitter'; })[0];
+    assert.ok(split, 'the splitter loss is not in the ODN: ' + JSON.stringify(row.breakdown));
+    assert.strictEqual(split.db, 10.5);
+    assert.strictEqual(row.verdict, 'ok');
+  });
+
   const wrongOntKind = await op(id, { op: 'update-node', id: 'n3', patch: { model: 'sfp-plus-10g-er-40km' } });
   test('an ONT given a transceiver model is refused for the same reason, with the engine\'s wording', function () {
     assert.strictEqual(wrongOntKind.status, 400, brief(wrongOntKind));

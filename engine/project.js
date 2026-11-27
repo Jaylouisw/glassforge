@@ -185,7 +185,20 @@ function apply(project, operation, opts) {
       const node = next.nodes.find(function (n) { return n.id === operation.id; });
       if (!node) return fail('unknown node "' + operation.id + '"');
       const patch = operation.patch || {};
-      for (const key of ['name', 'model', 'lat', 'lon', 'type']) {
+      // `type` is not part of this op - `patch` takes name, model, lat and lon - yet the copy below
+      // used to store it, and a node's type is not a cosmetic label: the root's type picks the
+      // technology (olt budgets a PON, headend an active link) and `trace`/`computeOdn` charge a
+      // splitter's loss only on a node of type splitter. Retyping the splitter of a healthy 1:8
+      // estate to a closure kept its splitter model as a warning, dropped the 10.5 dB from the ODN
+      // (11.53 -> 1.03) and answered 200 on a plant that now reads "fail - too loud, fit a 14 dB
+      // pad"; retyping the only ONT deleted the customer from /budget and the BOM the same way.
+      // A different kind of node is a remove and an add. The same value echoed back is not a change,
+      // so a writer that sends the whole node keeps working.
+      if (patch.type !== undefined && patch.type !== node.type) {
+        return fail('node "' + node.id + '" is a ' + node.type + ' - update-node cannot change the type of a node to "' +
+          String(patch.type) + '"; patch takes name, model, lat and lon, and a node of another kind is a remove and an add');
+      }
+      for (const key of ['name', 'model', 'lat', 'lon']) {
         if (patch[key] !== undefined) node[key] = patch[key];
       }
       next.history = snapshot(project, operation.op + ' ' + node.id, o.now);
