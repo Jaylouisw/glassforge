@@ -242,6 +242,39 @@ function parseCsv(text, opts) {
   };
 }
 
+/**
+ * A demand row's text fields - `label` and `address` - as the text they will be printed as.
+ *
+ * A CSV cell is text by construction, so the CSV path could never get this wrong; a JSON row is
+ * whatever the caller sent. `label` was already stringified for this reason (`{ label: 5 }` named the
+ * ONT node `5`), but `address` was copied through as-is, and `prepare` falls back to it when the row
+ * has no label. Measured through the server on main at 74456b7: a three-house demand whose last row
+ * carried `{ address: 5 }` answered `ok: false`, `technology: null` and all nine candidates refused
+ * for `node "d1-ont-d3" name must be a string, got a number` - one numeric house number, reported as
+ * every topology in the catalogue being invalid, with nothing naming the row.
+ *
+ * The rule is the CSV path's: a string is itself, a finite number is its decimal text (the cell a
+ * spreadsheet would have written, "5"), an empty or whitespace-only value is absent, and a value with
+ * no text reading returns `undefined`. `String({})` is `[object Object]`, which is not a name that
+ * passes `nameProblem` - it passes and prints - so an object is refused by the caller, by row and
+ * field, rather than coerced.
+ */
+function textField(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string') return value.trim() === '' ? null : value;
+  if (typeof value === 'number' && isFinite(value)) return String(value);
+  return undefined;
+}
+
+/** A value as the JSON a refusal can quote, never `[object Object]`. */
+function describeJson(value) {
+  try {
+    const text = JSON.stringify(value);
+    return text === undefined ? String(value) : text;
+  } catch (err) {
+    return String(value);
+  }
+}
 function parseArray(rows) {
   const points = [];
   const rejected = [];
@@ -265,10 +298,34 @@ function parseArray(rows) {
       return;
     }
     // A label becomes the node's name in the design and is printed there (`web/scene.js` draws it,
-    // the splice page titles itself with it), so it is text. `{ label: 5 }` used to name the ONT
-    // node `5`, and the plant then carried a number where every reader expects a string.
-    const label = row.label || row.name || null;
-    points.push({ label: label === null ? null : String(label), address: row.address || null, lat: lat, lon: lon });
+    // the splice page titles itself with it), so it is text - and so is the address, which `prepare`
+    // falls back to as the label. `{ label: 5 }` used to name the ONT node `5`, and the plant then
+    // carried a number where every reader expects a string; `{ address: 5 }` did the same one field
+    // over, and `network.validate` refused every candidate the design built. Both are read by
+    // `textField`, and a value it cannot read as text is refused here, by row and field.
+    const hasLabel = row.label !== undefined && row.label !== null &&
+      !(typeof row.label === 'string' && row.label.trim() === '');
+    const labelValue = hasLabel ? row.label : row.name;
+    const label = textField(labelValue);
+    const address = textField(row.address);
+    const labelBad = label === undefined;
+    const addressBad = address === undefined;
+    if (labelBad || addressBad) {
+      // One sentence per refusal: a row with a bad address must not read as "address must be text
+      // ... got address {...}", naming the field twice.
+      const which = labelBad && addressBad ? 'label and address' : (labelBad ? 'label' : 'address');
+      const got = labelBad && addressBad
+        ? 'label ' + describeJson(labelValue) + ', address ' + describeJson(row.address)
+        : describeJson(labelBad ? labelValue : row.address);
+      rejected.push({
+        row: i + 1,
+        reason: which + ' must be text - a label or an address is printed as the node name in the ' +
+          'design, and got ' + got,
+        text: describeJson(row).slice(0, 120)
+      });
+      return;
+    }
+    points.push({ label: label, address: address, lat: lat, lon: lon });
   });
   return { points: points, rejected: rejected };
 }
