@@ -101,7 +101,12 @@ function protectionOf(value) {
 const LINK_OPTION_FIELDS = ['sites', 'a', 'from', 'b', 'to', 'optics', 'optic', 'opticA', 'opticB',
   'fibres', 'connectors', 'splices', 'splicesPerJoint', 'protection', 'network', 'maxSnapM',
   'joinToleranceM', 'routeFactor', 'marginDb', 'direction', 'cable', 'ladder', 'overlengthPct',
-  'closure', 'thirdParty'];
+  'closure', 'thirdParty',
+  // Read only to be refused - see `refuseSplitters`. It is a field the budget side of the engine
+  // does read (a PON design carries it), so a caller who budgeted a PON and then asked for a
+  // circuit keeps the key at hand; naming it here is also what makes `splitter` a near miss of
+  // `splitters` rather than "not a key at all".
+  'splitters'];
 
 /** The two keys the link design's `optics` block names: one transceiver model per site. */
 const LINK_OPTIC_FIELDS = ['a', 'b'];
@@ -166,6 +171,48 @@ function assertOpticPair(value, fallbackOptic) {
   }
 }
 
+/**
+ * Refuse a splitter on a circuit, in the words the caller needs.
+ *
+ * An absent key, `null` or an empty list is not a splitter: a form that always sends
+ * `splitters: []` is not wrong, and refusing it would refuse the caller who has none. Any other
+ * value is refused whatever its shape - a bare model name is a caller who meant one splitter, and
+ * `{ model }` is the object the PON budget takes - because the shape is a detail and the topology is
+ * the contradiction.
+ *
+ * The sentence names the parts and the remedy, and points at the surface that can charge a splitter:
+ * a caller who put a splitter on a circuit either wanted a PON (budget it with
+ * `budget.opticalBudget`) or attached one by mistake (drop the key).
+ */
+function refuseSplitters(value) {
+  if (value === undefined || value === null) return;
+  if (Array.isArray(value) && !value.length) return;
+  const models = [];
+  if (Array.isArray(value)) {
+    value.forEach(function (entry) {
+      if (entry && typeof entry === 'object' && !Array.isArray(entry) &&
+          typeof entry.model === 'string' && entry.model && models.indexOf(entry.model) === -1) {
+        models.push(entry.model);
+      }
+    });
+  }
+  let what;
+  if (Array.isArray(value)) {
+    what = value.length + ' splitter' + (value.length === 1 ? '' : 's') +
+      (models.length ? ' (' + models.join(', ') + ')' : '');
+  } else if (typeof value === 'string') {
+    what = 'a splitter named ' + JSON.stringify(value);
+  } else {
+    what = 'a splitter as ' + (typeof value === 'object' ? JSON.stringify(value) : String(value));
+  }
+  throw new TypeError('the link design reads "splitters" and refuses it: a link is two optics and ' +
+    'fibre, and a splitter is a PON element, so this design puts ' + what + ' on a circuit that ' +
+    'cannot be built. A budget is a purchase order, so the design is refused rather than priced - ' +
+    'the insertion loss it names would be charged to a link nobody can pull, and the verdict that ' +
+    'came out of that would blame the route for a part the route cannot have. Drop the key, or ' +
+    'budget the PON with POST /api/design/budget, which charges a splitter.');
+}
+
 /** Normalise what a caller may hand us, and refuse the shapes that cannot describe a link. */
 function options(input, registry) {
   // Before the values are read, because a typo is the cause and "marginDb must be a number" would be
@@ -176,6 +223,20 @@ function options(input, registry) {
       'default runs, and the route, the cable BOM and the verdict on both legs are computed on a ' +
       'setting the caller did not name, so a near miss is refused rather than skipped.'
   });
+  // A circuit is two optics and fibre; a splitter is a PON element, and a link that carries one is
+  // not a design - it is a design with a part nobody can pull.
+  //
+  // `budget.pointToPoint` refuses `splitters` by name (gh#169/#170), but the link builds each leg's
+  // design itself and never hands the caller's list to the budget, so that guard cannot see it; the
+  // key was not on the option list either, so the near-miss guard called it "not a key at all" and
+  // the request answered 200. Measured on main at 5443234, A(51.50,-0.10) to B(51.51,-0.10) on
+  // 10G-LR optics: `{"sites":{...},"splitters":[{"model":"plc-1x8-sca"}]}` answered `ok: true` with
+  // a leg ODN loss of 1.067 dB - fibre and two connectors - and a cable BOM with no splitter in it.
+  // The 10.50 dB part was in neither the loss nor the bill, and the verdict read as "this circuit
+  // lights". A budget is a purchase order, so the contradiction is refused rather than priced.
+  // `input` may be absent entirely; the missing-sites refusal below is the one that sentence belongs
+  // to, so this guard must not read a property off nothing.
+  refuseSplitters(input && input.splitters);
   // A site-to-site budget reads the same two knobs, so it refuses the same two values: a reserve
   // that is not a number is not a reserve, and a direction it cannot place is a different receiver
   // at a different wavelength - `direction` was answered as `down` and nothing said so.
