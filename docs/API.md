@@ -25,18 +25,18 @@ The server binds `127.0.0.1:8000` by default (`HOST`, `PORT`), and stores projec
 ```
 GET /api/health
 → { ok: true, name: "glassforge", version: "0.4.0",
-    parts: { total: 144, byKind: { cable: 36, splitter: 14, olt: 17, ont: 12, transceiver: 32,
-                                  closure: 16, connector: 15, splice: 2 } },
+    parts: { total: 145, byKind: { cable: 36, splitter: 14, olt: 17, ont: 12, transceiver: 32,
+                                  closure: 17, connector: 15, splice: 2 } },
     projects: 0, uptimeS: 3 }
 ```
 
 `version` is `package.json`'s. `parts.total` and `parts.byKind` are the catalogue on disk, so they
 change whenever a part is added. The block above is a **snapshot, not a contract**: re-recorded on
-`main` at `3c92a08` (after the 36F and 60F duct rungs, gh#247, and the 12-port NAP closure, gh#253)
-on 2026-11-28, it is illustrative and will drift as the catalogue grows. The authorities are the
-endpoint itself and `node scripts/count-parts.js`, whose `--check` mode keeps README's copy of that
-line honest — it does not read this block, so a stale snapshot here is invisible to CI. Re-record it
-with the command below, never by editing the numbers by hand.
+`main` at `e74ab05` (after the 36F and 60F duct rungs, gh#247, the 12-port NAP closure, gh#253, and
+the 32-port NAP closure, gh#259) on 2026-11-28, it is illustrative and will drift as the catalogue
+grows. The authorities are the endpoint itself and `node scripts/count-parts.js`, whose `--check`
+mode keeps README's copy of that line honest — it does not read this block, so a stale snapshot here
+is invisible to CI. Re-record it with the command below, never by editing the numbers by hand.
 
 ```
 GF_DATA=/tmp/gf-port node server/index.js &
