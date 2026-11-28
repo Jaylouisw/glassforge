@@ -34,6 +34,20 @@ function rootCountMessage(found) {
   return 'exactly one olt or headend node is required, found ' + found;
 }
 
+/**
+ * The root as a sentence that points at it should name it.
+ *
+ * A plant's root is the OLT on a PON and the head-end on an active network, and SPEC §1 makes the
+ * root's type the thing that picks the technology. Two sentences - the budget's "not connected"
+ * error and the validator's matching warning - called both "the head-end", so a PON planner with an
+ * unplaced ONT was pointed at a node the project does not contain. The budget has told "the OLT
+ * receiver" and "the head-end optic" apart for the same reason; this is the plant-level sentence
+ * catching up.
+ */
+function rootNoun(root) {
+  return root && root.type === 'headend' ? 'the head-end' : 'the OLT';
+}
+
 function rootNodes(plant) {
   return ((plant && plant.nodes) || []).filter(function (n) { return n && ROOT_TYPES.indexOf(n.type) !== -1; });
 }
@@ -155,7 +169,7 @@ function trace(plant, ontId) {
     return false;
   }
 
-  if (!walk(root.id)) throw new Error('ont "' + ontId + '" is not connected to the head-end');
+  if (!walk(root.id)) throw new Error('ont "' + ontId + '" is not connected to ' + rootNoun(root));
 
   const nodes = [root];
   const spans = [];
@@ -822,7 +836,7 @@ function validate(plant, registry) {
       for (const edge of adj.get(id) || []) stack.push(edge.to);
     }
     for (const node of nodes) {
-      if (!seen.has(node.id)) warnings.push('node "' + node.id + '" is not connected to the head-end');
+      if (!seen.has(node.id)) warnings.push('node "' + node.id + '" is not connected to ' + rootNoun(roots[0]));
     }
     const edges = spans.reduce(function (n, s) { return n + 1; }, 0);
     if (edges !== Math.max(0, nodes.length - 1)) {

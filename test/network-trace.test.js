@@ -61,6 +61,27 @@ test('asking for an ONT that is not an ONT is refused', function () {
   throws(function () { network.trace(plant(), 'nope'); }, 'no node with id');
 });
 
+// The sentence that says an ONT is not reachable names the root **this plant has**: an OLT on a PON,
+// a head-end on an active network (GLOSSARY, "Head end"). It said "not connected to the head-end" to
+// both, so a PON planner with an unplaced ONT was told to look for a node the project does not have -
+// while the budget beside it already distinguishes "the OLT receiver" from "the head-end optic".
+test('the not-connected sentence names the root the plant has', function () {
+  const pon = plant();
+  pon.nodes.push({ id: 'n6', type: 'ont', model: 'gpon-ont-1ge', name: 'Orphan' });
+  const ponErr = throws(function () { network.trace(pon, 'n6'); }, 'not connected to the OLT', 'PON trace');
+  assert.ok(String(ponErr.message).indexOf('head-end') === -1,
+    'a PON names a head-end it does not have: ' + ponErr.message);
+
+  // The same sentence on an active plant names its own root, unchanged.
+  const active = {
+    name: 'Active', nodes: [
+      { id: 'h1', type: 'headend', model: 'qsfp-40g-lr4-10km', name: 'Head-end' },
+      { id: 'c1', type: 'ont', model: 'qsfp-40g-lr4-10km', name: 'Customer' }
+    ], spans: []
+  };
+  throws(function () { network.trace(active, 'c1'); }, 'not connected to the head-end', 'active trace');
+});
+
 test('a plant with two OLTs cannot be traced', function () {
   const p = plant();
   p.nodes.push({ id: 'n9', type: 'olt', model: 'gpon-c-plus-8', name: 'Second OLT' });
