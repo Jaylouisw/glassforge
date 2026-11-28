@@ -24,6 +24,53 @@ function nowIso(clock) {
   return (clock ? new Date(clock) : new Date()).toISOString();
 }
 
+/**
+ * A placement is a pair, and an edit is where half a pair used to be stored.
+ *
+ * `network.validate` checks `lat` and `lon` one at a time, and `null` on both means "not on a map
+ * yet" - a legitimate state for a node added from the palette. One coordinate is neither state: the
+ * canvas draws an unplaced node at the centre of the map (`web/scene.js`, `placed: false`), so
+ * `{ lat: 51.5, lng: -0.1 }` was stored as a node at 51.5 with no longitude, answered 200, passed
+ * `validate` because a null longitude looks like "not placed yet", and was drawn in the middle of an
+ * arbitrary view rather than on its street. `lng` is the key every map library but GeoJSON uses, and
+ * `engine/demand.js` already reads it on an imported demand list - so the edit names it instead of
+ * dropping it. `PUT` and a hand-edited file reach the same half through `network.validate`; this is
+ * the writer refusing it while the value is still visible.
+ */
+const LAT_LIMIT = 90;
+const LON_LIMIT = 180;
+
+/** A value as the caller sent it: JSON where JSON can say it, `String` otherwise (`JSON.stringify(NaN)` is `null`). */
+function showCoordinate(value) {
+  if (typeof value === 'number' && !isFinite(value)) return String(value);
+  const text = JSON.stringify(value);
+  return text === undefined ? String(value) : text;
+}
+
+/** One coordinate the plant can hold, or a sentence naming the one it cannot. */
+function coordinateProblem(label, value, limit) {
+  if (typeof value !== 'number' || !isFinite(value) || Math.abs(value) > limit) {
+    return label + ' must be a number between -' + limit + ' and ' + limit + ', got ' + showCoordinate(value);
+  }
+  return null;
+}
+
+/** `lat` and `lon` together, or neither - never one, and never a `lng` that quietly places nothing. */
+function placementProblem(input, what) {
+  if (input.lng !== undefined) {
+    return what + '.lng is not a field this model reads - did you mean "lon"? A node is placed at lat and lon, or at neither: a longitude under another name was dropped, so the node was drawn at the centre of the canvas, not where it is';
+  }
+  const hasLat = input.lat !== undefined && input.lat !== null;
+  const hasLon = input.lon !== undefined && input.lon !== null;
+  if (hasLat !== hasLon) {
+    return what + ' is placed with ' + (hasLat ? 'a latitude and no longitude' : 'a longitude and no latitude') +
+      ' - lat and lon are one placement (null on both means "not on a map yet"), so a node is placed at both or neither, and half a pair is drawn at the centre of the canvas';
+  }
+  if (!hasLat) return null;
+  return coordinateProblem(what + '.lat', input.lat, LAT_LIMIT) ||
+    coordinateProblem(what + '.lon', input.lon, LON_LIMIT);
+}
+
 function cloneState(project) {
   return {
     name: project.name,
@@ -101,6 +148,10 @@ function apply(project, operation, opts) {
     case 'add-node': {
       const input = operation.node || {};
       if (NODE_TYPES.indexOf(input.type) === -1) return fail('node.type must be one of ' + NODE_TYPES.join(', '));
+      // Before the root check and the id: a node with half a placement is not a node, however well
+      // it lists its type. See `placementProblem`.
+      const coordFault = placementProblem(input, 'node');
+      if (coordFault) return fail(coordFault);
       const rootTypes = ['olt', 'headend'];
       if (rootTypes.indexOf(input.type) !== -1 && next.nodes.some(function (n) { return rootTypes.indexOf(n.type) !== -1; })) {
         return fail(input.type === 'olt'
@@ -215,6 +266,19 @@ function apply(project, operation, opts) {
         return fail('node "' + node.id + '" is a ' + node.type + ' - update-node cannot change the type of a node to "' +
           String(patch.type) + '"; patch takes name, model, lat and lon, and a node of another kind is a remove and an add');
       }
+      // The pair as the patch would leave it, not just the keys it names: setting one axis of an
+      // unplaced node is the same half an `add-node` refuses, and `lng` here is a patch that moves
+      // nothing. `{ lat: null, lon: null }` is still how a node is taken off the map. A patch that
+      // does not touch a coordinate is not asked about the pair, so a legacy half can still be
+      // renamed - `validate` is what names it, and `{ lon }` is how it is fixed.
+      if (patch.lat !== undefined || patch.lon !== undefined || patch.lng !== undefined) {
+        const placedFault = placementProblem({
+          lat: patch.lat !== undefined ? patch.lat : node.lat,
+          lon: patch.lon !== undefined ? patch.lon : node.lon,
+          lng: patch.lng
+        }, 'node "' + node.id + '"');
+        if (placedFault) return fail(placedFault);
+      }
       for (const key of ['name', 'model', 'lat', 'lon']) {
         if (patch[key] !== undefined) node[key] = patch[key];
       }
@@ -226,7 +290,11 @@ function apply(project, operation, opts) {
     case 'move-node': {
       const node = next.nodes.find(function (n) { return n.id === operation.id; });
       if (!node) return fail('unknown node "' + operation.id + '"');
-      if (typeof operation.lat !== 'number' || typeof operation.lon !== 'number') return fail('move-node needs numeric lat and lon');
+      // A move is a placement too: `lat: 999` was stored and read back as an invalid latitude only
+      // on the next `GET`, so the edit that made it answered 200.
+      const movedFault = coordinateProblem('move-node.lat', operation.lat, LAT_LIMIT) ||
+        coordinateProblem('move-node.lon', operation.lon, LON_LIMIT);
+      if (movedFault) return fail(movedFault);
       next.history = snapshot(project, operation.op + ' ' + node.id, o.now);
       node.lat = operation.lat;
       node.lon = operation.lon;
