@@ -1,0 +1,18 @@
+{
+  "kind": "connector",
+  "model": "e2000-apc-lowloss",
+  "vendor": "generic",
+  "label": "E2000/APC connector pair (grade B, low loss)",
+  "lossDb": 0.15,
+  "maxLossDb": 0.25,
+  "notes": "Grade-B E2000/APC mated pair: 0.15 dB charged per mating against a 0.25 dB ceiling - the grade-B row of the same IEC 61753-1:2007 Table A.12 / ITU-T L.36 Table 9-1 that sc-apc-lowloss and lc-apc-lowloss are built on, where grade B is 0.12 dB mean and 0.25 dB maximum for more than 97% of random-mated samples. 0.15 sits between the mean and the ceiling, so a pair that passes the contract almost always beats the figure charged, and one that misses it is a warranty claim rather than a design assumption. The row exists for the reason sc-apc-lowloss does: e2000-apc alone gives an E2000 plant the grade-C figure and no way to name the 0.15 dB per mating a grade-B contract pays for. It is a verdict, not a rounding - measured on this engine, a class B+ line (gpon-b-plus-8, connectorised plc-1x32-sca-conn, 24.0 km of g652d-loose-12 and a 40 m drop, four matings charged) reads 23.589 dB of ODN and 4.91 dB of headroom on e2000-apc, \"marginal\", and 22.989 dB and 5.51 dB on this row, \"ok\"; the same plant at 33.0 km moves from \"fail\" (2.93 dB of headroom) to \"marginal\" (3.53 dB). On an active link the same 0.15 dB per mating is driven through budget.pointToPoint: 8.0 km of G.652.D on 10GBASE-LR with two matings is 3.40 dB of ODN and 2.8 dB of headroom on e2000-apc (\"fail\") against 3.10 dB and 3.1 dB here (\"marginal\"). Every pair on the path has to be grade B, because one grade-C patch cord in the chain caps the end-to-end figure, and the polish caveat travels with the row unchanged: an APC ferrule cannot be mated to a UPC one, and an SC/E2000 hybrid adapter adds a mated loss this row does not charge. The engine charges one connector per mating and budgets no return loss. 0.25 dB is the grade's maximum and 0.15 the figure charged: replace both with the loss measured on the patch cords you buy.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.36/en",
+  "tags": [
+    "connector",
+    "e2000",
+    "apc",
+    "low-loss",
+    "grade-b"
+  ],
+  "polish": "apc"
+}

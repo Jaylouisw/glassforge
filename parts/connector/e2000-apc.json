@@ -1,0 +1,17 @@
+{
+  "kind": "connector",
+  "model": "e2000-apc",
+  "vendor": "generic",
+  "label": "E2000/APC connector pair",
+  "lossDb": 0.3,
+  "maxLossDb": 0.5,
+  "notes": "E2000/APC mated pair, charged at IEC 61753-1 grade C: 0.25 dB mean and 0.50 dB maximum for a random-mated single-mode pair (61753-1:2007 Table A.12, reprinted as Table 9-1 of ITU-T L.36 (01/2015)), of which this row charges 0.30 dB per mating - the same figure sc-apc charges. A grade is a class limit on a mated pair, not a ferrule geometry, so that one table is the source for sc-apc, lc-apc and this row: the loss and the grade are identical and only the plug on the order differs. E2000 is the spring-loaded single-ferrule connector with a push-pull housing and a shutter that covers the ferrule while the plug is withdrawn - the footprint European carrier ODFs and handover points commonly present, as distinct from the push-pull SC and the small-form-factor LC. A plant handed over on E2000 adapters had, until this row, only sc-apc to name: the ODN came out right (measured on this engine, a class C+ plant with a connectorised 1:8 and four matings reads 11.819 dB of ODN and 21.18 dB of headroom on either row) but the BOM named the wrong part, which is the failure this catalogue exists to prevent - a plan that tells a buyer to order SC/APC patch cords for an E2000 panel. Deliberately not a lower \"typical\" E2000 number: a mated E2000 pair often measures under 0.30 dB, but no datasheet is cited here and \"often measures\" is not a citation, so the grade-C figure stands and e2000-apc-lowloss (0.15 / 0.25, grade B) is the row to name when the contract says grade B. Nothing already budgeted moves: sc-apc stays the default connector model, and this row is hand-selected with connectorModel or connectors: { model: 'e2000-apc', count }. Polish is not interchangeable and the engine does not check it: an APC ferrule mated to a UPC one loses several dB and can damage both endfaces, so a plant specified to this row must be APC end to end, and an E2000 panel reached through an SC/E2000 hybrid adapter pays the hybrid's own mated loss, which this row does not charge. The engine charges lossDb once per mating (a patched-through connection is 2 x 0.30 dB) and budgets no return loss at all, though APC's 60 dB mated return loss (return-loss grade 1) is the reason FTTH plants are APC. 0.50 dB is the grade's ceiling and 0.30 the figure charged: replace both with the loss measured on the patch cords you buy.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-L.36/en",
+  "tags": [
+    "connector",
+    "e2000",
+    "apc",
+    "carrier-odf"
+  ],
+  "polish": "apc"
+}
