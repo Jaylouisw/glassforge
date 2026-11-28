@@ -495,10 +495,28 @@ function cableFor(requiredFibres, ladder, registry) {
   return largest;
 }
 
-/** Distribution cable: a drop cable for one or two fibres, the ladder above that. */
+/**
+ * Distribution cable: a drop rung of the caller's ladder for one or two fibres, the ladder above that.
+ *
+ * This named `g657a2-drop-1` / `g657a2-drop-2` straight out of the catalogue, which is the defect the
+ * head of `cableForSpan` was fixed for, one branch deeper. A caller who stocks one cable
+ * (`ladder: ['g652d-loose-12']`) was billed for 1- and 2-fibre drop on every short span - a product
+ * they excluded - and a `costs` model priced to their ladder was refused for a cable the design was
+ * never entitled to build with (`costs.cablePerM has no price for g657a2-drop-1, g657a2-drop-2`).
+ * docs/API.md says "the ladder is the cable list every span is chosen from"; drop cable is a rung of
+ * that ladder, not an exception to it, which is why DEFAULT_LADDER lists both drop rungs. A ladder
+ * that starts at 12 has no drop rung and the short span is bought from the ladder.
+ *
+ * The rung must also carry the fibres: `cableFor` answers with the largest cable in the ladder when
+ * nothing in it fits, and a 1-fibre rung is not a cable a two-fibre span can use, so a rung that
+ * cannot carry the count is not taken as the drop and the span goes to the 12-fibre floor of the
+ * ladder instead.
+ */
 function cableForDistribution(requiredFibres, ladder, registry) {
-  if (requiredFibres <= 1 && registry.has('cable', 'g657a2-drop-1')) return registry.get('cable', 'g657a2-drop-1');
-  if (requiredFibres <= 2 && registry.has('cable', 'g657a2-drop-2')) return registry.get('cable', 'g657a2-drop-2');
+  if (requiredFibres <= 2) {
+    const rung = cableFor(requiredFibres, ladder, registry);
+    if (rung.fiberCount <= 2 && rung.fiberCount >= requiredFibres) return rung;
+  }
   return cableFor(Math.max(12, requiredFibres), ladder, registry);
 }
 
@@ -880,9 +898,10 @@ function emitTerminalTree(plant, tree, cfg, registry) {
       plant.spans.push({
         id: cfg.prefix + 'drop-' + terminalId,
         from: idOf.get(node.key), to: ontId,
-        // The drop is a span like any other, so it obeys the span rule: the builder's `terminalCable`
-        // is right for a spur and wrong for a rural 400 m gap, where it bought 1-fibre drop cable on a
-        // run nobody pulls one. `cableForSpan` is the one place the limit lives.
+        // The drop is a span like any other, so it obeys the span rule. A hard-coded terminal cable
+        // was right for a spur and wrong for a rural 400 m gap, where it bought 1-fibre drop cable on
+        // a run nobody pulls one, and it ignored a ladder that stocks no drop rung. `cableForSpan` is
+        // the one place the limit lives.
         cable: cableForSpan(cfg.terminalFibres, dropM, cfg.ladder, registry).model,
         lengthM: dropM,
         strands: cfg.terminalFibres === 1 ? [1] : [1, 2],
@@ -941,7 +960,12 @@ function emitFeederTree(plant, tree, cfg, registry) {
       });
       plant.spans.push({
         id: cfg.prefix + 'tail-' + node.key, from: closureId, to: splitterId,
-        cable: 'g657a2-drop-1', lengthM: 1, strands: [1], purpose: 'splitter-tail', feedsOnts: 0
+        // A 1 m single-fibre tail is a span like any other, so its cable comes from the caller's
+        // ladder through the same rule; the hard-coded drop model billed a ladder that excludes drop
+        // cable for a product it does not stock, the defect `cableForDistribution` now refuses to
+        // repeat. The default ladder lists the drop rung, so an ordinary design is unchanged.
+        cable: cableForSpan(1, 1, cfg.ladder, registry).model,
+        lengthM: 1, strands: [1], purpose: 'splitter-tail', feedsOnts: 0
       });
       cfg.splitterPlantId.set(node.attachTerminals[0], splitterId);
     }
@@ -990,7 +1014,6 @@ function buildActiveTree(demand, opts, registry, optic, graph) {
     prefix: '',
     pointById: new Map(demand.points.map(function (p) { return [p.id, p]; })),
     terminalModel: active.cpeOptic,
-    terminalCable: 'g657a2-drop-2',
     terminalFibres: 2,
     fibresPerTerminal: 2,
     minFibres: 2,
@@ -1125,7 +1148,6 @@ function buildPon(demand, opts, registry, ratio, graph) {
       prefix: 'd' + (i + 1) + '-',
       pointById: pointById,
       terminalModel: opts.pon.ont,
-      terminalCable: 'g657a2-drop-1',
       terminalFibres: 1,
       fibresPerTerminal: 1,
       minFibres: 1,

@@ -502,13 +502,16 @@ async function main() {
     ladder: ['g652d-nope']
   });
   test('a cable ladder reaches the design instead of being dropped at the handler', function () {
-    assert.strictEqual(laddered.status, 200, JSON.stringify(laddered.body).slice(0, 300));
-    const allowed = ['g652d-loose-48', 'g657a2-drop-1', 'g657a2-drop-2'];
+    assert.strictEqual(laddered.status, 200, JSON.stringify(laddered.body).slice(0, 400));
+    // The list used to allow g657a2-drop-1 and g657a2-drop-2 as well, because `cableForDistribution`
+    // bought drop cable for every span of two fibres or fewer regardless of the ladder - so a caller
+    // who named one cable still got two others on the drops. The ladder is "the cable list every span
+    // is chosen from" (docs/API.md), and this assertion now holds it to that.
     const models = laddered.body.plant.spans.map(function (s) { return s.cable; });
     for (const model of models) {
-      assert.ok(allowed.indexOf(model) !== -1, "a span was bought on " + model + ", not the caller's ladder");
+      assert.strictEqual(model, 'g652d-loose-48', 'a span was bought on ' + model + ', not the cable the ladder names');
     }
-    assert.ok(models.indexOf('g652d-loose-48') !== -1, 'the ladder named a cable the trunk did not buy: ' + models.join(', '));
+    assert.ok(models.indexOf('g652d-loose-48') !== -1, 'the ladder named a cable the plant did not buy: ' + models.join(', '));
   });
   test('a ladder of the wrong shape, or naming an unknown cable, is a 400 naming the field', function () {
     assert.strictEqual(stringLadder.status, 400, 'status ' + stringLadder.status + ': ' + JSON.stringify(stringLadder.body).slice(0, 200));
