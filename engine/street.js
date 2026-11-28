@@ -35,6 +35,7 @@ const DEFAULT_JOIN_M = 1.5;        // KML lines from different drawings rarely s
 const DEFAULT_MAX_SNAP_M = 250;    // farther than this from any street, a property is not connected
 const CROSSING_EPS_M = 0.05;       // shallower than this off the other line is a graze
 const TWIN_EPS_DEG = 1e-6;         // ~0.11 m: a second copy of a drawing, not a second alignment
+const EDGE_CELL_M = 200;           // bucket for the interior-vertex scan: a block, not a lane
 
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 function round(n, places) {
@@ -371,15 +372,70 @@ function splitAtInteriorVertices(graph, tol) {
     boxes.set(edge.id, box);
     return box;
   }
+
+  // An edge bucket at edge scale, not at `joinToleranceM`: a node can only project onto an edge whose
+  // bounding box touches the node's own cell (widened by `tol`), so registering each edge under the
+  // cells its box covers and querying only the node's cells keeps the same answer without the V x E
+  // scan. The step is one fixed value for the whole drawing - the bucket is a hash key, and a grid
+  // whose step changed per row would put one edge in a cell no query ever looks at.
+  let minLat = Infinity, maxLat = -Infinity;
+  for (const node of graph.nodes.values()) {
+    if (node.lat < minLat) minLat = node.lat;
+    if (node.lat > maxLat) maxLat = node.lat;
+  }
+  const refLat = isNum(minLat) && isNum(maxLat) ? (minLat + maxLat) / 2 : 0;
+  const latStep = EDGE_CELL_M / 111132.95;
+  const lonStep = EDGE_CELL_M / (111319.49 * Math.max(0.01, Math.cos((refLat * Math.PI) / 180)));
+  const buckets = new Map();
+  const edgeCells = new Map();
+  function indexEdge(edge) {
+    if (edgeCells.has(edge.id)) return;
+    const box = boxOf(edge);
+    const keys = [];
+    for (let y = Math.floor(box.minLat / latStep); y <= Math.floor(box.maxLat / latStep); y++) {
+      for (let x = Math.floor(box.minLon / lonStep); x <= Math.floor(box.maxLon / lonStep); x++) {
+        const key = y + ':' + x;
+        keys.push(key);
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(edge.id);
+      }
+    }
+    edgeCells.set(edge.id, keys);
+  }
+  function forgetEdge(edgeId) {
+    const keys = edgeCells.get(edgeId);
+    if (!keys) return;
+    for (const key of keys) {
+      const list = buckets.get(key);
+      if (!list) continue;
+      const at = list.indexOf(edgeId);
+      if (at !== -1) list.splice(at, 1);
+    }
+    edgeCells.delete(edgeId);
+  }
+  for (const edge of graph.edges.values()) indexEdge(edge);
+
   const nodeIds = Array.from(graph.nodes.keys()).sort(cmp);
   for (const nodeId of nodeIds) {
     const node = graph.nodes.get(nodeId);
-    // A node outside an edge's bounding box (widened by the tolerance) cannot project onto it, and on
-    // a town-sized import that rejection is most of the work: the projection itself is the expensive
-    // half, and this pass is quadratic without it.
+    // A node outside an edge's bounding box (widened by the tolerance) cannot project onto it. The
+    // candidate list comes from the buckets the node's +/-tol box covers, so an edge that comes
+    // within `tol` of the node is always in it: that edge's box contains the near point, and the
+    // near point is inside the node's padded box.
     const latPad = tol / 111132.95;
     const lonPad = tol / (111319.49 * Math.max(0.01, Math.cos((node.lat * Math.PI) / 180)));
-    const edgeIds = Array.from(graph.edges.keys()).sort(cmp);
+    const y0 = Math.floor((node.lat - latPad) / latStep);
+    const y1 = Math.floor((node.lat + latPad) / latStep);
+    const x0 = Math.floor((node.lon - lonPad) / lonStep);
+    const x1 = Math.floor((node.lon + lonPad) / lonStep);
+    const seen = new Set();
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const bucket = buckets.get(y + ':' + x);
+        if (bucket) for (const id of bucket) seen.add(id);
+      }
+    }
+    const edgeIds = Array.from(seen).sort(cmp);
     for (const edgeId of edgeIds) {
       const edge = graph.edges.get(edgeId);
       if (!edge || edge.a === nodeId || edge.b === nodeId) continue;
@@ -392,9 +448,14 @@ function splitAtInteriorVertices(graph, tol) {
       const before = edge.geometry.slice(0, found.segIndex).concat([node]);
       const after = [node].concat(edge.geometry.slice(found.segIndex));
       removeEdge(graph, edgeId);
+      forgetEdge(edgeId);
       boxes.delete(edgeId);
-      graph.addEdge(edge.a, nodeId, before);
-      graph.addEdge(nodeId, edge.b, after);
+      const one = graph.addEdge(edge.a, nodeId, before);
+      const two = graph.addEdge(nodeId, edge.b, after);
+      // The halves are new edges the rest of this pass must still see - a second node on the same
+      // road projects onto one of them, not onto the edge that no longer exists.
+      if (one) indexEdge(one);
+      if (two) indexEdge(two);
       splits++;
     }
   }
