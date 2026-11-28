@@ -42,7 +42,10 @@ test('KML LineStrings are accepted as a street network', function () {
 test('a KML with no lines is refused, and says what it found instead', function () {
   const kml = '<kml><Document><Placemark><name>box</name><Point><coordinates>-0.1,51.5,0</coordinates></Point></Placemark></Document></kml>';
   throws(function () { street.buildGraph(kml); }, 'no LineStrings');
-  throws(function () { street.buildGraph({ edges: [] }); }, 'no usable polylines');
+  // An empty list used to answer 'no usable polylines ... each needs at least two coordinates',
+  // which described a filter `normaliseLine` no longer has: every unreadable line is now refused
+  // by name, so an empty list means the caller sent no edges at all (gh#198).
+  throws(function () { street.buildGraph({ edges: [] }); }, 'the network geometry has no edges');
 });
 
 test('a property is snapped onto the street, and the gap is carried as a spur', function () {
