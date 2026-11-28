@@ -35,12 +35,18 @@ test('it is the smallest in-line closure that joints a 96F cable', function () {
   assert.strictEqual(fits[0].spliceCapacity, 96, '96 is the first capacity at or above 96');
 });
 
-test('a 144F joint still goes to the 600-C, so this row does not absorb the next size up', function () {
+test('a 144F joint does not use this box: it has its own 144-splice rung now', function () {
   const inlines = registry.all('closure').filter(function (c) { return c.type === 'inline'; });
   const fits = inlines.filter(function (c) { return c.spliceCapacity >= 144; })
     .sort(function (a, b) { return a.spliceCapacity - b.spliceCapacity || (a.model < b.model ? -1 : 1); });
-  // 96 < 144, so fosc-400b4-inline-96 is not in this list and the 216 stays the answer.
-  assert.strictEqual(fits[0].model, 'fosc-600c-inline-216', 'smallest fitting in-line closure: ' + fits[0].model);
+  // 96 < 144, so fosc-400b4-inline-96 is not in this list - the point of the test, unchanged.
+  // It used to assert 'fosc-600c-inline-216' here, because 216 was the next capacity above 96 and a
+  // 144F through-joint therefore bought 72 unused positions. parts/closure/fosc-450b6-inline-144
+  // (6 trays x 24 = 144) now seats that joint exactly, so the 216 is no longer the first answer.
+  assert.strictEqual(fits[0].model, 'fosc-450b6-inline-144', 'smallest fitting in-line closure: ' + fits[0].model);
+  assert.strictEqual(fits[0].spliceCapacity, 144, '144 is the first capacity at or above 144');
+  assert.ok(fits.some(function (c) { return c.model === 'fosc-600c-inline-216'; }),
+    'the 216-splice box is still offered behind it');
 });
 
 /** OLT -<feeder>-> joint -<feeder>-> handhole -<drop>-> ONT: every strand of the cable is spliced. */
