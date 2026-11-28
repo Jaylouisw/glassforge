@@ -1,0 +1,20 @@
+{
+  "kind": "connector",
+  "model": "mpo-16-apc-lowloss",
+  "vendor": "senko",
+  "label": "MPO-16/APC connector pair (low loss)",
+  "lossDb": 0.15,
+  "maxLossDb": 0.35,
+  "notes": "0.15 dB typical and 0.35 dB maximum are the single-mode APC 16-fibre row of the SENKO MPO-PLUS 702/712 standard-connector datasheet (DS-MPO-000001-RevB-EN) optical table - and the empty cell beside it is why this row is low-loss only: the same table prints N/A where a standard-grade 16-fibre single-mode APC figure would be, while the 12-fibre pair beside it is 0.20 / 0.70 and the 24-fibre pair 0.25 / 1.00. There is no standard-loss single-mode 16-position ferrule on this sheet to buy, so a catalogue row at 0.20 dB would be a figure nobody prints. The asterisk qualifies both numbers: 'based on master grade jumper to low loss random mating test' - a bench measurement against a reference jumper, so 0.15 dB is a best case and 0.35 dB is the ceiling to hold a supplier to; 0.35 dB is 0.10 dB above IEC 61753-1 grade B (0.25 max random mating) and inside grade C (0.50), which is the honest reading of a ferrule that publishes no standard grade. APC return loss >= 60 dB, interface IEC 61754-7 (type MPO), 500 matings per TIA-568.3, cable suitability 2.0-5.5 mm round or jacketed ribbon. Why the row exists: osfp-800g-dr8-500m shipped before this ferrule did, and its own note had to tell the caller to budget the leg with an MPO-12 pair 'whichever the module has', because no 16-position part was catalogued - two of its four vendor sheets (FS, Asterfusion) put 800GBASE-DR8 on a single MPO-16/APC receptacle and the other two (Gigalight, AO) on twin MPO-12/APC, so the right ferrule is a purchase order and not a rounding. The key matters and the sheet states it: 12- and 24-fibre MPO are centre-key, 16- and 32-fibre are offset-key (SENKO 712 series housing with the 16/32F pin keeper), so this part mates with neither the 12F nor the 24F rows here and cannot be expressed as a count on them. What the engine charges is one mating per fibre path, not sixteen: connectors { model: 'mpo-16-apc-lowloss', count: 2 } is 2 x 0.15 = 0.30 dB typical, against 2 x 0.20 = 0.40 dB for the 12F standard pair that note currently uses. Polarity (Method A/B/C), gender, and the sixteen-paths-at-once cost of one dirty end-face are not modelled, and engine/link.js takes only a connector count and budgets the default sc-apc pair, so this row reaches budget.pointToPoint and a project budget, not link design. Replace with the measured loss of the trunks and fanouts actually purchased: a supplier's 0.35 dB is a maximum and the typical is not a contract.",
+  "sourceUrl": "https://www.senko.com/wp-content/uploads/2024/06/Data-Sheet_MPO-Standard-Connector.pdf",
+  "tags": [
+    "connector",
+    "mpo",
+    "mtp",
+    "16f",
+    "parallel",
+    "low-loss",
+    "high-density"
+  ],
+  "polish": "apc"
+}

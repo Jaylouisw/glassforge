@@ -1,0 +1,20 @@
+{
+  "kind": "connector",
+  "vendor": "senko",
+  "sourceUrl": "https://www.senko.com/wp-content/uploads/2024/06/Data-Sheet_MPO-Standard-Connector.pdf",
+  "polish": "apc",
+  "model": "mpo-24-apc-lowloss",
+  "label": "MPO-24/APC connector pair (low loss)",
+  "lossDb": 0.15,
+  "maxLossDb": 0.35,
+  "notes": "0.15 dB typical and 0.35 dB maximum are the single-mode APC 24-fibre low-loss row of the SENKO MPO-PLUS 702/712 datasheet optical table (DS-MPO-000001-RevB-EN), under the sheet's own asterisk - 'based on master grade jumper to low loss random mating test' - so the typical is a bench best case against a reference jumper and 0.35 dB is the figure to write into a purchase order. Two jobs this row does. The first is the 24-fibre ribbon cable in this catalogue (g652d-ribbon-24): a 24F ribbon terminates or splices as one 24-position ferrule, and until this row the only multi-fibre APC parts here were 12-position, so a 24F trunk ODF had to be charged matings the bought cable cannot make or an SC pair per path. The second is the grade: 24-fibre standard loss on this sheet is 0.25 / 1.00 (the row beside this one), which is 0.65 dB worse at the ceiling and meets neither IEC 61753-1 grade B (0.25 max) nor grade C (0.50 max) - a 24F standard MPO is a connector with no random-mating grade, which is why a contract should name the low-loss row. Note the size step the sheet prints and a 12F-only catalogue hides: 12F low loss is 0.10 dB typical, 24F is 0.15, so the larger ferrule costs 0.05 dB typical and a 288F feeder carried as twelve 24F trunks pays it on every terminated path. APC return loss >= 60 dB, IEC 61754-7 interface, 500 matings per TIA-568.3, 2.0-5.5 mm cable suitability. 24-fibre MPO is centre-key (12/24F centre key, 16/32F offset key on this sheet), so it does not mate with the 16F row here. The engine charges one mating per fibre path, not twenty-four: connectors { model: 'mpo-24-apc-lowloss', count: 2 } is 2 x 0.15 = 0.30 dB. Polarity, gender and connectorisation practice are not modelled, and engine/link.js budgets the default sc-apc pair and ignores a named model. Replace with the measured loss of the trunks actually purchased.",
+  "tags": [
+    "connector",
+    "mpo",
+    "mtp",
+    "24f",
+    "ribbon",
+    "low-loss",
+    "high-density"
+  ]
+}
