@@ -25,17 +25,17 @@ The server binds `127.0.0.1:8000` by default (`HOST`, `PORT`), and stores projec
 ```
 GET /api/health
 → { ok: true, name: "glassforge", version: "0.4.0",
-    parts: { total: 135, byKind: { cable: 34, splitter: 14, olt: 16, ont: 7, transceiver: 32,
+    parts: { total: 141, byKind: { cable: 34, splitter: 14, olt: 17, ont: 12, transceiver: 32,
                                   closure: 15, connector: 15, splice: 2 } },
     projects: 0, uptimeS: 3 }
 ```
 
 `version` is `package.json`'s. `parts.total` and `parts.byKind` are the catalogue on disk, so they
 change whenever a part is added. The block above is a **snapshot, not a contract**: re-recorded on
-`main` at `87653d4` (after the 36F and 60F aerial ADSS rungs, gh#224) on 2026-11-28, it is
-illustrative and will drift as the catalogue grows. The authorities are the endpoint itself and
-`node scripts/count-parts.js`, whose `--check` mode keeps README's copy of that line honest —
-re-record the block with the command below, never by editing the numbers by hand.
+`main` at `2214340` (after the one-port GPON root, gh#231, and the four Nokia ONTs, gh#234 and
+gh#241) on 2026-11-28, it is illustrative and will drift as the catalogue grows. The authorities are
+the endpoint itself and `node scripts/count-parts.js`, whose `--check` mode keeps README's copy of
+that line honest — re-record the block with the command below, never by editing the numbers by hand.
 
 ```
 GF_DATA=/tmp/gf-port node server/index.js &
