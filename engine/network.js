@@ -785,7 +785,18 @@ function validate(plant, registry) {
       }
     }
     // `null` means "not placed on a map yet", which is a legitimate state for a node added from the
-    // palette. Only a present-but-wrong value is an error.
+    // palette. Only a present-but-wrong value is an error - and one coordinate is not "not placed
+    // yet": `lat` and `lon` are one placement, and `web/scene.js` draws a node it cannot place at the
+    // centre of the canvas (`placed: false`). A node stored with `lat` and no `lon` - the shape a
+    // `lng` key leaves behind when a writer drops it - was therefore reported ok and drawn somewhere
+    // it is not. Half a pair is an error; two nulls are not.
+    const latGiven = node.lat !== undefined && node.lat !== null;
+    const lonGiven = node.lon !== undefined && node.lon !== null;
+    if (latGiven !== lonGiven) {
+      errors.push('node "' + node.id + '" is placed with ' +
+        (latGiven ? 'a latitude and no longitude' : 'a longitude and no latitude') +
+        ' - lat and lon are one placement, and null on both means "not on a map yet"; a node is at both or neither, and half a pair is drawn at the centre of the canvas');
+    }
     if (node.lat !== undefined && node.lat !== null && (typeof node.lat !== 'number' || !isFinite(node.lat) || Math.abs(node.lat) > 90)) {
       errors.push('node "' + node.id + '" has an invalid latitude');
     }
