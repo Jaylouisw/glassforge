@@ -1,0 +1,17 @@
+{
+  "kind": "ont",
+  "model": "uf-nano-g",
+  "vendor": "Ubiquiti",
+  "label": "Ubiquiti UF-Nano G GPON ONT, 1x GE",
+  "pon": "gpon",
+  "txPowerDbmMin": 0.5,
+  "txPowerDbmMax": 5,
+  "rxSensitivityDbm": -27,
+  "rxOverloadDbm": -8,
+  "ports": {
+    "ge": 1
+  },
+  "notes": "The box is the datasheet's: one SC/APC GPON WAN port at 2.488 Gbit/s down and 1.244 Gbit/s up, one Gigabit LAN, 24 V passive PoE, up to 128 per OLT GPON port. The optical window is not the datasheet's, deliberately. Ubiquiti prints the UF-Nano G as TX (Class B+) 1.5 to 5 dBm, RX -8 to -28 dBm, and those are the OLT-side class B+ figures reprinted for the ONU: ITU-T G.984.2 Table III.1 puts an ONU at +0.5..+5 dBm launch with -27 dBm sensitivity and -8 dBm overload. This row carries the standard's ONU window and not the printed pair, because the upstream budget is set by the weakest ONU on a shared ODN: a plan leaning on a +1 dBm floor and a -28 dBm receiver is 1 dB optimistic in each direction the day a different ONT joins the same PON, and a printed pair that matches the OLT column is more likely a reprint than a measurement. If every ONT on the plant is a UF-Nano G and the sheet is right, both directions gain about 1 dB - that is a decision to write down in the plan, not a default. Only the class is asserted here: replace the row with the ONT actually installed, because the budget moves with its measured sensitivity.",
+  "sourceUrl": "https://dl.ubnt.com/ds/uf_gpon.pdf",
+  "tags": ["gpon", "b+", "ubiquiti", "1ge"]
+}
