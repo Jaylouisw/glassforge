@@ -1,0 +1,29 @@
+{
+  "kind": "cable",
+  "model": "g652d-armoured-48",
+  "vendor": "Corning",
+  "label": "Corning ALTOS gel-free single-armoured 48F G.652.D, direct buried",
+  "fiberCount": 48,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "sourceUrl": "https://www.corning.com/catalog/coc/documents/product-family-specifications/0001_NAFTA_AEN.pdf",
+  "notes": "The 48-fibre rung of the same Corning ALTOS gel-free, double-jacket, single-armored family as g652d-armoured-24: family spec sheet 0001_NAFTA_AEN (revision 2019-03-01), which prints one geometry row for the whole 12-72 F band - six tube positions, 1 to 6 active, 179 kg/km, 14.3 mm nominal outer diameter, 215 mm installation bend radius, 143 mm operation bend radius - over a corrugated steel tape armor and two polyethylene jackets around a dielectric central element, for direct-buried installation while suitable for duct and lashed aerial, GR-20 and ICEA S-87-640, 890 N long-term and 2700 N short-term tensile, installation -30 to +70 C. The family sheet does not print a separate 48 F row and this row does not claim one: 48 fibres is four 12-fibre tubes, which is inside the six tube positions and the 1-6 active tubes the row states, so a 48 F reel shares the band's 14.3 mm diameter and 179 kg/km weight rather than being a bigger cable. That is arithmetic from the sheet's 12 fibres per tube, stated here so nobody reads the 179 kg/km as a weighed 48 F drum. Why the row exists: the two sizes a buried distribution joint actually mixes are 24 F and 48 F, and with no armoured row at all the trench case had to bill unarmoured duct cable - so it is added alongside g652d-armoured-24 as the rung a 48-fibre buried span buys, and a design whose ladder names an armoured model gets a cable that can be buried. Attenuation is the same figure and the same caveat as the 24 F row: 0.35 / 0.22 / 0.21 dB/km are this catalogue's typical installed values, while the sheet publishes maxima of 0.35 / 0.35 / 0.25 dB/km for the general OS2 grade (0.40 / 0.40 / 0.30 for performance option 01) and 0.34 / 0.34 / 0.22 with typical 0.32 / 0.32 / 0.18 for the SMF-28e+ LL grade, so 0.35 at 1310 nm is the general grade's maximum and above the LL grade's, and 0.21 at 1550 nm is between the LL maximum 0.22 and typical 0.18. 1490 nm is interpolated by this catalogue, and the 1383 nm water peak is not budgetable at all because the engine holds only the 1310, 1490 and 1550 windows. drumM 2000 is the catalogue's standard reel, not a published put-up length: replace it, and every figure here, with the drum and test report actually purchased.",
+  "tags": [
+    "corning",
+    "altos",
+    "armoured",
+    "direct-buried",
+    "g.652.d"
+  ]
+}

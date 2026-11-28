@@ -78,7 +78,12 @@ test('a span whose cable the catalogue lacks is refused for the model, not blame
   assert.strictEqual(result.errors.length, 1, JSON.stringify(result.errors));
   assert.ok(result.errors[0].indexOf('span "s1" uses unknown cable model "not-a-cable" - known models: ') === 0,
     result.errors[0]);
-  assert.ok(result.errors[0].indexOf('g652d-loose-12') !== -1, result.errors[0]);
+  // Pinned against the registry's own tail, not a literal model: SPEC §8 prints up to eight in plain
+  // string order and the window moves as rungs are added - the literal here used to be
+  // 'g652d-loose-12', which g652d-armoured-24/-48 have since pushed out of the eight.
+  assert.strictEqual(result.errors[0],
+    'span "s1" uses unknown cable model "not-a-cable"' + registry.knownModelsTail('cable'),
+    result.errors[0]);
 });
 
 done();

@@ -1,0 +1,29 @@
+{
+  "kind": "cable",
+  "model": "g652d-armoured-24",
+  "vendor": "Corning",
+  "label": "Corning ALTOS gel-free single-armoured 24F G.652.D, direct buried",
+  "fiberCount": 24,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "sourceUrl": "https://www.corning.com/catalog/coc/documents/product-family-specifications/0001_NAFTA_AEN.pdf",
+  "notes": "Corning ALTOS gel-free, double-jacket, single-armored cable, 24 F, part number 024EU5-T4101D20: the product spec sheet 024EU5-T4101D20_NAFTA_AEN (revision 2026-11-28) for the tube layout, and the family spec sheet 0001_NAFTA_AEN (revision 2019-03-01) for the 12-288 F characteristics. What the family sheet says: a corrugated steel tape armor under two polyethylene jackets around a dielectric central element, sold for direct-buried installation while suitable for duct and lashed aerial, built to Telcordia GR-20 and ICEA S-87-640, 890 N long-term and 2700 N short-term tensile, installation -30 to +70 C, operation -40 to +70 C, and the armor is what the sheet names as the rodent resistance. The 12-72 F band is one geometry row - six tube positions, 1 to 6 active, 179 kg/km, 14.3 mm nominal outer diameter, 215 mm installation bend radius - and the 24 F sheet's own design block confirms this count sits there: 2 active tubes of 12 fibres, 2.5 mm buffer diameter, 4 filling elements, 3 ripcords. Why the row exists: every underground cable in this catalogue is an unarmoured loose-tube duct cable (g652d-loose-12 through -144), so a direct-buried trench - the plant the street and duct router exists to plan - had to bill a cable that is not rated to be buried, and a rodent-protected run had nothing to name. Attenuation: this row charges 0.35 / 0.22 / 0.21 dB/km, the catalogue's typical installed figures, and they must be read against the sheet rather than taken as its numbers. The sheet publishes maxima of 0.35 / 0.35 / 0.25 dB/km at 1310 / 1383 / 1550 nm for the general OS2 grade (performance option 00; the 024EU5-T4101D20 part quoted here is option 01 at 0.40 / 0.40 / 0.30) and 0.34 / 0.34 / 0.22 dB/km with typical 0.32 / 0.32 / 0.18 for the SMF-28e+ LL or SMF-28 Ultra grade. So 0.35 at 1310 nm is above the LL grade's maximum and equal to the general grade's, and 0.21 at 1550 nm sits between the LL maximum 0.22 and its typical 0.18: the row is a typical, slightly conservative figure rather than one printed row, and 1490 nm is this catalogue's interpolated value because no recommendation publishes a 1490 nm attenuation figure of its own. 1383 nm - the water-peak window G.652.D specifies at 0.35 dB/km, 0.34 for the LL grade - cannot be budgeted here at all: the engine's windows are 1310, 1490 and 1550, so an OTDR trace at the water peak is outside what this catalogue can price. drumM 2000 is the catalogue's standard reel and not a published put-up length - the family sheet prints none for this construction - so replace it with the reel the order actually specifies. These are a family spec sheet's published characteristics, not a drum you have tested: replace this row with the purchased cable's test report before construction.",
+  "tags": [
+    "corning",
+    "altos",
+    "armoured",
+    "direct-buried",
+    "g.652.d"
+  ]
+}
