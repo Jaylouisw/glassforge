@@ -557,6 +557,34 @@ function refuseEndpointLaunch(end, path) {
 }
 
 /**
+ * The pad a row carries, whichever side of the launch window owns it.
+ *
+ * `attenuator` and `launchWindowPad` are mutually exclusive - one owns a receiver already too loud at
+ * the floor launch, the other one that is only too loud at the ceiling - so a direction's pad is
+ * whichever of the two its row carries.
+ */
+function padOfRow(row) {
+  if (!row || !row.result) return null;
+  return row.result.attenuator || row.result.launchWindowPad || null;
+}
+
+/** The direction, as a sentence says it. */
+function directionWord(direction) { return direction === 'up' ? 'upstream' : 'downstream'; }
+
+/**
+ * The receiver a direction is judged at, named for a sentence.
+ *
+ * `bandVoice` leaves the downstream PON receiver implicit ("inside the overload point" - the ONT is
+ * the only thing below the OLT), which reads well in the band sentence and not at all in a clause
+ * that has to say whose overload point a pad clears.
+ */
+function receiverName(result, direction) {
+  const voice = bandVoice(result, direction);
+  if (voice.receiver) return voice.receiver;
+  return result.technology === 'p2p' ? 'the customer optic' : 'the ONT';
+}
+
+/**
  * The rows of one direction, summarised: which ONTs are in the band, the worst by overshoot, and the
  * sizes an order needs. `direction` comes from the budget result the row carries - `allOntBudgets`
  * stamps every one - and rows a caller built by hand default to downstream, which is the direction
@@ -565,6 +593,10 @@ function refuseEndpointLaunch(end, path) {
  * Split out of `launchWindowNote` because the note is now a sentence about *two* passes over one ODN:
  * it has to compare the downstream band with the upstream one and quote the larger pad, and two
  * copies of the count-and-size arithmetic would disagree the first time one of them changed.
+ *
+ * It also carries `floorPad`: the largest pad any receiver in this direction needs - the band's, or
+ * the `attenuator`'s when a row is already over its overload point at the floor launch. Those rows
+ * are never `hot`, and a note built from `hot` alone promised the smaller pad.
  */
 function bandSummary(rows) {
   const budgeted = (rows || []).filter(function (r) { return r && r.result; });
@@ -579,9 +611,21 @@ function bandSummary(rows) {
   });
   const sizes = Array.from(bySize.keys()).sort(function (a, b) { return b - a; });
   const sizeList = sizes.map(function (db) { return bySize.get(db) + ' x ' + db + ' dB'; }).join(', ');
+  // The largest pad any receiver in this direction needs: the band's, or the one a receiver already
+  // over its overload point at the **floor** launch needs. `attenuator` and `launchWindowPad` are
+  // mutually exclusive (each owns one side of the window), so a hard-over row is never in `hot` and
+  // its pad was invisible to the note - which then promised a smaller pad than the OLT receiver needs.
+  let floorRow = null;
+  budgeted.forEach(function (r) {
+    const p = padOfRow(r);
+    if (!p) return;
+    if (!floorRow || p.padDb > padOfRow(floorRow).padDb) floorRow = r;
+  });
+  const floorPad = floorRow ? padOfRow(floorRow) : null;
   if (!hot.length) {
     return { direction: direction, budgeted: budgeted, hot: hot, worst: null, pad: null,
-      sizes: sizes, sizeList: sizeList, noPad: 0, rest: budgeted.length, bySize: bySize };
+      sizes: sizes, sizeList: sizeList, noPad: 0, rest: budgeted.length, bySize: bySize,
+      floorPad: floorPad, floorRow: floorRow };
   }
   // The worst overshoot, ties broken on the ONT id: the sentence must not depend on the order the
   // plant happened to be built in, and `reduce` keeps whichever row came first.
@@ -594,7 +638,7 @@ function bandSummary(rows) {
   const noPad = hot.filter(function (r) { return !r.result.launchWindowPad.fits; }).length;
   return { direction: direction, budgeted: budgeted, hot: hot, worst: worst,
     pad: worst.result.launchWindowPad, sizes: sizes, sizeList: sizeList, noPad: noPad,
-    rest: budgeted.length - hot.length, bySize: bySize };
+    rest: budgeted.length - hot.length, bySize: bySize, floorPad: floorPad, floorRow: floorRow };
 }
 
 /**
@@ -622,12 +666,37 @@ function bandVoice(result, direction) {
 }
 
 /** The band as one sentence, for one direction's summary. */
-function bandSentence(sum, marginDb) {
+function bandSentence(sum, marginDb, binds) {
   const worst = sum.worst;
   const pad = sum.pad;
   const voice = bandVoice(worst.result, sum.direction);
   const hot = sum.hot.length;
   const total = sum.budgeted.length;
+  // **The reverse direction is already too loud at the floor launch.** Its row carries the pad in
+  // `attenuator`, which `bandSummary` never puts in `hot` - so this note used to promise its own,
+  // smaller pad "carries the design to full launch" while the failure line above it said "fit a
+  // 6 dB inline pad". One pad in the ODN serves both receivers, so this one must name the larger.
+  if (binds) {
+    const shared = sum.rest === 0 && sum.bySize.size === 1;
+    const need = binds.pad.fits
+      ? binds.db + ' dB'
+      : binds.db + ' dB, which the margin and the class budget cannot fund';
+    const buy = shared
+      ? (binds.pad.fits
+        ? ', so one pad in this ODN serves both receivers and this plant takes the larger: ' +
+          binds.db + ' dB'
+        : ', and this plant needs a different split or optic')
+      : ', and it needs ' + need + ' on the shared path, where a pad at each ONT does not reach it' +
+        (binds.pad.fits ? '' : ', and this plant needs a different split or optic');
+    return hot + ' of ' + total + ' ONT' + (total === 1 ? '' : 's') + ' ' + (hot === 1 ? 'is' : 'are') +
+      ' inside ' + (voice.receiver ? voice.receiver + "'s overload point" : 'the overload point') +
+      ' only at the bottom of the ' + voice.window + ' launch window: worst ' + pad.overDb +
+      ' dB over at the ' + pad.atTxDbm + ' dBm top, but the ' + directionWord(binds.direction) + ' direction is ' +
+      'already over ' + binds.receiver + "'s overload point at the floor launch" + buy +
+      (sum.noPad ? '; ' + sum.noPad + ' of them cannot be padded inside the ' + marginDb +
+        ' dB margin and the class budget, so those need a different split or optic' : '');
+  }
+
   // One pad at the OLT is only the right purchase when every ONT in the band needs the same pad. A
   // pad is one size, so a band that needs a 1 dB pad on six drops and a 2 dB pad on two cannot be
   // served from the feeder: the 2 dB pad over-pads the six and spends their margin to fix the two.
@@ -683,6 +752,15 @@ function bandSentence(sum, marginDb) {
  * its overload point at the top of the ONT's window, with every row `ok` and no other sentence on the
  * page about it.
  *
+ * **The other direction's floor launch, too.** A receiver already over its overload point at the
+ * *floor* launch reports its pad in `attenuator` and is not in the band at all, so the two-direction
+ * swap above cannot see it - and the note used to promise the band's pad "carries the design to full
+ * launch" while the failure line on the same page said "fit a 6 dB inline pad". Measured on a C+ OLT
+ * with a 1:8 cassette 200 m out and a 30 m drop (ODN 11.251 dB downstream, 11.281 dB up): the
+ * downstream band is 4 dB, the OLT receiver is 1.22 dB over at the ONT's floor launch and needs 6 dB,
+ * and 4 dB leaves it 2 dB over at the top of the ONT's window. The sentence names the larger pad,
+ * says which receiver needs it, and `padBinds` says which direction set the size.
+ *
  * rows are `{ ont, name, result }` as `network.allOntBudgets` returns them; rows whose budget threw
  * carry no result and are not counted, because "2 of 3" has to mean three budgeted ONTs. Returns null
  * when no row in either pass is in the band - an empty note is not a warning, and a 0 dB pad is a
@@ -707,12 +785,20 @@ function launchWindowNote(rows, opts) {
   if (!mine.hot.length) { primary = theirs; other = mine; }
   else if (theirsHot && theirs.pad.padDb > mine.pad.padDb) { primary = theirs; other = mine; }
 
-  let text = bandSentence(primary, marginDb);
-  if (other && other.hot.length && other.pad.padDb !== primary.pad.padDb) {
+  // A receiver already over its overload point at the floor launch needs its pad from `attenuator`,
+  // not from `launchWindowPad`, so the two-direction swap above cannot see it. It is still the pad
+  // order, and a pad is ODN loss: when it is larger than the band's, it is the one this note names.
+  const binds = other && other.floorPad && other.floorPad.padDb > primary.pad.padDb
+    ? { pad: other.floorPad, db: other.floorPad.padDb, direction: other.direction,
+        receiver: receiverName(other.floorRow.result, other.direction) }
+    : null;
+
+  let text = bandSentence(primary, marginDb, binds);
+  if (!binds && other && other.hot.length && other.pad.padDb !== primary.pad.padDb) {
     // The other direction's own sizes, said only when they differ: an equal size is one purchase and
     // one sentence. It cannot promise a single pad, because the advice above may already be a pad at
     // each ONT - what holds in both cases is that a pad is ODN loss and serves both receivers.
-    text += '; the ' + (other.direction === 'up' ? 'upstream' : 'downstream') + ' direction needs ' +
+    text += '; the ' + directionWord(other.direction) + ' direction needs ' +
       other.sizeList + ', and a pad is ODN loss in both directions, so size it for the larger';
   }
 
@@ -723,12 +809,16 @@ function launchWindowNote(rows, opts) {
     worstOnt: primary.worst.ont,
     olt: primary.worst.result.olt,
     direction: primary.direction,
-    padDb: primary.pad.padDb,
-    overDb: primary.pad.overDb,
-    atTxDbm: primary.pad.atTxDbm,
-    maxPadDb: primary.pad.maxPadDb,
+    // The size a crew buys: this band's, or the larger pad a receiver in the reverse direction needs
+    // already at the floor launch. `padBinds` names the direction that set it, because the other
+    // figures here would otherwise read as one direction's arithmetic.
+    padDb: binds ? binds.pad.padDb : primary.pad.padDb,
+    padBinds: binds ? binds.direction : primary.direction,
+    overDb: binds ? binds.pad.overDb : primary.pad.overDb,
+    atTxDbm: binds ? binds.pad.atTxDbm : primary.pad.atTxDbm,
+    maxPadDb: binds ? binds.pad.maxPadDb : primary.pad.maxPadDb,
     sizes: primary.sizes,
-    fits: primary.pad.fits,
+    fits: binds ? binds.pad.fits : primary.pad.fits,
     unpadded: primary.noPad
   };
 }

@@ -55,7 +55,17 @@ test('a synthesised design whose ONTs all sit in the blind zone reports it', fun
   assert.ok(loud[0].indexOf('12 of 12') !== -1, 'names how many ONTs the band covers: ' + loud[0]);
   assert.ok(loud[0].indexOf('3.64 dB over at the 7 dBm') !== -1,
     'names the worst overshoot and the launch it happens at: ' + loud[0]);
-  assert.ok(loud[0].indexOf('4 dB of inline pad') !== -1, 'ceil(3.64) = 4, and the fix must be named: ' + loud[0]);
+  // The band's own pad is ceil(3.64) = 4 dB, and that is what this sentence used to name. But this
+  // estate's OLT receiver is already 0 dB short at the *floor* launch (12 of 12 fail upstream at 6 dB
+  // of pad), so 4 dB does not carry the design anywhere: it leaves the OLT over its overload point at
+  // the top of the ONT's window. A pad is ODN loss, so the plant takes the larger size, and the
+  // sentence must not promise the smaller one - the upstream sentence beside it already says 6 dB.
+  assert.ok(loud[0].indexOf('takes the larger: 6 dB') !== -1,
+    'the pad to buy is the 6 dB the OLT receiver needs, not the 4 dB of the band: ' + loud[0]);
+  assert.ok(loud[0].indexOf('4 dB of inline pad') === -1,
+    'the note still promises the band pad carries the design: ' + loud[0]);
+  assert.ok(loud[0].indexOf('the upstream direction is already over') !== -1,
+    'the larger size must say which receiver needs it: ' + loud[0]);
 });
 
 test('the design report counts the band per ONT as well as saying it once', function () {
