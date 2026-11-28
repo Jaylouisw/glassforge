@@ -87,7 +87,12 @@ function assertPonWavelength(design) {
 const PON_DESIGN_FIELDS = ['direction', 'wavelength', 'olt', 'ont', 'spans', 'splices', 'spliceModel',
   'connectors', 'connectorModel', 'splitters', 'thirdParty', 'allowanceDb', 'marginDb', 'txDbm'];
 const ACTIVE_DESIGN_FIELDS = ['direction', 'wavelength', 'headEnd', 'cpe', 'spans', 'splices', 'spliceModel',
-  'connectors', 'connectorModel', 'thirdParty', 'allowanceDb', 'marginDb', 'txDbm'];
+  'connectors', 'connectorModel', 'splitters', 'thirdParty', 'allowanceDb', 'marginDb', 'txDbm'];
+// `splitters` is listed because the active budget *does* meet the key - to refuse it (see
+// `refuseActiveSplitters`). Leaving it out said the opposite: `computeOdn` charges whatever the list
+// holds, so a design carrying one was priced on a 10.5 dB part the technology forbids, while the key
+// itself was "unrelated" to a guard that only knows the names it is given. A singular `splitter` then
+// suggested nothing and the default ran - the caller's splitter was neither charged nor mentioned.
 // The **project** budget (`network.designForOnt` as the server calls it) is not handed a design: it
 // builds the spans, splices and connectors from the plant it traced, and reads only these knobs off the
 // request body. `ontId` is the server's own narrowing key, not a budget field, and is listed because a
@@ -1017,6 +1022,57 @@ function opticalBudget(design, registry) {
 }
 
 /**
+ * An active link has no splitter, so a design that carries one is refused by name.
+ *
+ * The plant path already refuses it - `network.designForOnt` throws for a splitter node on a headend
+ * root, and SPEC 8 lists "a splitter in an active plant" among the things the engine refuses to
+ * guess. `pointToPoint` reads its design through the shared `computeOdn`, which charges
+ * `design.splitters` exactly as the PON path does (both technologies charge the same losses for the
+ * same plant), so a caller handing one straight in was answered instead of refused. Measured on main
+ * at 009d3ce, two 10G-LR optics 2 km apart:
+ *
+ *   without splitters    fibre 2 km x 0.35 dB/km = 0.70 dB    ODN 0.70  -> headroom 5.50, "ok"
+ *   with a 1:8 splitter  0.70 + 10.50 insertion   = 11.20 dB   ODN 11.20 -> "fail", reasons
+ *     "headroom -5 dB is below the 3 dB design margin" and "link loss 11.2 dB exceeds the 6.2 dB this
+ *     optic pair can afford"
+ *
+ * The loss is real and the arithmetic is right; the network is not. A verdict read off it tells a
+ * planner the pair is too short for the route, when the route is 2 km and the 10.5 dB belongs to a
+ * part that cannot sit between two transceivers - the remedy (a longer-reach optic) buys the wrong
+ * thing. A budget is a purchase order, so the contradiction is refused rather than priced, and the
+ * refusal points at the budget that may carry a splitter.
+ *
+ * An absent key, or an empty list, is not a splitter: a form that always sends `splitters: []` is not
+ * wrong, and refusing it would refuse the caller who has none.
+ */
+function refuseActiveSplitters(design) {
+  const value = design.splitters;
+  // `null` is not a splitter and not this refusal's cause either: a list the budget cannot read is
+  // refused by its shape in `listField`, with the sentence that says a dropped list would delete the
+  // loss it names. Taking it here would answer a caller who meant "none" with a topology lecture.
+  if (value === undefined || value === null) return;
+  const isList = Array.isArray(value);
+  if (isList && !value.length) return;
+  const models = [];
+  if (isList) {
+    value.forEach(function (s) {
+      if (s && typeof s === 'object' && !Array.isArray(s) && typeof s.model === 'string' &&
+          s.model && models.indexOf(s.model) === -1) models.push(s.model);
+    });
+  }
+  const what = !isList
+    ? 'a value that is not a list of splitters (' + showValue(value) + ')'
+    : (value.length === 1 ? '1 splitter' : value.length + ' splitters') +
+      (models.length ? ' (' + models.join(', ') + ')' : '');
+  throw new TypeError('the active budget does not read "splitters": an active link is two optics and ' +
+    'fibre, and a splitter is a PON element, so this design puts ' + what + ' on a network that cannot ' +
+    'be built. A budget is a purchase order, so the design is refused rather than priced - the ' +
+    'insertion loss it names would be charged to a link nobody can pull, and the verdict that came ' +
+    'out of that would blame the route for a part the route does not have. Remove the splitters, or ' +
+    'budget the PON they belong to with opticalBudget.');
+}
+
+/**
  * Run an active (point-to-point) budget between two optics.
  *
  * `design`:
@@ -1025,6 +1081,8 @@ function opticalBudget(design, registry) {
  *   direction 'down' | 'up'            (default 'down')
  *   wavelength                         (default: the head-end optic's wavelength)
  *   spans, splices, connectors, allowanceDb, marginDb, txDbm   — as for the PON budget
+ *   splitters                          refused: an active link has no splitter, so a design that
+ *                                      carries one is a contradiction, not a setting
  *
  * The second verdict here is the link's own loss budget, `launch(min) − sensitivity`, rather than a
  * PON class: an active link has no class, it has two datasheets. Reach is checked separately, because
@@ -1042,6 +1100,9 @@ function pointToPoint(design, registry) {
   const cpe = registry.get('transceiver', design.cpe.model);
   refuseEndpointLaunch(design.headEnd, 'design.headEnd');
   refuseEndpointLaunch(design.cpe, 'design.cpe');
+  // Before the rate and wavelength checks, because the topology is the larger contradiction: two LR
+  // optics on different wavelengths cannot meet, but neither can meet a splitter that is not there.
+  refuseActiveSplitters(design);
 
   if (headEnd.speedMbps !== cpe.speedMbps) {
     throw new Error('the optics run at different rates (' + headEnd.speedMbps + ' and ' + cpe.speedMbps +
