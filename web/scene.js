@@ -17,6 +17,27 @@
 
   const EARTH_RADIUS_M = 6371008.8;
 
+  /**
+   * Longitude difference `to - from` taken the short way round, in (-180, 180].
+   *
+   * The same arithmetic `engine/geo.ts` uses: 179.95 and -179.95 are 0.1 deg apart, not 359.9.
+   * `distanceM` is a great-circle formula and was always right without it; the projection is a
+   * planar one, so every offset it draws has to be measured round the join rather than across the
+   * planet. For a drawing that does not straddle 180 this is the plain difference.
+   */
+  function lonDelta(from, to) {
+    let d = (to - from) % 360;
+    if (d > 180) d -= 360;
+    else if (d <= -180) d += 360;
+    return d;
+  }
+
+  /** A longitude in [-180, 180): one value per meridian, so 180 and -180 are one place. */
+  function wrapLon(lon) {
+    if (lon >= -180 && lon <= 180) return lon === 180 ? -180 : lon;
+    return ((lon + 180) % 360 + 360) % 360 - 180;
+  }
+
   function distanceM(a, b) {
     const toRad = function (d) { return (d * Math.PI) / 180; };
     const dLat = toRad(b.lat - a.lat);
@@ -26,6 +47,14 @@
     return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
   }
 
+  /**
+   * The box that covers the nodes, with longitude taken the short way round.
+   *
+   * `minLon > maxLon` means the box crosses the antimeridian: it runs east from `minLon` through
+   * 180 to `maxLon`, and its width is `lonDelta(minLon, maxLon)`. A raw `minLon <= lon <= maxLon`
+   * test is only valid on a box that does not cross. Latitude is a plain min/max. The convention is
+   * `engine/geo.ts`'s, so a box from `geo.bbox` maps onto a drawing without translation.
+   */
   function bounds(nodes) {
     // A project's JSON can hold `null` where a node belongs; the validator names that entry by
     // position, and the drawing skips it rather than throwing where a picture was asked for.
@@ -33,11 +62,27 @@
       return !!n && typeof n.lat === 'number' && typeof n.lon === 'number' && isFinite(n.lat) && isFinite(n.lon);
     });
     if (!placed.length) return null;
-    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    let minLat = Infinity, maxLat = -Infinity;
+    const lons = [];
     for (const n of placed) {
       minLat = Math.min(minLat, n.lat); maxLat = Math.max(maxLat, n.lat);
-      minLon = Math.min(minLon, n.lon); maxLon = Math.max(maxLon, n.lon);
+      lons.push(n.lon);
     }
+    lons.sort(function (a, b) { return a - b; });
+    // Longitude is not a plain min/max: min/max of 179.95 and -179.95 is a box 359.9 deg wide, and
+    // a 0.15 deg estate either side of 180 was fitted to the planet and drawn on top of itself
+    // (gh#255). The covered arc is the complement of the widest gap between the sorted longitudes;
+    // when that gap is an interior one the box runs east from `minLon` through 180 to `maxLon`, so
+    // `minLon > maxLon` means the box crosses. A tie keeps the wrap gap, which keeps every ordinary
+    // drawing exactly as it was.
+    let widest = lons[0] + 360 - lons[lons.length - 1];
+    let start = 0;
+    for (let i = 1; i < lons.length; i++) {
+      const gap = lons[i] - lons[i - 1];
+      if (gap > widest) { widest = gap; start = i; }
+    }
+    const minLon = start === 0 ? lons[0] : lons[start];
+    const maxLon = start === 0 ? lons[lons.length - 1] : lons[start - 1];
     return { minLat: minLat, maxLat: maxLat, minLon: minLon, maxLon: maxLon };
   }
 
@@ -62,7 +107,8 @@
     const mPerDegLat = 111132.95;
     const mPerDegLon = 111319.49 * Math.cos((centreLat * Math.PI) / 180) || 1;
 
-    let spanX = box ? (box.maxLon - box.minLon) * mPerDegLon : 0;
+    // The width of the covered arc, not `max - min`: a crossing box has minLon > maxLon.
+    let spanX = box ? Math.abs(lonDelta(box.minLon, box.maxLon)) * mPerDegLon : 0;
     let spanY = box ? (box.maxLat - box.minLat) * mPerDegLat : 0;
     const tiny = 25; // metres: below this the view is "one place", not a drawing
     let scale;
@@ -74,7 +120,7 @@
       scale = Math.min(innerW / Math.max(spanX, 1), innerH / Math.max(spanY, 1));
     }
 
-    const midLon = box ? (box.minLon + box.maxLon) / 2 : 0;
+    const midLon = box ? wrapLon(box.minLon + lonDelta(box.minLon, box.maxLon) / 2) : 0;
     const midLat = box ? (box.minLat + box.maxLat) / 2 : 0;
 
     const out = [];
@@ -84,7 +130,7 @@
         out.push(Object.assign({}, node, { x: width / 2, y: height / 2, placed: false }));
         continue;
       }
-      const dx = (node.lon - midLon) * mPerDegLon;
+      const dx = lonDelta(midLon, node.lon) * mPerDegLon;
       const dy = (node.lat - midLat) * mPerDegLat;
       out.push(Object.assign({}, node, {
         x: Math.round((width / 2 + dx * scale) * 10) / 10,
@@ -113,7 +159,7 @@
     const mPerDegLon = 111319.49 * Math.cos((centre.lat * Math.PI) / 180) || 1;
     return {
       lat: centre.lat + (height / 2 - y) / scale / mPerDegLat,
-      lon: centre.lon + (x - width / 2) / scale / mPerDegLon
+      lon: wrapLon(centre.lon + (x - width / 2) / scale / mPerDegLon)
     };
   }
 
@@ -132,7 +178,7 @@
     const mPerDegLat = 111132.95;
     const mPerDegLon = 111319.49 * Math.cos((centre.lat * Math.PI) / 180) || 1;
     return (points || []).map(function (point) {
-      const dx = (point.lon - centre.lon) * mPerDegLon;
+      const dx = lonDelta(centre.lon, point.lon) * mPerDegLon;
       const dy = (point.lat - centre.lat) * mPerDegLat;
       return {
         x: Math.round((width / 2 + dx * scale) * 10) / 10,
