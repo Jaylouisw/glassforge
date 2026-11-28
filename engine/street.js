@@ -154,6 +154,11 @@ class Graph {
     this.adjacency = new Map();
     this.nextNode = 1;
     this.nextEdge = 1;
+    // How many edge additions were the *same drawing* as an edge already in the graph and went into
+    // that edge instead (see `_sameDrawing`). A caller comparing what it imported with the graph it
+    // got back has no other way to see where a segment went, and "the network lost a line" with no
+    // count is the silence every importer in this engine was taught to avoid.
+    this.duplicates = 0;
     this._grid = new Map();
   }
 
@@ -245,7 +250,10 @@ class Graph {
     for (const entry of this.adjacency.get(aId) || []) {
       if (entry.to !== bId) continue;
       const twin = this.edges.get(entry.edgeId);
-      if (twin && this._sameDrawing(points, twin.geometry)) return twin;
+      if (twin && this._sameDrawing(points, twin.geometry)) {
+        this.duplicates += 1;
+        return twin;
+      }
     }
     const id = 'e' + this.nextEdge++;
     const edge = { id: id, a: aId, b: bId, lengthM: lengthM, geometry: points };
@@ -272,6 +280,9 @@ class Graph {
     return {
       nodes: this.nodes.size,
       edges: this.edges.size,
+      // Segments that were the same drawing as an edge already present and were merged into it. A
+      // count, because a merge the caller cannot see is a line the network lost without a word.
+      duplicates: this.duplicates,
       lengthM: round(lengthM, 1),
       lengthKm: round(lengthM / 1000, 3)
     };
