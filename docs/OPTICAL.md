@@ -27,16 +27,46 @@ says "OK" and does not light.
 
 ## Splice and connector loss
 
-| Element | Typical | Acceptance limit | Used by default |
-|---|---|---|---|
-| Fusion splice | 0.10 dB | 0.15 dB | 0.10 dB |
-| Mechanical splice | 0.30 dB | 0.50 dB | 0.30 dB |
-| SC/APC mated pair | 0.30 dB | 0.50 dB | 0.30 dB |
-| SC/UPC mated pair | 0.30 dB | 0.50 dB | 0.30 dB |
-| LC/APC mated pair | 0.25 dB | 0.50 dB | 0.25 dB |
+| Splice model | Typical | Acceptance limit |
+|---|---|---|
+| `fusion` | 0.10 dB | 0.15 dB |
+| `mechanical` | 0.30 dB | 0.50 dB |
 
-Connector figures follow IEC 61753-1 grades; splice figures are the values contracts commonly accept.
-The engine charges **one connector per mating**, so an OLT port plus an ONT is 2 × 0.3 dB.
+Splice figures are the values contracts commonly accept, not a standard's limit. A connector is per
+**part**, because the catalogue ships two grades of most geometries and the grade moves a verdict:
+`lossDb` is what the engine charges per mating and `maxLossDb` the ceiling the part is held to in a
+contract — carried by the part and validated against `lossDb`, never charged, because the arithmetic
+budgets the figure you will actually get, not the worst one you would accept.
+
+| Model | Pair | Basis | Charged per mating | Acceptance limit |
+|---|---|---|---|---|
+| `sc-apc` | SC/APC | IEC 61753-1 grade C (0.25 dB mean, 0.50 dB max) | 0.30 dB | 0.50 dB |
+| `sc-apc-lowloss` | SC/APC | grade B (0.12 dB mean, 0.25 dB max) | 0.15 dB | 0.25 dB |
+| `sc-upc` | SC/UPC | grade C | 0.30 dB | 0.50 dB |
+| `sc-upc-lowloss` | SC/UPC | grade B | 0.15 dB | 0.25 dB |
+| `lc-apc` | LC/APC | grade C | 0.25 dB | 0.50 dB |
+| `lc-apc-lowloss` | LC/APC | grade B | 0.15 dB | 0.25 dB |
+| `lc-upc` | LC/UPC | grade C | 0.25 dB | 0.50 dB |
+| `lc-upc-lowloss` | LC/UPC | grade B | 0.15 dB | 0.25 dB |
+| `e2000-apc` | E2000/APC | grade C | 0.30 dB | 0.50 dB |
+| `e2000-apc-lowloss` | E2000/APC | grade B | 0.15 dB | 0.25 dB |
+| `mpo-12-apc` | MPO-12/APC | vendor standard loss (SENKO MPO-PLUS 702/712) | 0.20 dB | 0.70 dB |
+| `mpo-12-apc-lowloss` | MPO-12/APC | vendor low loss, at the grade-B ceiling | 0.10 dB | 0.25 dB |
+
+The grade is the point of the table, not a footnote. Grade C allows 0.50 dB and grade B 0.25 dB, so a
+grade-B patch cord is a **different part**, never a tolerance on the grade-C one. The MPO rows are the
+one vendor datasheet here rather than a standard, and their ceiling meets no IEC 61753-1 grade at all:
+0.70 dB is what "standard loss" means for a multi-fibre ferrule, which is why a 288-fibre trunk's
+purchase order should say low loss. The MPO's own footnote qualifies the typical figure as a bench
+measurement against a reference jumper, and one dirty end-face costs twelve paths at once where an LC
+pair costs one.
+
+`sc-apc` is the row used when none is named. A plant budget and a `pointToPoint` budget select one
+with `connectorModel`, or `connectors: { model, count }`; a link design (`link.design`) takes a
+connector **count** only and budgets `sc-apc` at both ends, so an E2000 or LC/UPC handover cannot be
+named on a circuit yet. The engine charges **one connector per mating** and budgets no return loss, so
+an OLT port plus an ONT is 2 × 0.3 dB, and a path through two MPO ODFs is 2 × 0.10 dB, not
+twelve times that.
 
 ## Splitters
 
