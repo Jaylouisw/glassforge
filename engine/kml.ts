@@ -146,6 +146,22 @@ function firstBlock(xml: string, tag: string): string | null {
   return all.length ? all[0] : null;
 }
 
+/**
+ * The part of a `<Document>`'s body that belongs to the document itself, cut before its first nested
+ * feature.
+ *
+ * KML writes a Document's `<name>` ahead of its features, and every `<name>` after that one belongs to
+ * the Placemark, Folder or overlay it sits in. `firstText` searches a whole block, so reading the
+ * document's name off the entire body took the first *street* in a nameless file: the import answered
+ * `name: "Main St"` for a two-street survey and a caller filing the import under that name filed the
+ * drawing as one street. The document's own name is the head; a document that has none has none
+ * (SPEC section 8 - a figure is never filled from somewhere else).
+ */
+function documentHead(doc: string): string {
+  const nested = /<(?:[A-Za-z0-9_.-]+:)?(?:Placemark|Folder|GroundOverlay|ScreenOverlay|PhotoOverlay|NetworkLink)(?=[ >/])/i.exec(doc);
+  return nested ? doc.slice(0, nested.index) : doc;
+}
+
 /** XML's five predefined entities. Anything else needs a DTD this importer does not read. */
 const NAMED_ENTITIES: { [name: string]: string } = {
   amp: '&', lt: '<', gt: '>', quot: '"', apos: "'"
@@ -339,7 +355,7 @@ export function parseKml(text: unknown): ParsedKml {
     throw new Error('not a KML document: no <kml> root element');
   }
   const doc = firstBlock(xml, 'Document');
-  const docName = doc === null ? null : firstText(doc, 'name');
+  const docName = doc === null ? null : firstText(documentHead(doc), 'name');
 
   const placemarks: KmlPlacemark[] = [];
   // Named, not only counted: `unsupported` is what a caller sees, and a count with no name left a
