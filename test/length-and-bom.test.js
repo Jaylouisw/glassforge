@@ -117,6 +117,53 @@ test('a route with no measurable length is refused, not priced at zero metres', 
   }, 'under 0.0001 m', 'a route below the printed floor');
 });
 
+test('a positive route that rounds to 0.00 m is refused, while routeM 0 stays a calculation', function () {
+  // gh#164. gh#151 refused the *drawn* route that measured nothing; the direct form and the BOM were
+  // the two doors left open. Measured on main at 19269af: `cableToBuy({ routeM: 0.004 })` answered
+  // `routeM: 0, designM: 0, drums: 0, purchaseM: 0`, with the itemised line reading
+  // "Purchase (0 x 2000 m drum)" - a purchase order for nothing, from a figure the caller measured.
+  throws(function () { length.cableToBuy({ routeM: 0.004 }); }, 'rounds to 0.00 m', 'four millimetres');
+  // Below the printed floor the sentence says the figure is under it rather than calling 0.011 mm
+  // "0 m", the same split the drawn-route refusal makes.
+  throws(function () { length.cableToBuy({ routeM: 0.00000001 }); }, 'under 0.0001 m', 'a route below the printed floor');
+  // `routeM: 0` is not a rounding - it is a number the caller measured, and reserves are priced
+  // against it. That is gh#151's deliberate line and this guard must not move it.
+  const bare = length.cableToBuy({ routeM: 0 });
+  assert.strictEqual(bare.purchaseM, 0, 'a zero route is a zero purchase, not a refusal');
+  const reserved = length.cableToBuy({ routeM: 0, splices: 2, drumM: 2000 });
+  // 0 + 0 + 2 x 30 = 60 m, which is one drum.
+  assert.strictEqual(reserved.designM, 60);
+  assert.strictEqual(reserved.drums, 1);
+  // Half a centimetre is the smallest figure the 2 dp round keeps, and it is still a route: 0.005 m
+  // rounds to 0.01 m, which is bought by the metre.
+  assert.strictEqual(length.cableToBuy({ routeM: 0.005, drumM: 0, overlengthPct: 0 }).designM, 0.01);
+});
+
+test('a BOM span that measures four millimetres is refused by the span, not priced as zero drums', function () {
+  // The BOM refuses a span with `lengthM <= 0` ("measure the route before building a BOM"), and a
+  // span of 0.004 m passed that check only to be priced at zero on 19269af: the line read
+  // `{ routeM: 0, designM: 0 }` and the row `drums: 0, purchaseM: 0`, so the trace-back line
+  // disagreed with the map it is there to explain.
+  const plant = {
+    root: 'a',
+    nodes: [],
+    spans: [{ id: 's1', from: 'a', to: 'b', cable: 'g652d-loose-12', lengthM: 0.004 }]
+  };
+  const err = throws(function () { length.billOfMaterials(plant, registry, {}); },
+    'rounds to 0.00 m', 'a four-millimetre span');
+  assert.ok(err.message.indexOf('s1') !== -1, 'the refusal names the span: ' + err.message);
+  // Half a centimetre survives the round: 0.005 m of route, 3% of it rounds to 0, so designM is
+  // 0.01 m - a tiny span, but a measured one, and the drum is the drum.
+  const ok = length.billOfMaterials({
+    root: 'a',
+    nodes: [],
+    spans: [{ id: 's1', from: 'a', to: 'b', cable: 'g652d-loose-12', lengthM: 0.005 }]
+  }, registry, {});
+  assert.strictEqual(ok.lines[0].routeM, 0.01, 'the span line echoes the route it measured');
+  assert.strictEqual(ok.byCable[0].designM, 0.01);
+  assert.strictEqual(ok.byCable[0].drums, 1);
+});
+
 test('a route point that is not a coordinate is named by its index', function () {
   // An empty CSV/import cell is the classic case: `Number('')` is 0, and a point at 0,0 used to be
   // reached as a real coordinate. It is refused, but "distanceM needs two { lat, lon } coordinates"
