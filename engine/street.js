@@ -70,8 +70,21 @@ function fromKml(text) {
     return { id: 'kml-' + (i + 1), coords: route.points };
   });
   if (!lines.length) {
+    // A file of recorded tracks is not a file of points: the old sentence answered "0 point(s) were
+    // found instead", which names neither the placemark nor what it holds, so the one thing a user
+    // needs - which placemark in my file is the problem, and why - was missing. `classify` now folds
+    // the unreadable placemarks into `skipped` with those two facts; name the first few and count the
+    // rest, because a 500-track export must not print a page into a 400.
+    const unread = classified.skipped.filter(function (s) { return s.type === 'unsupported'; });
+    const named = unread.slice(0, 3).map(function (s) {
+      return '"' + (s.name === null ? '(unnamed)' : s.name) + '" holds ' + s.reason;
+    }).join('; ');
+    const tail = unread.length
+      ? '; ' + unread.length + ' placemark(s) hold no geometry this importer reads: ' + named +
+        (unread.length > 3 ? '; and ' + (unread.length - 3) + ' more' : '')
+      : '';
     throw new Error('the KML contains no LineStrings - a street network needs lines, not points ' +
-      '(' + classified.points.length + ' point(s) were found instead)');
+      '(' + classified.points.length + ' point(s) were found instead' + tail + ')');
   }
   return lines;
 }
