@@ -329,6 +329,27 @@ function options(input, registry) {
     belowMin: 'A negative overlength quotes less cable than the route measures, which is a BOM nobody ' +
       'can pull.'
   });
+  // The one key in the list above that no code read: `options()` returned the 8-pass default
+  // unconditionally, so `{ kmeansIterations: 1 }` passed the near-miss guard and every candidate was
+  // still clustered with eight passes. A correct spelling that changes nothing is the one mistake a
+  // near-miss check cannot see. Read here, and refuse a count the loop cannot use: with zero passes
+  // the assignment never runs, every PON candidate comes back with no ONT on it, and it wins the
+  // ranking on 0 fibre-metres - a plant that reaches nobody, offered as the best design.
+  designFields.assertNumberField(o, 'kmeansIterations', 1, 'the design', {
+    measure: 'a number of clustering passes',
+    unusable: 'A pass count the clustering cannot read falls back to ' + DEFAULTS.kmeansIterations +
+      ', so every splitter site, span and fibre-metre in the answer was clustered on a setting the ' +
+      'caller did not name.',
+    belowMin: 'Zero or fewer passes assigns no house to a site, so every PON candidate comes back ' +
+      'with no ONT on it and wins the ranking on 0 fibre-metres; a plant that reaches nobody is ' +
+      'refused rather than run.'
+  });
+  if (isNum(o.kmeansIterations) && Math.floor(o.kmeansIterations) !== o.kmeansIterations) {
+    throw new TypeError('the design reads "kmeansIterations" as a whole number of clustering passes ' +
+      'and got ' + showOption(o.kmeansIterations) + '. The clustering loop runs it as a count of ' +
+      'assignment passes, so half a pass is not a tighter clustering - it is a count nobody can run, ' +
+      'and rounding it would cluster on a number the caller did not name.');
+  }
   designFields.assertChoiceField(o, 'technology', ['auto', 'pon', 'active'], 'the design', {
     wrong: 'A technology it cannot place is refused rather than searched: "PON" is not "pon", and the ' +
       'answer to it was "no candidate topology could be built", which blames the estate for a typo.'
@@ -363,7 +384,7 @@ function options(input, registry) {
     ladderSupplied: Array.isArray(o.ladder) && o.ladder.length > 0,
     overlengthPct: isNum(o.overlengthPct) ? o.overlengthPct : DEFAULTS.overlengthPct,
     costs: costModel(o.costs),
-    kmeansIterations: DEFAULTS.kmeansIterations,
+    kmeansIterations: isNum(o.kmeansIterations) ? o.kmeansIterations : DEFAULTS.kmeansIterations,
     includeAllPlants: !!o.includeAllPlants
   };
 }
