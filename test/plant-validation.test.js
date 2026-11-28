@@ -278,9 +278,20 @@ test('an unknown part model names the models that exist (SPEC §8)', function ()
   assert.strictEqual(cableError, 'span "s1" uses unknown cable model "g652d-loose-99" - known models: ' + tail);
 
   // Plain string order, not natural order: SPEC §8's own example is that 144 sorts before 24.
-  // g652d-loose-144 < g652d-loose-24 < g652d-loose-48 as strings; a `localeCompare` would not.
-  assert.ok(cableError.indexOf('g652d-loose-144, g652d-loose-24') !== -1,
+  // The pair used to be g652d-loose-144, g652d-loose-24, which sat inside the eight-model window -
+  // gh#174 records that the window moves as rungs are added, and after g652d-adss-72 it holds
+  // neither of those. g652d-adss-144, g652d-adss-24 is the same evidence in the window the
+  // catalogue has now: 144 before 24 as strings, which a numeric comparison would not give.
+  assert.ok(cableError.indexOf('g652d-adss-144, g652d-adss-24') !== -1,
     'the list is in plain string order, got: ' + cableError);
+  // And a natural sort of the same catalogue opens differently, so this case can tell them apart:
+  // localeCompare with numeric collation answers 12, 24, 48, 72, 96, 144 and the printed list does
+  // not - which is the whole point of the SPEC sentence.
+  const natural = cables.slice().sort(function (a, b) {
+    return a.localeCompare(b, 'en', { numeric: true });
+  });
+  assert.notStrictEqual(natural.slice(0, 8).join(', '), cables.slice(0, 8).join(', '),
+    'a natural sort would print ' + natural.slice(0, 8).join(', '));
 
   const q = base();
   q.nodes[1].model = 'plc-1x99-sca';
