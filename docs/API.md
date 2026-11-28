@@ -508,12 +508,13 @@ overload point at the floor launch, so one pad in this ODN serves both receivers
 the larger: 6 dB
 ```
 
-The note's fields come from that pad: `padDb 6`, `overDb 5.72`, `atTxDbm 5`, `maxPadDb 18` and
-`padBinds: "up"`. This plant is not `ok` on both verdicts, and the page does not say it is: the
-downstream band is the 4 dB the top of the OLT window asks for, but the upstream pass puts the OLT
-receiver at -10.78 dBm against its -12 dBm overload point even at the ONT's +0.5 dBm floor launch, so
-the same Checks section opens with an error - `2 of 2 ONTs fail upstream at the OLT receiver - Casa 1:
-... fit a 6 dB inline pad ...` - and the two sentences name one pad, not two. Fitting the 4 dB the
+The note's fields come from that pad - `padDb 6`, `overDb 5.72`, `atTxDbm 5`, `maxPadDb 18` and
+`padBinds: "up"` - while the sentence itself keeps the band's own overshoot (3.75 dB at the 7 dBm
+top). This plant is not `ok` on both verdicts, and the page does not say it is: the downstream band
+is the 4 dB the top of the OLT window asks for, but the upstream pass puts the OLT receiver at
+-10.78 dBm against its -12 dBm overload point even at the ONT's +0.5 dBm floor launch, so the same
+Checks section opens with an error - `2 of 2 ONTs fail upstream at the OLT receiver - Casa 1: ...
+fit a 6 dB inline pad ...` - and the two sentences name one pad, not two. Fitting the 4 dB the
 downstream band alone asks for leaves the OLT receiver 2 dB over at the top of the ONT's window.
 
 One pad at the OLT is only the right purchase when every ONT in the band needs the same size. A band
