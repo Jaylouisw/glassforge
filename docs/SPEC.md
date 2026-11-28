@@ -143,6 +143,14 @@ A span is one route, not always one cable. `spans[].bundles` is how many cables 
 sets it above one when the span's fibres do not fit the largest cable in the ladder — and the purchase
 and the strand ledger both count every cable, while `routeM` stays the measured route.
 
+Bundles multiply a **distribution or feeder** cable; a drop rung is not bundled. Drop cable is the last
+leg, legal only at or below `DROP_CABLE_MAX_M` (300 m) with at most two fibres and one cable, so a span
+that needs more fibres than its drop rung carries, or more than 300 m of it, is a refused candidate, not
+a bundle: the reason names the span, the figure that left the class and the rung to add — e.g. `the cable
+ladder names no cable that carries 12 fibres: g657a2-drop-2 is a 2-fibre drop cable, and a span is not
+built by bundling drop cable - f-root-site-1 needs 12 fibres over 454.9 m; add a distribution cable at 12
+fibres or more to the ladder`.
+
 ## 6. Strands are addressed the way the tray is
 
 `fiber.addressFor(31)` → `{ tube: 3, fiber: 7, label: 'T03-F07', fiberColor: red, tubeColor: green }`,

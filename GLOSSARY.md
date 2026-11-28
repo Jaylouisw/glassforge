@@ -22,6 +22,12 @@ of cables needed (160 fibres over a 144-fibre ladder is two), and the cable purc
 ledger count every one of them. Absent means one; `0` and fractions are a contradiction, refused by
 the validator and by the BOM by span and by field.
 
+Bundling buys **distribution or feeder cable, never a drop rung**. Drop cable is the last leg: legal
+only at or below `DROP_CABLE_MAX_M` (300 m, `engine/design.js`) with at most two fibres and one
+cable. A span outside that class — more fibres than the drop rung carries, or longer than 300 m —
+is not built out of bundled drop cable: the candidate is refused by name and the sentence says which
+rung is missing (the `dropClassRefusals` check in `engine/design.js`).
+
 **Head end** — where the provider's signal starts. `olt` for a PON, `headend` for an active
 point-to-point or active-over-tree design. The root node type selects the budget that is applied.
 
