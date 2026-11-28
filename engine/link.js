@@ -878,12 +878,21 @@ function design(input, registry) {
 
   let sentence;
   if (legs.length < 2) {
-    sentence = diversity.method === 'coincident'
-      ? 'both sites attach to the same node on the network (' + latLon(coincidentAt) + '): the two ' +
-        'site drops meet in one chamber, so there is no duct run between them and nothing to protect'
-      : diversity.method === 'straight-line'
-      ? 'one straight-line leg: without a graph no protected pair can be drawn'
-      : 'one leg only: the graph offers a single route between the sites, so the circuit is unprotected';
+    if (diversity.method === 'coincident') {
+      sentence = 'both sites attach to the same node on the network (' + latLon(coincidentAt) + '): the two ' +
+        'site drops meet in one chamber, so there is no duct run between them and nothing to protect';
+    } else if (diversity.method === 'straight-line') {
+      sentence = 'one straight-line leg: without a graph no protected pair can be drawn';
+    } else if (diversity.requested === 'single') {
+      // The caller asked for one leg, so the reason is the request and not the duct (gh#118). This
+      // branch used to fall through to the graph sentence below: on the `test/link-design` grid the
+      // same network gives two edge-disjoint legs under the `diverse` default, while
+      // `protection: 'single'` reported "the graph offers a single route between the sites" - a claim
+      // about the duct, which a planner reads as the reason to build a second one.
+      sentence = 'one leg: protection is "single", so the shortest route is built and the circuit is unprotected';
+    } else {
+      sentence = 'one leg only: the graph offers a single route between the sites, so the circuit is unprotected';
+    }
   } else if (achieved) {
     sentence = 'the two legs are edge-disjoint along the supplied graph: ' + legs[0].routedM.toFixed(1) +
       ' m and ' + legs[1].routedM.toFixed(1) + ' m, 0 m shared';
