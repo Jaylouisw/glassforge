@@ -22,13 +22,14 @@ of cables needed (160 fibres over a 144-fibre ladder is two), and the cable purc
 ledger count every one of them. Absent means one; `0` and fractions are a contradiction, refused by
 the validator and by the BOM by span and by field.
 
-Bundling buys **distribution or feeder cable, never a drop rung**. Drop cable is the last leg: legal
-only at or below `DROP_CABLE_MAX_M` (300 m, `engine/design.js`) with at most two fibres and one
-cable. A span that cannot be built that way goes **up the ladder** to the smallest cable that carries
+Bundling buys **distribution or feeder cable, never a drop rung**. Drop cable is the last leg: one
+cable, at or below `DROP_CABLE_MAX_M` (300 m, `engine/design.js`), at whatever fibre count its rung
+carries (`g657a2-drop-4` is a drop rung too — "at most two fibres" described the catalogue, not the
+rule). A span that cannot be built that way goes **up the ladder** to the smallest cable that carries
 it (a 4-fibre 100 m span on the default ladder is `g652d-loose-12`, not a refusal), and is refused by
-name only when the ladder has nothing bigger than the drop rung, so neither the fibres nor a leg over
-300 m can leave the drop class — the `dropClassRefusals` check in `engine/design.js` names the rung to
-add.
+name only when the ladder has nothing bigger than its drop rung, or when a drop leg is over 300 m —
+the `dropClassRefusals` check in `engine/design.js` reads both shapes off the plant and names the
+rung to add.
 
 **Head end** — where the provider's signal starts. `olt` for a PON, `headend` for an active
 point-to-point or active-over-tree design. The root node type selects the budget that is applied.
