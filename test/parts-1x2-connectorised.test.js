@@ -66,19 +66,23 @@ test('auto-design still names the spliced 1:2, so no design changes', function (
   assert.notStrictEqual(built, 'plc-1x2-sca-conn', 'the connectorised row is not what the builder names');
 });
 
-test('every ratio from 1:2 to 1:64 ships both a spliced and a connectorised cassette', function () {
+test('every ratio from 1:2 to 1:128 ships both a spliced and a connectorised cassette', function () {
   // The hole this suite closed: 1:4 through 1:64 had a -conn twin and 1:2 did not, so a hand-drawn
   // plant that terminated its first stage was forced to name a spliced chip or a part nobody sells.
   // A future ratio added on one side only fails here.
-  const ratios = [2, 4, 8, 16, 32, 64];
+  const ratios = [2, 4, 8, 16, 32, 64, 128];
   for (const ratio of ratios) {
     assert.ok(registry.has('splitter', 'plc-1x' + ratio + '-sca'), '1:' + ratio + ' spliced cassette');
     assert.ok(registry.has('splitter', 'plc-1x' + ratio + '-sca-conn'), '1:' + ratio + ' connectorised cassette');
   }
-  // 1:128 ships spliced only: it is the last single-chip ratio and is not sold as a shelf cassette,
-  // which is why the completeness rule above stops at 1:64 rather than pretending otherwise.
+  // This assertion used to read `!registry.has('plc-1x128-sca-conn')`, on the claim that a 1:128 "is
+  // not sold as a shelf cassette" and is the last single-chip ratio, so the rule stopped at 1:64.
+  // The second half is true (a 1:128 is two chips spliced inside the module) and the first is false:
+  // OPTCORE sells PLC-AB-1128-20-SCA-15, a 1x128 SC/APC ABS module at <= 24.6 dB, and LG Optic
+  // quotes 1x128 with connectors at <= 24.0 dB. The rule now runs to 1:128;
+  // test/parts-1x128-connectorised.test.js holds the row to the chip-plus-two-matings arithmetic.
   assert.ok(registry.has('splitter', 'plc-1x128-sca'));
-  assert.ok(!registry.has('splitter', 'plc-1x128-sca-conn'), 'no 1:128 connectorised row exists');
+  assert.ok(registry.has('splitter', 'plc-1x128-sca-conn'), 'the terminated 1:128 exists');
 });
 
 done();

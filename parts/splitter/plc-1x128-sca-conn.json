@@ -1,0 +1,19 @@
+{
+  "kind": "splitter",
+  "model": "plc-1x128-sca-conn",
+  "vendor": "generic",
+  "label": "PLC 1x128 SC/APC connectorised ABS module",
+  "ratio": 128,
+  "splitLossDb": 21.07,
+  "excessLossDb": 2.73,
+  "termination": "connectorised",
+  "technology": "plc",
+  "notes": "The connectorised form of plc-1x128-sca: the same two-chip 1:128 PLC (a 1x64 chip and a 1x2 spliced inside the module, which is why this ratio carries more spread than the single-chip rungs) in an ABS module with 128 SC/APC adapters. Chip figures are that row's, unchanged and from the same place: 21.07 dB ideal split (10*log10(128)) plus 2.73 dB excess = 23.8 dB, the 1x128 figure the spliced row carries from Precision OT. The termination is what differs: this row bills two SC/APC matings on the module input (the catalogue's own sc-apc row, 2 x 0.3 = 0.6 dB) where the spliced row bills one fusion splice (0.1 dB), so it reads 0.5 dB more ODN for the same chip. That puts the row at 24.4 dB: 0.4 dB pessimistic against LG Optic's with-connector standard-grade limit for a 1x128 (<= 24.0 dB, <= 23.7 dB P-grade, and its sheet notes 0.2 dB less without connectors) and 0.2 dB optimistic against OPTCORE's PLC-AB-1128-20-SCA-15 (<= 24.6 dB, 140 x 115 x 18 mm ABS box, 2.0 mm pigtails, 1260-1650 nm, IL uniformity <= 2.5 dB, return loss >= 55 dB, PDL <= 0.5 dB). The spread across vendors at this ratio is wider than at 1:64: Browave quotes 23.5 dB typical with connectors, LG Optic <= 24.0 dB and OPTCORE <= 24.6 dB for the same terminated 1:128, so treat +/- 1 dB as the real band. The trap when replacing this row: a module sheet prints ONE insertion-loss figure that already includes the module's own adapters, so that figure is compared against 21.07 + 2.73 + 0.6 = 24.4 dB and is never loaded into excessLossDb, which would charge the connectors twice. Auto-design never picks this row: buildPon resolves a splitter as plc-1x<ratio>-sca, so the spliced chip stays what a synthesised 1:128 PON is costed on; this row is for a plant drawn by hand, or for a CO stage whose module arrives terminated. Both figures are datasheet typicals, not limits: replace with the bought module's datasheet before construction.",
+  "sourceUrl": "https://www.optcore.net/product/plc-ab-1128-20-sca-15/",
+  "tags": [
+    "plc",
+    "1x128",
+    "connectorised",
+    "sc/apc"
+  ]
+}
