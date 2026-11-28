@@ -411,10 +411,13 @@
       tr.appendChild(el('td', { class: 'num', text: String(row.index) }));
       tr.appendChild(el('td', { text: at.label }));
       const td = el('td', {});
-      const sw = el('span', { class: 'swatch' });
-      sw.style.background = at.address.fiberColor.hex;
+      // Past the twelfth fibre of a 24-fibre tube the colour repeats with a tracer; the tab words it
+      // and stripes the swatch, or two rows in one tray are the same blue (gh#258).
+      const fibre = at.address.fiberColor;
+      const sw = el('span', { class: 'swatch' + (fibre.tracer ? ' tracer-' + fibre.tracer : '') });
+      sw.style.background = fibre.hex;
       td.appendChild(sw);
-      td.appendChild(el('span', { text: at.address.fiberColor.name }));
+      td.appendChild(el('span', { text: GFFiber.colorText(fibre) }));
       tr.appendChild(td);
       table.appendChild(tr);
     }

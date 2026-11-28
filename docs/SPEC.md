@@ -162,6 +162,12 @@ f-root-site-1 needs 12 fibres over 454.9 m; add a distribution cable at 12 fibre
 because that is what is written on the tray in a closure. `fiber.parseAddress` accepts `T03-F07`,
 `t3f7`, `3-7`, `3/7` and a bare strand index.
 
+Past the twelfth fibre in a tube the colours repeat with a tracer, so `fiberColor` is
+`{ name, hex, tracer }`: `tracer` is `null` for 1–12 and `'black'` for 13–24, except position 20 where
+it is `'white'` because black on black cannot be read. `fiber.colorText` is the one place that is
+worded (`blue with black tracer`), and a splice row carries the same `tracer`; `docs/FIBRE-COLOURS.md`
+has the table and the manufacturer caveat past 24.
+
 How many fibres a tube holds is a property of the **cable** (`fibersPerTube`, validated 1..24), not a
 fixed twelve, and the address follows the cable the strand is in: `network.spliceTable` addresses every
 row from the span's own cable part, so strand 25 is `T02-F01` in a 24-per-tube ribbon and `T03-F01` in
@@ -171,8 +177,8 @@ falls back to the standard twelve rather than hiding the strand from the sheet.
 
 A span with `bundles > 1` numbers its strands **continuously across the bundle** — 1…`fibersPerCable ×
 bundles` — but a tray is per cable, so `network.spliceTable` scopes each row to the cable the strand is
-in. Every row carries `cable` (1-based within the bundle), `strandInCable` (1-based within that cable)
-and a cable-qualified `label`: strand 18 of `2 x g652d-loose-12` is `cable: 2`, `strandInCable: 6`,
+in. Every row carries `cable` (1-based within the bundle), `strandInCable` (1-based within that cable),
+`colour`/`hex`/`tracer` and a cable-qualified `label`: strand 18 of `2 x g652d-loose-12` is `cable: 2`, `strandInCable: 6`,
 bare `address: 'T01-F06'` and `label: 'C02/T01-F06'`. `address` stays the bare tray label because
 `fiber.parseAddress` and the ledger read it; `label` is what the printed schedule shows, and on a
 single-cable span the two are equal. An index past `fibersPerCable × bundles` is refused by name

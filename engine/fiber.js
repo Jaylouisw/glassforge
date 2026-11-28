@@ -8,6 +8,11 @@
  * back to one strand. Colours are load-bearing: a splice diagram whose colours are arbitrary is a
  * diagram nobody can work from in a manhole.
  *
+ * A tube of more than twelve fibres does not simply repeat the colours. Positions 13-24 repeat the
+ * twelve with a **black tracer**, and the repeated black (position 20) takes a **white tracer** so it
+ * can be seen against itself. Two plain blues in one 24-fibre tray is two indistinguishable fibres to
+ * the crew holding the splicer (gh#258).
+ *
  * Counting is 1-based at both levels, because that is how the hardware is numbered.
  */
 
@@ -28,7 +33,10 @@ const COLORS = [
 
 const DEFAULT_FIBERS_PER_TUBE = 12;
 
-/** Colour of a 1-based position in a tube. Positions past 12 wrap, as the standard repeats. */
+/**
+ * Base colour of a 1-based position in the twelve-colour sequence: a tube number, or a fibre position
+ * read without its tracer. Positions past 12 wrap, as the standard repeats, so tube 13 is blue again.
+ */
 function colorFor(position) {
   const n = Number(position);
   if (!Number.isInteger(n) || n < 1) throw new RangeError('fibre position must be a positive integer, got ' + position);
@@ -52,6 +60,39 @@ function fibersPerTubeOf(opts) {
 }
 
 /**
+ * Colour of a 1-based fibre position **inside a tube**, tracer included: `{ name, hex, tracer }`.
+ *
+ * Positions 1-12 are the plain colours (`tracer: null`). Positions 13-24 repeat them with a black
+ * tracer; position 20 is black-on-black, so its tracer is white. Past 24 the marking is the
+ * manufacturer's - a Corning 24-fibre tube ships fibre 20 as a natural fibre with a black tracer - so
+ * this returns the base colour and no tracer rather than guessing: the T-number identifies the fibre
+ * and the cable's construction sheet decides. `fibersPerTube` is capped at 24 today, so the >24 branch
+ * is a stated limit, not a live path.
+ */
+function tubeFiberColor(position) {
+  const n = Number(position);
+  if (!Number.isInteger(n) || n < 1) throw new RangeError('fibre position must be a positive integer, got ' + position);
+  const base = COLORS[(n - 1) % COLORS.length];
+  if (n <= COLORS.length || n > COLORS.length * 2) {
+    return { name: base.name, hex: base.hex, tracer: null };
+  }
+  return { name: base.name, hex: base.hex, tracer: base.name === 'black' ? 'white' : 'black' };
+}
+
+/**
+ * The only place the tracer is spelled out: `blue`, `blue with black tracer`. Takes either an
+ * address's `fiberColor` (`{ name }`) or a splice row (`{ colour, tracer }`), because both render the
+ * same fibre. Served to the browser with the table so the printed plan and the splice tab cannot word
+ * the same fibre differently.
+ */
+function colorText(colour) {
+  if (!colour) return '';
+  const name = colour.name || colour.colour;
+  if (!name) return '';
+  return colour.tracer ? name + ' with ' + colour.tracer + ' tracer' : name;
+}
+
+/**
  * Strand index (1-based, across the whole cable) to a tube/fibre address.
  * Tube 1 holds strands 1..perTube, tube 2 the next block, and so on.
  */
@@ -68,7 +109,7 @@ function addressFor(strandIndex, opts) {
     tube: tube,
     fiber: fiber,
     tubeColor: colorFor(tube),
-    fiberColor: colorFor(fiber),
+    fiberColor: tubeFiberColor(fiber),
     label: labelFor(tube, fiber, opts)
   };
 }
@@ -169,10 +210,10 @@ function parseAddress(text, opts) {
   return Object.assign(addressFor(resolved, opts), { raw: String(text) });
 }
 
-/** Human string for a splice line: `T03-F07 red - green (blue)`. */
+/** Human string for a splice line: `T03-F07 red`, or `T01-F13 blue with black tracer`. */
 function describe(address) {
   if (!address || !address.fiberColor) return '';
-  return address.label + ' ' + address.fiberColor.name;
+  return address.label + ' ' + colorText(address.fiberColor);
 }
 
 const api = {
@@ -180,6 +221,8 @@ const api = {
   DEFAULT_FIBERS_PER_TUBE: DEFAULT_FIBERS_PER_TUBE,
   colorFor: colorFor,
   colorName: colorName,
+  tubeFiberColor: tubeFiberColor,
+  colorText: colorText,
   isStandardColor: isStandardColor,
   tubeCount: tubeCount,
   addressFor: addressFor,

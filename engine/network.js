@@ -1106,6 +1106,9 @@ function spliceTable(plant, registry) {
           label: at.label,
           colour: at.address.fiberColor.name,
           hex: at.address.fiberColor.hex,
+          // A fibre past the twelfth in a 24-fibre tube repeats the colour with a tracer; the row
+          // carries it or the printed plan shows two identical blues in one tray (gh#258).
+          tracer: at.address.fiberColor.tracer,
           via: others.length ? 'splice' : 'parked',
           port: null,
           splicedTo: others
@@ -1195,6 +1198,7 @@ function splitterPoint(node, local, idOf, depth, registry) {
         label: at.label,
         colour: at.address.fiberColor.name,
         hex: at.address.fiberColor.hex,
+        tracer: at.address.fiberColor.tracer,
         via: isInput ? 'splitter-input' : 'splitter-port',
         port: isInput ? null : ++port,
         splicedTo: []

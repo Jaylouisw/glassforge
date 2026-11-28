@@ -825,6 +825,14 @@ function escapeHtml(value) {
   });
 }
 
+/**
+ * CSS class for a tracer stripe on a splice-schedule swatch. Only the two tracers the engine emits get
+ * a class; anything else renders the plain swatch rather than an invented one.
+ */
+function tracerClass(tracer) {
+  return tracer === 'black' || tracer === 'white' ? ' tracer-' + tracer : '';
+}
+
 function metres(n) {
   return String(Number(Number(n).toFixed(1)));
 }
@@ -963,6 +971,10 @@ function printPage(req, res, project, registry) {
     'th,td{border:1px solid #999;padding:3px 6px;text-align:left;vertical-align:top}' +
     'th{background:#eee;font-weight:600}.num{text-align:right}.err{color:#a00}.warn{color:#8a5a00}' +
     '.swatch{display:inline-block;width:10px;height:10px;border:1px solid #333;margin-right:4px;vertical-align:middle}' +
+    // A tracer is a stripe down the fibre; inset shadow, because an inline `background` (the colour)
+    // would reset a background-image. Two plain blues in a 24-fibre tray is the defect (gh#258).
+    '.swatch.tracer-black{box-shadow:inset -3px 0 0 #000}' +
+    '.swatch.tracer-white{box-shadow:inset -3px 0 0 #fff}' +
     '.drawing{border:1px solid #999}footer{margin-top:18px;color:#666;font-size:10px}' +
     '@page{margin:14mm}@media print{body{padding:0;max-width:none}thead{display:table-header-group}' +
     'tr{page-break-inside:avoid}h2{page-break-after:avoid}.drawing{page-break-inside:avoid}}' +
@@ -1129,7 +1141,10 @@ function printPage(req, res, project, registry) {
         // `label` is the cable-qualified tray address (`C02/T01-F06` on a bundled span); it equals
         // `address` on a single-cable span, so the sheet reads the same as before there.
         return [row.span, { text: String(row.strand), cls: 'num' }, row.label,
-          { html: '<span class="swatch" style="background:' + escapeHtml(row.hex) + '"></span>' + escapeHtml(row.colour) },
+          // The tracer is part of the colour the crew reads: `blue with black tracer`, not a second
+          // plain blue. Both words and stripe come from the engine's own table (gh#258).
+          { html: '<span class="swatch' + tracerClass(row.tracer) + '" style="background:' + escapeHtml(row.hex) +
+            '"></span>' + escapeHtml(engine.fiber.colorText(row)) },
           spliceTarget(row, point)];
       })));
     }

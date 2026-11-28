@@ -57,8 +57,40 @@ test('a closure addresses a strand in the tube geometry of the cable it arrives 
   assert.strictEqual(byStrand.get(1).address, 'T01-F01');
   assert.strictEqual(byStrand.get(25).address, 'T02-F01', 'strand 25 is in tube 2 of a 24-fibre tube');
   assert.strictEqual(byStrand.get(48).address, 'T02-F24');
-  // 2 * 24 + 24 wraps the twelve-colour sequence: fibre 24 is aqua, as the standard repeats.
+  // This used to say only "2 * 24 + 24 wraps the twelve-colour sequence: fibre 24 is aqua" and stop
+  // there, which read the wrap as the whole story. Past twelve a fibre also carries a tracer, so the
+  // row says aqua *with a black tracer* and the first twelve stay plain (gh#258).
   assert.strictEqual(byStrand.get(48).colour, 'aqua');
+  assert.strictEqual(byStrand.get(48).tracer, 'black');
+  assert.strictEqual(byStrand.get(1).tracer, null, 'fibre 1 is the plain colour');
+  assert.strictEqual(byStrand.get(25).tracer, null, 'fibre 1 of tube 2 is plain too: the tracer follows the fibre position');
+});
+
+test('two fibres twelve positions apart in one 24-fibre tray are told apart by the tracer', function () {
+  // The defect in the sheet: T01-F01 and T01-F13 both read plain "blue" with the same hex, so a crew
+  // had two indistinguishable fibres in one tray (gh#258).
+  const plant = {
+    nodes: [
+      { id: 'o1', type: 'olt', model: 'gpon-c-plus-8' },
+      { id: 'c1', type: 'closure', model: 'mufa-inline-24' }
+    ],
+    spans: [{ id: 's1', from: 'o1', to: 'c1', cable: RIBBON_48, lengthM: 800, strands: [1, 13, 20] }]
+  };
+  const rows = new Map(engine.network.spliceTable(plant, registry).points[0].rows
+    .map(function (r) { return [r.strand, r]; }));
+  const first = rows.get(1);
+  const blueTracer = rows.get(13);
+  assert.strictEqual(first.address, 'T01-F01');
+  assert.strictEqual(blueTracer.address, 'T01-F13');
+  assert.strictEqual(first.colour, 'blue');
+  assert.strictEqual(blueTracer.colour, 'blue');
+  assert.strictEqual(first.tracer, null);
+  assert.strictEqual(blueTracer.tracer, 'black');
+  assert.strictEqual(engine.fiber.colorText(first), 'blue');
+  assert.strictEqual(engine.fiber.colorText(blueTracer), 'blue with black tracer');
+  // Position 20 repeats black, so its tracer is white: black on black cannot be read in a tray.
+  assert.strictEqual(rows.get(20).tracer, 'white');
+  assert.strictEqual(rows.get(20).colour, 'black');
 });
 
 test('a closure joining two cables addresses each side in its own cable', function () {

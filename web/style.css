@@ -94,3 +94,6 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .err { color: #ff8a8a; }
 .warn { color: var(--warn); }
 .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 3px; }
+/* A tracer is a stripe down the fibre: inset shadow, so the swatch keeps its colour. */
+.swatch.tracer-black { box-shadow: inset -2px 0 0 0 #1a1a1a; }
+.swatch.tracer-white { box-shadow: inset -2px 0 0 0 #f0f0f0; }
