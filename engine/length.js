@@ -244,6 +244,14 @@ function billOfMaterials(plant, registry, opts) {
   const lines = [];
 
   plant.spans.forEach(function (span, i) {
+    // A BOM is a purchase order, so it cannot price an entry it cannot read - and it must not skip
+    // it either (a skipped span is a drum nobody orders). Measured: a project file holding `null`
+    // among its spans answered `500 Cannot read properties of null (reading 'cable')` out of
+    // `/api/projects/:id/bom` and out of the printed plan, where the file was the caller's own.
+    if (!network.isEntry(span)) {
+      throw new Error('span #' + i + ' is not a span object - the bill of materials prices objects ' +
+        'with an id, a cable and a length in metres');
+    }
     const cable = registry.get('cable', span.cable);
     if (!isNum(span.lengthM) || span.lengthM <= 0) {
       throw new Error('span ' + (span.id || '#' + i) + ' has no measured length - measure the route before building a BOM');

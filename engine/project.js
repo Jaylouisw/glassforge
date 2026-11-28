@@ -11,6 +11,12 @@
 
 const network = require('./network');
 
+// A project's `nodes`/`spans` come from a JSON file and from `PUT` bodies, either of which can hold
+// `null` where an object belongs. `network.validate` names that entry; the summary below is built
+// for the same project - `GET /api/projects/:id` asks for both - so it skips what it cannot read
+// instead of dereferencing it (that threw a 500 out of the endpoint the user opens to fix the file).
+const isEntry = network.isEntry;
+
 const MAX_HISTORY = 50;
 const NODE_TYPES = network.NODE_TYPES;
 
@@ -322,8 +328,10 @@ function summary(project, registry) {
     updatedAt: project.updatedAt,
     nodes: (project.nodes || []).length,
     spans: (project.spans || []).length,
-    onts: (project.nodes || []).filter(function (n) { return n.type === 'ont'; }).length,
-    routeM: Math.round((project.spans || []).reduce(function (n, s) { return n + (s.lengthM || 0); }, 0) * 10) / 10,
+    onts: (project.nodes || []).filter(function (n) { return isEntry(n) && n.type === 'ont'; }).length,
+    routeM: Math.round((project.spans || []).reduce(function (n, s) {
+      return n + (isEntry(s) && s.lengthM ? s.lengthM : 0);
+    }, 0) * 10) / 10,
     capacity: registry ? network.capacity(project, registry) : null
   };
 }

@@ -56,6 +56,21 @@ const MODEL_KINDS = {
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 
 /**
+ * A plant entry the lists can read: an object, not `null`, not an array.
+ *
+ * A project is a JSON file, and a JSON file can hold `null` where an object belongs - a hand edit
+ * with a stray comma, a merge that dropped a line, an import that kept a blank. `validate` names
+ * that entry (`nodes[3] is not a node object`); the derived readers - capacity, stats, the strand
+ * ledger, the splice sheet - also run on files that never met the save gate, so they skip it rather
+ * than dereference it. Measured before this guard, driven through the real server: a `null` beside a
+ * valid OLT answered `500 Cannot read properties of null (reading 'type')` on `GET /api/projects/:id`
+ * and on `PUT`, where the caller's own file was being blamed on the server.
+ */
+function isEntry(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
  * A splice or closure count on a span.
  *
  * Absent means none - the design builders omit the field on a span with nothing to count - so
@@ -101,13 +116,14 @@ function strandListText(value) {
 }
 
 function nodeById(plant, id) {
-  return (plant.nodes || []).find(function (n) { return n.id === id; }) || null;
+  return (plant.nodes || []).find(function (n) { return isEntry(n) && n.id === id; }) || null;
 }
 
 function adjacency(plant) {
   const adj = new Map();
-  for (const node of plant.nodes || []) adj.set(node.id, []);
+  for (const node of plant.nodes || []) if (isEntry(node)) adj.set(node.id, []);
   for (const span of plant.spans || []) {
+    if (!isEntry(span)) continue;
     if (adj.has(span.from)) adj.get(span.from).push({ span: span, to: span.to });
     if (adj.has(span.to)) adj.get(span.to).push({ span: span, to: span.from });
   }
@@ -133,7 +149,7 @@ function trace(plant, ontId) {
     throw new Error('node "' + ontId + '" has type "' + target.type + '", not "ont" - trace takes an ONT id');
   }
 
-  const roots = plant.nodes.filter(function (n) { return ROOT_TYPES.indexOf(n.type) !== -1; });
+  const roots = plant.nodes.filter(function (n) { return isEntry(n) && ROOT_TYPES.indexOf(n.type) !== -1; });
   if (roots.length !== 1) {
     throw new Error('a plant needs exactly one olt (or headend) node, found ' + roots.length);
   }
@@ -329,7 +345,7 @@ function budgetRow(plant, ontId, registry, opts) {
 
 /** Every ONT's budget, in one pass. This is the "signal" page of the planner. */
 function allOntBudgets(plant, registry, opts) {
-  const onts = (plant.nodes || []).filter(function (n) { return n.type === 'ont'; });
+  const onts = (plant.nodes || []).filter(function (n) { return isEntry(n) && n.type === 'ont'; });
   return onts.map(function (node) { return budgetRow(plant, node.id, registry, opts); });
 }
 
@@ -423,6 +439,10 @@ function strandLedger(plant, registry) {
   let totalUsed = 0;
 
   (plant.spans || []).forEach(function (span, i) {
+    // A list entry that is not a span is named by `validate` (`spans[i] is not a span object`); the
+    // ledger is a read surface for files that never met that gate, so it counts the spans it can
+    // read instead of throwing on the one it cannot.
+    if (!isEntry(span)) return;
     const cap = spanFibreCapacity(span, registry);
     const entries = Array.isArray(span.strands) ? span.strands.slice() : [];
     const carried = new Set();
@@ -492,8 +512,8 @@ function strandLedger(plant, registry) {
 /** Capacity of the plant against the OLT's limits and each splitter's own: ports, split ratio, ONTs
  * per port, branches per splitter. */
 function capacity(plant, registry) {
-  const onts = (plant.nodes || []).filter(function (n) { return n.type === 'ont'; });
-  const splitters = (plant.nodes || []).filter(function (n) { return n.type === 'splitter'; });
+  const onts = (plant.nodes || []).filter(function (n) { return isEntry(n) && n.type === 'ont'; });
+  const splitters = (plant.nodes || []).filter(function (n) { return isEntry(n) && n.type === 'splitter'; });
   const roots = rootNodes(plant);
   if (roots.length !== 1) {
     // Refuse to pick a root. Reporting the first OLT's ports for a plant that has two of them (or
@@ -544,7 +564,7 @@ function capacity(plant, registry) {
   const adj = adjacency(plant);
   {
     const oltOrHead = (plant.nodes || []).find(function (n) {
-      return n.type === 'olt' || n.type === 'headend';
+      return isEntry(n) && (n.type === 'olt' || n.type === 'headend');
     });
     const stack = oltOrHead ? [{ id: oltOrHead.id, ratio: 1, seen: new Set([oltOrHead.id]) }] : [];
     while (stack.length) {
@@ -604,7 +624,7 @@ function capacity(plant, registry) {
       list.push(child);
       children.set(parent, list);
     }
-    const typeOf = new Map((plant.nodes || []).map(function (n) { return [n.id, n.type]; }));
+    const typeOf = new Map((plant.nodes || []).filter(isEntry).map(function (n) { return [n.id, n.type]; }));
     // Outputs in use, in fibres: an ONT is one, a downstream splitter is one and ends the walk.
     const outputsInUse = function (splitterId) {
       const walked = new Set([splitterId]);
@@ -621,7 +641,7 @@ function capacity(plant, registry) {
       return used;
     };
     for (const node of plant.nodes || []) {
-      if (node.type !== 'splitter' || !node.model || !registry.has('splitter', node.model)) continue;
+      if (!isEntry(node) || node.type !== 'splitter' || !node.model || !registry.has('splitter', node.model)) continue;
       const part = registry.get('splitter', node.model);
       const used = outputsInUse(node.id);
       splitterPorts.push({
@@ -716,8 +736,13 @@ function validate(plant, registry) {
   if (errors.length) return { ok: false, errors: errors, warnings: warnings };
 
   const ids = new Set();
-  for (const node of nodes) {
-    if (!node || !node.id) { errors.push('a node has no id'); continue; }
+  for (let index = 0; index < nodes.length; index++) {
+    const node = nodes[index];
+    if (!isEntry(node)) {
+      errors.push('nodes[' + index + '] is not a node object - a node is an object with an id, a type and a model');
+      continue;
+    }
+    if (!node.id) { errors.push('node #' + index + ' has no id'); continue; }
     if (ids.has(node.id)) errors.push('duplicate node id "' + node.id + '"');
     ids.add(node.id);
     if (NODE_TYPES.indexOf(node.type) === -1) {
@@ -755,11 +780,12 @@ function validate(plant, registry) {
     errors.push(rootCountMessage(roots.length));
   } else {
     const active = roots[0].type === 'headend';
-    if (active && nodes.some(function (n) { return n.type === 'splitter'; })) {
+    if (active && nodes.some(function (n) { return isEntry(n) && n.type === 'splitter'; })) {
       errors.push('an active network (headend root) cannot contain a splitter - splitters are a PON element');
     }
     if (!active && nodes.some(function (n) {
-      return n.type === 'ont' && n.model && registry.has('transceiver', n.model) && !registry.has('ont', n.model);
+      return isEntry(n) && n.type === 'ont' && n.model &&
+        registry.has('transceiver', n.model) && !registry.has('ont', n.model);
     })) {
       errors.push('a PON plant needs ONT models at the customer end, not transceivers');
     }
@@ -769,8 +795,13 @@ function validate(plant, registry) {
   // fault: no customer ONT can ever be blamed for it, so the message a caller greps for is unambiguous.
 
   const spanIds = new Set();
-  for (const span of spans) {
-    if (!span || !span.id) { errors.push('a span has no id'); continue; }
+  for (let index = 0; index < spans.length; index++) {
+    const span = spans[index];
+    if (!isEntry(span)) {
+      errors.push('spans[' + index + '] is not a span object - a span is an object with an id, a cable and a length in metres');
+      continue;
+    }
+    if (!span.id) { errors.push('span #' + index + ' has no id'); continue; }
     if (spanIds.has(span.id)) errors.push('duplicate span id "' + span.id + '"');
     spanIds.add(span.id);
     if (!ids.has(span.from)) errors.push('span "' + span.id + '" starts at unknown node "' + span.from + '"');
@@ -876,13 +907,13 @@ function validate(plant, registry) {
 
 function stats(plant, registry) {
   const spans = plant.spans || [];
-  const routeM = spans.reduce(function (n, s) { return n + (isNum(s.lengthM) ? s.lengthM : 0); }, 0);
+  const routeM = spans.reduce(function (n, s) { return n + (isEntry(s) && isNum(s.lengthM) ? s.lengthM : 0); }, 0);
   return {
     nodes: (plant.nodes || []).length,
     spans: spans.length,
-    onts: (plant.nodes || []).filter(function (n) { return n.type === 'ont'; }).length,
-    splitters: (plant.nodes || []).filter(function (n) { return n.type === 'splitter'; }).length,
-    closures: (plant.nodes || []).filter(function (n) { return n.type === 'closure'; }).length,
+    onts: (plant.nodes || []).filter(function (n) { return isEntry(n) && n.type === 'ont'; }).length,
+    splitters: (plant.nodes || []).filter(function (n) { return isEntry(n) && n.type === 'splitter'; }).length,
+    closures: (plant.nodes || []).filter(function (n) { return isEntry(n) && n.type === 'closure'; }).length,
     routeM: Math.round(routeM * 10) / 10,
     routeKm: Math.round((routeM / 1000) * 1000) / 1000,
     capacity: capacity(plant, registry),
@@ -938,6 +969,7 @@ function spliceTable(plant, registry) {
   const idOf = new Map();
   const spanById = new Map();
   spans.forEach(function (span, i) {
+    if (!isEntry(span)) return;
     const id = span.id || '#' + i;
     idOf.set(span, id);
     spanById.set(id, span);
@@ -948,8 +980,8 @@ function spliceTable(plant, registry) {
   let totalStrands = 0;
 
   for (const node of nodes) {
-    if (node.type !== 'closure' && node.type !== 'splitter') continue;
-    const local = spans.filter(function (s) { return s.from === node.id || s.to === node.id; });
+    if (!isEntry(node) || (node.type !== 'closure' && node.type !== 'splitter')) continue;
+    const local = spans.filter(function (s) { return isEntry(s) && (s.from === node.id || s.to === node.id); });
     if (!local.length) continue;
 
     if (node.type === 'splitter') {
@@ -1102,6 +1134,7 @@ function splitterPoint(node, local, idOf, depth, registry) {
 
 module.exports = {
   NODE_TYPES: NODE_TYPES,
+  isEntry: isEntry,
   trace: trace,
   designForOnt: designForOnt,
   allOntBudgets: allOntBudgets,

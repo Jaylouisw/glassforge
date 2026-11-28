@@ -508,8 +508,11 @@ async function handle(req, res, ctx) {
         // The same read as the validator, naming the span. A file edited by hand never met the write
         // gate, and cableToBuy's own sentence ("splices must be a number or an array") tells the
         // caller the server broke when it was the file's field that is not a count.
-        const unpriceable = (project.spans || []).map(function (span) {
-          if (!span) return null;
+        const unpriceable = (project.spans || []).map(function (span, i) {
+          if (!engine.network.isEntry(span)) {
+            return 'span #' + i + ' is not a span object - the bill of materials prices objects ' +
+              'with an id, a cable and a length in metres';
+          }
           if (span.cable && !registry.has('cable', span.cable)) {
             return 'span "' + span.id + '" uses unknown cable model "' + span.cable + '"';
           }
@@ -801,6 +804,7 @@ function planSvg(project) {
   parts.push('<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="#ffffff"/>');
 
   for (const span of project.spans || []) {
+    if (!span) continue;
     const a = placed.get(span.from);
     const b = placed.get(span.to);
     if (!a || !b || !a.placed || !b.placed) continue;
@@ -884,7 +888,9 @@ function printPage(req, res, project, registry) {
   const stats = engine.network.stats(project, registry);
   const check = engine.project.check(project, registry);
   const plan = planSvg(project);
-  const root = (project.nodes || []).find(function (n) { return n.type === 'olt' || n.type === 'headend'; });
+  const root = (project.nodes || []).find(function (n) {
+    return engine.network.isEntry(n) && (n.type === 'olt' || n.type === 'headend');
+  });
   const technology = root ? (root.type === 'olt' ? 'PON' : 'active') : 'no head-end';
 
   let bom = null, bomError = null;
