@@ -91,6 +91,30 @@ test('a route with no measurable length is refused, not priced at zero metres', 
   // the same answer as "nothing was drawn".
   throws(function () { length.cableToBuyForRoute([], {}); }, 'at least two', 'an empty route');
   throws(function () { length.cableToBuyForRoute([{ lat: 51.5, lon: -0.1 }], {}); }, 'at least two', 'a one-point route');
+  // The count check caught a route too short to have points; a route that has the points but measures
+  // nothing was still priced at zero. Measured on 03a7f81: `POST /api/design/length
+  // {"points":[{"lat":52,"lon":4},{"lat":52,"lon":4}]}` answered 200 with `routeM: 0, drums: 0,
+  // purchaseM: 0` - the same purchase order for nothing, from a route the caller did draw. A tap that
+  // lands twice on one spot is an ordinary way to draw it, and 0.00 m is not a length anybody's crew
+  // can pull, so it is refused with the reason it measured nothing.
+  throws(function () {
+    length.cableToBuyForRoute([{ lat: 51.5, lon: -0.1 }, { lat: 51.5, lon: -0.1 }], {});
+  }, 'same place', 'two coincident points');
+  throws(function () {
+    length.cableToBuyForRoute([{ lat: 51.5, lon: -0.1 }, { lat: 51.5, lon: -0.1 }, { lat: 51.5, lon: -0.1 }], {});
+  }, 'same place', 'three coincident points');
+  // A route four millimetres long is real geometry, but its design length is 0.00 m once the
+  // calculation rounds, so it is refused by the figure it measured rather than by the "same place"
+  // clause. 0.00000004 degrees of latitude is about 4.4 mm.
+  throws(function () {
+    length.cableToBuyForRoute([{ lat: 51.5, lon: -0.1 }, { lat: 51.50000004, lon: -0.1 }], {});
+  }, 'rounds to 0.00 m', 'a route shorter than the purchase rounds to');
+  // Below a tenth of a millimetre the figure cannot be printed to four places either, so the
+  // sentence says the length is under the floor rather than measuring it as 0 m (0.0000000001
+  // degrees of latitude is about 0.011 mm).
+  throws(function () {
+    length.cableToBuyForRoute([{ lat: 51.5, lon: -0.1 }, { lat: 51.5000000001, lon: -0.1 }], {});
+  }, 'under 0.0001 m', 'a route below the printed floor');
 });
 
 test('a route point that is not a coordinate is named by its index', function () {
