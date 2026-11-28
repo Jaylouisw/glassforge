@@ -1,0 +1,28 @@
+{
+  "kind": "cable",
+  "model": "g652d-adss-144",
+  "vendor": "Corning",
+  "label": "Corning ADSS 144F aerial, G.652.D",
+  "fiberCount": 144,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder"
+  ],
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Corning 144ELE-T3322A20 product spec sheet (Corning Optical Communications ecatalog, revision date 2026-11-28): Aerial Dielectric Self-Supporting Cable, ADSS 144 F Single-mode (OS2), A-D2Y(T)2Y, (12 x 12). Twelve active loose tubes of 12 fibres in twelve tube positions - the top of the stranded family, which the 48F row sheet describes as single-layer stranded construction up to 144 fibers - dielectric central element, DRY core held by swellable elements rather than gel, non-metallic (aramid) strength members over the core, black PE jacket, halogen-free, one ripcord; construction A-D2Y(T)2Y per EN 60794-1-1 (DIN VDE 0888-100-1); 19.9 mm nominal diameter, 282 kg/km, crush 3000 N/10 cm, max tensile 1700 N long-term / 4000 N short-term, min bend radius 350 mm installation / 300 mm operation, -40 to +70 C operating and storage (-5 to +50 C installation), Telcordia colour code, ITU-T G.652.D / IEC 60793-2-50 B1.3 fibre, cable cutoff 1260 nm, PMD link design value <= 0.06 ps/sqrt(km). The same 19.9 mm sheath as the 96F rung and 84 kg/km more of it: both sheets print 19.9 mm and the same 1700/4000 N ratings, so the 144-fibre core rides the same stranded design rather than a heavier one, and the mass is the difference the pole line sees. Why the row exists: a 144-fibre aerial trunk had no aerial row at all - the ladder could only answer g652d-loose-144 (gel-filled duct loose tube) or g652d-ribbon-144 (ribbon for a duct, or a trunk pulled into one), and neither is a cable to hang between poles, so an aerial trunk BOM named a product the route cannot take. Measured on this engine: a 1,200 m 144-fibre span answers g652d-loose-144 from a ladder that stocks only the duct and ribbon rungs, and g652d-adss-144 once this row is in the ladder (equal 144-fibre counts, tie broken on model id, g652d-adss-144 first). With g652d-adss-96 this closes the family the 48F row cited at up to 144. Attenuation, and exactly what kind of figure it is: the sheet publishes MAXIMUM 0.36 dB/km at 1310 nm, 0.36 at 1383 nm and 0.22 at 1550 nm - maxima, not typicals, and no 1490 nm figure at all. This row carries 0.35 / 0.22 / 0.21, the same typical installed row every other cable here carries; 1490 nm is interpolated and is not a citation from Corning or from ITU-T, and the sheet 0.36 dB/km at 1310 nm is 0.01 above the 0.35 here, so hold the supplier to 0.36 in acceptance. The row publishes NO drumM: the Corning Dimensions block prints Max. cable length per reel/drum 6000 m, a ceiling and not a putup list, and declaring it would bill a 6 km reel for a short run - measured on engine/length.js at 0.7 km of route a 6000 m drum bills 6,000 m where the 2,000 m engine default bills 2,000, and at 12 km it bills 18,000 m against 14,000; the two agree only between 4.8 and 6 km. With no drumM the engine falls back to its 2,000 m default and the purchase line carries it, so enter the reel actually ordered. What the engine does not model, and one trap. CABLE_USES has no aerial value, so aerial-ness lives in the tags and this note and nothing in the planner reads it; nothing checks span, sag, ice or wind loading, so the design will run this cable over any span you draw and the pole-to-pole distance stays a decision the planner takes; nothing metallic means nothing to bond or earth at a joint. The trap is the tie-break: cableFor answers with the SMALLEST cable that fits and breaks an equal fibre count on model id, and this model sorts before its duct and ribbon twins, so a ladder naming this row beside them buys aerial cable for every span of that size in the plant - name this row instead of the duct twin, not beside it, unless the whole plant is on poles. This row deliberately does not say drop: isDropCable in engine/design.js reads the use field to REFUSE a span that ended up on drop cable beyond 300 m, and an aerial trunk is not tight-buffer G.657.A2 flat drop. One product data sheet, not a measured build: replace with the cable actually purchased and its as-built attenuation before ordering.",
+  "sourceUrl": "https://ecatalog.corning.com/optical-communications/EMEA/en/generate-product-specsheet/144ELE-T3322A20.pdf",
+  "tags": [
+    "corning",
+    "adss",
+    "aerial",
+    "g.652.d",
+    "144f",
+    "dielectric"
+  ]
+}
