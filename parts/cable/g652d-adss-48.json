@@ -1,0 +1,29 @@
+{
+  "kind": "cable",
+  "model": "g652d-adss-48",
+  "vendor": "Corning",
+  "label": "Corning ADSS 48F aerial, G.652.D",
+  "fiberCount": 48,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Corning 048ELE-T3322A20 product spec sheet (Corning Optical Communications ecatalog, revision date 2026-11-28): 'Aerial Dielectric Self-Supporting Cable, ADSS 48 F, Single-mode (OS2), A-D2Y(T)2Y, (4 x 12)'. Four active loose tubes of 12 fibres in twelve tube positions with eight filling elements, dielectric central element, DRY core held by swellable elements rather than gel, non-metallic (aramid) strength members over the core, black PE jacket, halogen-free; construction code A-D2Y(T)2Y per EN 60794-1-1 (DIN VDE 0888-100-1); 15.1 mm nominal diameter, 161 kg/km, crush 3000 N/10 cm, max tensile 1700 N long-term / 4000 N short-term, min bend radius 265 mm installation / 225 mm operation, -40 to +70 C operating and storage (-5 to +50 C installation), single-layer stranded construction up to 144 fibres, Telcordia colour code, ITU-T G.652.D / IEC 60793-2-50 B1.3 fibre, cable cutoff 1260 nm, PMD link design value <= 0.06 ps/sqrt(km). Why the row exists: 48F is what an aerial feeder is on a rural or peri-urban pole route - one run from the exchange or a handhole out to the first splitter site - and until this row the catalogue's only 48F cable was g652d-loose-48, a gel-filled duct cable with no self-supporting strength member, which is not a cable to hang between poles. This is the top rung of the catalogue's first aerial family (12F is g652d-adss-12, 24F is g652d-adss-24), and the sheet's own note that the same stranded design runs up to 144 fibres means a larger aerial feeder is a part this vendor stocks rather than a different construction. Attenuation, and what kind of figure it is: the sheet publishes MAXIMUM 0.36 dB/km at 1310 nm, 0.36 at 1383 nm and 0.22 at 1550 nm - maxima, not typicals, and no 1490 nm figure. This row carries 0.35 / 0.22 / 0.21, the same typical row g652d-loose-48 and g657a2-indoor-48 carry, so an aerial feeder and a duct feeder are budgeted on the same footing; 1490 nm is interpolated between the two published windows and is not a citation from Corning or ITU-T. The published maximum sits 0.01 dB/km above the 1310 nm figure here: hold the supplier to 0.36 and read the as-built OTDR for a budget that gets signed. The row publishes NO drumM deliberately: Corning prints 'Max. cable length per reel/drum 6000 m' in its Dimensions block, a ceiling rather than a putup list, and carrying it would bill a 6 km reel for a short aerial feeder - measured on engine/length.js at 0.7 km of route that is 6,000 m of cable bought against 2,000 m at the engine's default, and at 12 km 18,000 m against 14,000, the two agreeing only between 4.8 and 6 km. With no drumM the engine falls back to engine/length.js default of 2,000 m, and the BOM row carries 2,000 m and no field saying whether that is a drum or the engine default - measured on an eight-house estate (706.3 m of design length) the row comes back drumM 2000, one drum, 2,000 m purchased, 1,293.73 m spare - so enter the reel actually ordered. What is not modelled: CABLE_USES has no 'aerial' value, so nothing in the planner knows this cable is span-mounted - the tags and this note carry it - and no span, sag, ice or wind loading check exists, which means a design will happily run a 48F ADSS feeder over a 900 m span that would fail the utility's loading rules; the pole schedule and that check are the planner's, not the tool's. Nothing metallic means no bonding or earthing at the joint, a fact rather than a field. Tie-break trap: cableFor answers with the smallest cable that fits and breaks ties on model id, so 'g652d-adss-48' sorts before 'g652d-loose-48' and a ladder naming both buys aerial cable for every 48-fibre span - name this row instead of its duct twin, not beside it. use says feeder and distribution, never drop, because isDropCable in engine/design.js reads use to REFUSE a span built on drop cable beyond 300 m or bundled, and aerial feeder is not G.657.A2 flat drop. One product data sheet's figures, not a measured build: replace with the cable actually purchased and its as-built attenuation before ordering.",
+  "sourceUrl": "https://ecatalog.corning.com/optical-communications/AU/en/generate-product-specsheet/048ELE-T3322A20.pdf",
+  "tags": [
+    "corning",
+    "adss",
+    "aerial",
+    "g.652.d",
+    "48f",
+    "dielectric"
+  ]
+}

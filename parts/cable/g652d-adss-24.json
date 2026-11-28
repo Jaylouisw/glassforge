@@ -1,0 +1,29 @@
+{
+  "kind": "cable",
+  "model": "g652d-adss-24",
+  "vendor": "Corning",
+  "label": "Corning ADSS 24F aerial, G.652.D",
+  "fiberCount": 24,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Corning 024ELE-T3322A20 product spec sheet (Corning Optical Communications ecatalog, revision date 2026-11-28): 'Aerial Dielectric Self-Supporting Cable, ADSS 24 F, Single-mode (OS2), A-DQ2Y(T)2Y, (2 x 12)'. Two active loose tubes of 12 fibres in twelve tube positions with ten filling elements, dielectric central element, DRY core held by swellable elements rather than gel, non-metallic (aramid) strength members over the core, black PE jacket, halogen-free; construction code A-DQ2Y(T)2Y per EN 60794-1-1 (DIN VDE 0888-100-1); 15.1 mm nominal diameter, 161 kg/km, crush 3000 N/10 cm, max tensile 1700 N long-term / 4000 N short-term, min bend radius 265 mm installation / 225 mm operation, -40 to +70 C operating and storage (-5 to +50 C installation), Telcordia colour code, ITU-T G.652.D / IEC 60793-2-50 B1.3 fibre, cable cutoff 1260 nm, PMD link design value <= 0.06 ps/sqrt(km). Why the row exists: the catalogue had no aerial cable at all, so a pole route feeding a handful of NAPs - the distribution span between two poles - had only gel-filled duct loose tube to name, and the BOM bought a cable the route cannot take. This is the 24F rung of the catalogue's first aerial family (12F is g652d-adss-12, 48F is g652d-adss-48), and it is the size an aerial distribution run usually is: two tubes of 12 address T01 and T02, so a NAP at the far pole can be given a whole tube and the other left for a spur. Attenuation, and what kind of figure it is: the sheet publishes MAXIMUM 0.36 dB/km at 1310 nm, 0.36 at 1383 nm and 0.22 at 1550 nm - maxima and no 1490 nm figure. This row carries 0.35 / 0.22 / 0.21, the same typical row every other cable here carries, so an aerial span is comparable with a duct span in one budget; 1490 nm is interpolated between the two published windows and is not a citation from Corning or ITU-T. Corning's 0.36 at 1310 nm sits 0.01 dB/km above the 0.35 here: hold the supplier to 0.36 in acceptance and read the as-built OTDR before signing. The row publishes NO drumM on purpose: Corning's Dimensions block prints 'Max. cable length per reel/drum 6000 m', which is a ceiling rather than a putup list, and declaring it bills a 6 km reel for a short run - measured on engine/length.js, 0.7 km of route buys 6,000 m at a 6000 m drum against 2,000 m at the engine's default, and 12 km buys 18,000 m against 14,000, the two agreeing only between 4.8 and 6 km. With no drumM the engine falls back to engine/length.js default of 2,000 m, and the BOM row carries 2,000 m and no field saying whether that is a drum or the engine default - measured on an eight-house estate (706.3 m of design length) the row comes back drumM 2000, one drum, 2,000 m purchased, 1,293.73 m spare - so enter the reel actually ordered. Not modelled, and worth knowing before it bites: CABLE_USES has no 'aerial' value, so nothing in the planner knows this cable hangs from poles - the tags and this note are the whole record - and no span, sag, ice or wind check exists, so the design will run it over any distance you draw, which is where the pole schedule and the utility's loading rules have to come in. Nothing metallic means no bonding or earthing at a joint. Two traps. First, the tie-break: cableFor answers with the smallest cable that fits and breaks ties on model id, and 'g652d-adss-24' sorts before 'g652d-loose-24', so a ladder naming both buys aerial cable for every 24-fibre span - name this row instead of its duct twin, not beside it. Second, use says feeder and distribution and not drop: isDropCable in engine/design.js reads use to REFUSE a span that ended up on drop cable beyond 300 m or bundled, not to permit one, and aerial distribution is not tight-buffer G.657.A2 flat drop. A product spec sheet's figures, not a measured build: replace with the cable actually purchased and its as-built attenuation before ordering.",
+  "sourceUrl": "https://ecatalog.corning.com/optical-communications/AU/en/generate-product-specsheet/024ELE-T3322A20.pdf",
+  "tags": [
+    "corning",
+    "adss",
+    "aerial",
+    "g.652.d",
+    "24f",
+    "dielectric"
+  ]
+}
