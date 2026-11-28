@@ -349,3 +349,39 @@ test('a street file that holds only a track says which placemark it could not re
   assert.ok(err.message.indexOf('gx:Track') !== -1,
     'the refusal names what the placemark holds, got: ' + err.message);
 });
+
+// The import's `name` is the **document's** name, and a document that has none has none.
+//
+// `firstText(doc, 'name')` walked the whole `<Document>` block, so the first `<name>` it found was
+// often a Placemark's: a survey exported from Google Earth without a document name answered
+// `name: "Main St"` - the first street in it - and a caller saving the import filed a forty-street
+// drawing under one street. A nested feature's name is that feature's; the document's missing name
+// stays missing (SPEC §8: a figure is never filled from somewhere else). Measured before the fix on
+// the two-street file below: `name: "Main St"`.
+test('a document with no name of its own is not labelled with its first street', function () {
+  const nameless = '<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>' +
+    '<Placemark><name>Main St</name><LineString>' +
+    '<coordinates>-0.1000,51.5000 -0.0900,51.5000</coordinates></LineString></Placemark>' +
+    '<Placemark><name>Side St</name><LineString>' +
+    '<coordinates>-0.0900,51.5000 -0.0900,51.5100</coordinates></LineString></Placemark>' +
+    '</Document></kml>';
+  assert.strictEqual(kml.parseKml(nameless).name, null,
+    'the document has no name, so the answer has none - not the first Placemark name');
+
+  // The document's own `<name>` still wins, and it is still decoded: the fix must not have made the
+  // field null for every file.
+  const named = '<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>' +
+    '<name>Town &amp; depot survey</name>' +
+    '<Placemark><name>Main St</name><LineString>' +
+    '<coordinates>-0.1000,51.5000 -0.0900,51.5000</coordinates></LineString></Placemark>' +
+    '</Document></kml>';
+  assert.strictEqual(kml.parseKml(named).name, 'Town & depot survey');
+
+  // A name inside a Folder is the folder's, not the document's.
+  const folderNamed = '<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document>' +
+    '<Folder><name>Phase 2</name><Placemark><name>Side St</name><LineString>' +
+    '<coordinates>-0.0900,51.5000 -0.0900,51.5100</coordinates></LineString></Placemark>' +
+    '</Folder></Document></kml>';
+  assert.strictEqual(kml.parseKml(folderNamed).name, null,
+    'a Folder name is the folder\'s, not the document\'s');
+});
