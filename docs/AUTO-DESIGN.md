@@ -376,6 +376,17 @@ A protected request whose legs share anything carries a warning quoting the same
 same building the same way; a leased segment on `leg: "both"` is counted separately in
 `leasedSharedM`.
 
+A circuit that built **one leg** says which cause it was, in `diversity.sentence`, and the cause is the
+thing that actually decided it rather than the loudest-looking one. `protection: "single"` is a request,
+not a finding about the duct: `one leg: protection is "single", so the shortest route is built and the
+circuit is unprotected` - the grid in `test/link-design.test.js` gives two edge-disjoint legs under the
+`diverse` default, and until gh#118 the same network reported "the graph offers a single route between
+the sites" when asked for `single`. The other three causes are named as what they are: both sites
+snapping to one node (no duct run between them, nothing to protect), a graph the router could only
+draw one route on, and no graph at all (`one straight-line leg: ...`). `protection.legs` is 1 in every one of those cases, so it
+is a count and never a verdict about the network; `diversity.sharedM` is `null` because there is nothing
+to compare.
+
 ### Both directions per leg, and leased fibre that is not cable
 
 Each leg is its own `budget.pointToPoint` call in the direction the caller asked for (`direction`,

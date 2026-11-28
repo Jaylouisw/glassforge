@@ -153,10 +153,14 @@ graph only gave one route — is `attached: false` and summed in the `unattached
 budget crosses it and nobody buys it.
 
 **Protection** — whether the circuit is protected: `protection.requested` is `"diverse"` (default) or
-`"single"`, `protection.legs` is how many legs the graph actually allowed (1 means unprotected), and
-`protection.achieved` is true only when `diversity.sharedM` is 0 (no duct and no site drop is on both
-legs), no leased segment is assigned to `both` legs, and `diversity.sharedNodes` is empty — zero shared
-metres with one chamber on both legs is not a protected pair (see **Diversity**).
+`"single"`, and `protection.legs` is how many legs the circuit **built** - the graph's pair under
+`diverse`, exactly one under `single` - so 1 means unprotected and, on a `single` request, says nothing
+about the duct: asked for one leg on the grid that gives two edge-disjoint legs under the default, the
+sentence claimed "the graph offers a single route" until gh#118. `diversity.sentence` names what decided
+a one-leg circuit - the `"single"` request, a coincident pair, a graph the router could only draw
+one route on, or no graph at all. `protection.achieved` is true only when `diversity.sharedM` is 0 (no duct and no site drop is
+on both legs), no leased segment is assigned to `both` legs, and `diversity.sharedNodes` is empty — zero
+shared metres with one chamber on both legs is not a protected pair (see **Diversity**).
 
 **Attenuator (pad)** — an inline loss fitted because the receiver is *too loud*: `attenuator` on a
 budget result, `null` when the receiver is at or below its overload point. `overDb` is how far above
