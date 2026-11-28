@@ -162,6 +162,28 @@ function isCommentLine(line) {
 }
 
 /**
+ * Every record with the 1-based line of the input it starts on.
+ *
+ * The filter below drops comments and blank records, and a *row number* is not the position among the
+ * records that survived: `docs/API.md` promises `row` is the 1-based line of the input, header
+ * included, because the figure exists to send a planner to the line that is wrong. Counting the kept
+ * records instead put a bad row on line 4 of a commented survey at "row 3" - one line off the file,
+ * and one further off for every `# note` or blank line above it.
+ *
+ * A record carries its own line breaks: a quoted address may hold one (`splitRecords` keeps it), so
+ * the line count advances by the newlines *inside* the record plus the one that ended it - which is
+ * exactly `split('\n').length`. The final record has no terminator, and nothing follows it.
+ */
+function recordLines(records) {
+  let line = 1;
+  return records.map(function (text) {
+    const entry = { line: line, text: text };
+    line += String(text).split('\n').length;
+    return entry;
+  });
+}
+
+/**
  * Parse CSV text.
  *
  * A header is read when it names a latitude and a longitude column. Without one, the first row is
@@ -174,14 +196,16 @@ function parseCsv(text, opts) {
   // Records before lines: a quoted field may carry a line break, so the record splitter has to see
   // the quote before the newline means anything. `null` means the quotes never balanced.
   const records = splitRecords(raw) || raw.split('\n');
-  const lines = records
-    .map(function (l) { return l.trim(); })
-    .filter(function (l) { return l && !isCommentLine(l); });
+  // Rows are refused by the line they sit on, not by their rank among the rows that parsed
+  // (see `recordLines`).
+  const lines = recordLines(records)
+    .map(function (entry) { return { line: entry.line, text: entry.text.trim() }; })
+    .filter(function (entry) { return entry.text && !isCommentLine(entry.text); });
 
   if (!lines.length) throw new Error('the demand list is empty');
 
-  const delimiter = o.delimiter || sniffDelimiter(lines[0]);
-  const firstRow = splitRow(lines[0], delimiter);
+  const delimiter = o.delimiter || sniffDelimiter(lines[0].text);
+  const firstRow = splitRow(lines[0].text, delimiter);
   let header = firstRow;
   let latIdx = indexOfAny(header, LAT_NAMES);
   let lonIdx = indexOfAny(header, LON_NAMES);
@@ -208,26 +232,26 @@ function parseCsv(text, opts) {
   const rejected = [];
 
   for (let i = bodyStart; i < lines.length; i++) {
-    const row = splitRow(lines[i], delimiter);
-    const rowNumber = i + 1;
+    const row = splitRow(lines[i].text, delimiter);
+    const rowNumber = lines[i].line;
     if (!row.length || row.every(function (c) { return c === ''; })) continue;
     // An empty cell is not zero: `Number('')` is 0, which would put a house in the Gulf of Guinea
     // and pass every range check.
     const rawLat = row[latIdx];
     const rawLon = row[lonIdx];
     if (rawLat === '' || rawLon === '' || rawLat === undefined || rawLon === undefined) {
-      rejected.push({ row: rowNumber, reason: 'latitude or longitude is empty', text: lines[i].replace(/\n/g, ' ').slice(0, 120) });
+      rejected.push({ row: rowNumber, reason: 'latitude or longitude is empty', text: lines[i].text.replace(/\n/g, ' ').slice(0, 120) });
       continue;
     }
     const lat = Number(rawLat);
     const lon = Number(rawLon);
     if (!isNum(lat) || !isNum(lon)) {
-      rejected.push({ row: rowNumber, reason: 'latitude/longitude are not numbers', text: lines[i].replace(/\n/g, ' ').slice(0, 120) });
+      rejected.push({ row: rowNumber, reason: 'latitude/longitude are not numbers', text: lines[i].text.replace(/\n/g, ' ').slice(0, 120) });
       continue;
     }
     const point = { lat: lat, lon: lon };
     if (!geo.isCoordinate(point)) {
-      rejected.push({ row: rowNumber, reason: 'latitude/longitude out of range', text: lines[i].replace(/\n/g, ' ').slice(0, 120) });
+      rejected.push({ row: rowNumber, reason: 'latitude/longitude out of range', text: lines[i].text.replace(/\n/g, ' ').slice(0, 120) });
       continue;
     }
     const label = labelIdx !== -1 && row[labelIdx] ? row[labelIdx] : null;
