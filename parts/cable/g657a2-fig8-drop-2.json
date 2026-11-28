@@ -1,0 +1,32 @@
+{
+  "kind": "cable",
+  "model": "g657a2-fig8-drop-2",
+  "vendor": "prysmian",
+  "label": "Prysmian ezDrop Figure 8 2F aerial drop, G.657.A2",
+  "fiberCount": 2,
+  "fibersPerTube": 6,
+  "construction": "loose-tube",
+  "fiberStandard": "G.657.A2",
+  "use": [
+    "drop"
+  ],
+  "drumM": 640,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Prysmian ezDrop Figure 8 Integrated Messenger Drop Cable, product data sheet TLS-DS-A-605-0226 (the -0723 revision of the same sheet prints the same ordering table): figure-8 construction, a 3/32 in stranded galvanised steel messenger joined to the fibre sub-unit by a jacket web, a 1.9 mm gel-filled buffer tube holding up to 6 fibres, aramid strength yarns, non-armoured, ripcord, tear-away messenger that is toneable for underground locating; cable 4.1 mm diameter x 8.8 mm height, 49 kg/km, bend radius 15 cm both loaded and unloaded, max short-term pulling load 300 lbf (1,335 N), installation -30 to +60 C, operation -40 to +70 C, ANSI/ICEA 717 and Telcordia GR-20 drop requirements. Why the row exists: since gh#147 and gh#173 the catalogue can name an aerial DISTRIBUTION span (g652d-adss-12 through -144), but it had no aerial DROP. The drop family (g657a2-drop-1/2/4) is flat tight-buffer cable with no messenger, and the ADSS rows deliberately do not carry use drop, because isDropCable in engine/design.js reads that field and an ADSS row tagged drop would be pullable onto any span under DROP_CABLE_MAX_M. So the last 30-125 m of an aerial estate - pole to house, the one span every other aerial span exists to reach - had no cable that can hang: the BOM named a buried drop and someone lashed it, or the route went unfunded. This is that product, with its messenger rating in the sheet instead of in a note. Ordering: the sheet's part number is DF81JKT-06-AA-002-BB, where AA is glass type and BB is attenuation grade; the sheet's standard build is B1 = G.657.A1 and G.652.D, B2 = G.657.A2, B.2 and G.652.D is an option, and this row names B2 (a G.657.A2 drop is the bend-tolerant choice a staple gun and a corner need). The two published attenuation grades, both orderable on B1 or B2, are E1 = 0.40/0.40/0.30 dB/km and E3 = 0.35/0.35/0.25 dB/km at 1310/1383/1550 nm, so the line item is DF81JKT-06-B2-002-E3. fibersPerTube is 6 rather than 2 because the ordering code fixes a 6-fibre buffer tube (grouping 06) and the 2-fibre build fills two of its positions: there is one tube, not two, and engine/network.js addresses both strands as T01-F01 and T01-F02. Attenuation, and exactly what kind of figure it is: the sheet publishes MAXIMA only (E3 0.35 at 1310, 0.35 at 1383, 0.25 at 1550) and no 1490 nm figure at all. This row carries 0.35 / 0.22 / 0.21, the same typical installed row every other cable here carries, so an aerial drop and the buried drop it replaces are budgeted the same way; 1490 nm is interpolated between the two published windows and is typical, not a citation. Read the gap honestly: 0.21 at 1550 nm is 0.04 under the E3 ceiling, and on a 150 m drop that is 0.04 x 0.15 = 0.006 dB - immaterial to a verdict, but the acceptance figure is 0.25 dB/km and a budget that gets signed should read the as-built OTDR. If you would rather budget the ceiling, enter 0.35 / 0.30 / 0.25 and a 150 m drop costs 0.006 dB more. drumM 640 is a published put-up, not a guess: the only two package options on the sheet are R-18 ply at 2,100 ft (640 m) and R-30 ply at 9,500 ft (2,895 m), and 640 m is the contractor spool a drop order arrives on. Declaring it is what makes the drop BOM honest, because without drumM the engine falls back to engine/length.js's 2,000 m default and bills 2 km of cable for a 60 m drop; measured on eight 60 m aerial drops (494.4 m of aggregated design length at the 3 percent overlength) the row at drumM 640 bills one spool, 640 m, with 145.6 m spare, where the same cable with no declared drum falls back to engine/length.js 2,000 m and bills a single 2 km reel for 494 m of route; a 1,000 m run (design length 1,030 m) bills two spools, 1,280 m, against 2,000. Enter the packaging actually ordered. What the sheet rates and the engine does not: the integrated messenger self-supports to 400 ft (125 m), and the aerial loading table at 1% installation sag gives a minimum span of 410 ft (125 m) at 169 lbf (750 N) under NESC Light, 265 ft (80 m) at 109 lbf (485 N) under NESC Medium and 150 ft (45 m) at 62 lbf (275 N) under NESC Heavy. CABLE_USES has no aerial value and nothing in the engine computes sag, tension, ice or wind, so those figures are quoted here, not enforced. The engine's own drop refusal is looser than the messenger: DROP_CABLE_MAX_M is 300 m, so a 250 m pole span passes validation and is not a span this cable may carry - keep pole spans inside the NESC row for the loading district. The trap is the tie-break: cableFor answers with the SMALLEST cable that fits and breaks ties on model id, and g657a2-drop-2 sorts before g657a2-fig8-drop-2, so a ladder naming both buys the buried flat drop for every aerial span and the messenger is silently gone. Name this row INSTEAD of g657a2-drop-2, not beside it. Second consequence of use drop: a bundled span, or one over 300 m, is refused by engine/design.js with a message telling the planner to stock a distribution rung - right for a drop, and the reason an aerial distribution run must keep naming g652d-adss-*. One product data sheet's figures, not a measured build: replace with the cable actually purchased and its as-built attenuation before ordering.",
+  "sourceUrl": "https://na.prysmian.com/sites/na.prysmian.com/files/media/products/TLS-DS-A-605_ezDrop%20Figure%208%20Drop%20Cable.pdf",
+  "tags": [
+    "prysmian",
+    "ezdrop",
+    "figure-8",
+    "aerial",
+    "self-supporting",
+    "messenger",
+    "drop",
+    "g.657.a2",
+    "2f"
+  ]
+}
