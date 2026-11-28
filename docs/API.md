@@ -189,7 +189,7 @@ POST /api/design/link
     direction?: "down" (default) | "up",
     thirdParty?: [{ provider, lengthM, lossDb, leg?: "a"|"b"|"both", cost?, reference? }],
     fibres?, cable?, ladder?, connectors?, splices?, splicesPerJoint?, closure?, marginDb?,
-    maxSnapM?, joinToleranceM? }
+    splitters? (read only to be refused), maxSnapM?, joinToleranceM? }
   → { ok, mode: "link", technology, routeMethod, network, sites, protection, legs, paths, runs,
       diversity, thirdParty, bom, verdict, upstreamVerdict, reasons, warnings, notes }
 ```
@@ -202,6 +202,17 @@ answered `designM` 1199.15 - the 3% default, **81.49 m of cable short** against 
 and 10.37 dB of headroom from `ok` into `marginal`. The rule is the budgets' rule (`LINK_OPTION_FIELDS`
 in `engine/link.js`: case, singular/plural, a prefix, one letter wrong, a swapped pair) so a caller's
 `name` and `notes` still pass; it names the option it read and the one that was meant.
+
+`splitters` is the one option on that list the link **reads only to refuse**. A circuit is two optics
+and fibre, and a splitter is a PON element, so a design carrying one is a contradiction, not a setting.
+It is on `LINK_OPTION_FIELDS` so that a singular `splitter` is a near miss of it and named as one, and a
+`splitters` key with content is a `400` - `{"splitters":[{"model":"plc-1x8-sca"}]}` answers `the link
+design reads "splitters" and refuses it: a link is two optics and fibre, and a splitter is a PON
+element, so this design puts 1 splitter (plc-1x8-sca) on a circuit that cannot be built. … Drop the key,
+or budget the PON with POST /api/design/budget, which charges a splitter.` An absent key, `null` or `[]`
+is "no splitter" and still designs. Measured on `main` at `5443234`, the same request answered `200`,
+`ok: true`, with leg `odnLossDb` 1.067 dB and no splitter in the BOM: the 10.50 dB part was in neither
+the loss nor the bill, which is why the key is refused now rather than dropped.
 
 Two named sites and an optic at each end, with **both legs routed along the supplied duct/street
 graph** — there is no straight-line fallback while a graph is present. With `protection: "diverse"` the
@@ -372,10 +383,24 @@ real field (`margin` for `marginDb`), one letter wrong, or a swapped adjacent pa
 other key is still ignored — `name`, `notes` or a caller's own bookkeeping passes through untouched,
 because a guard that refused every unknown key would refuse a caller who is not wrong.
 `budget.pointToPoint`, the **active** budget, refuses the same way against its own list (`headEnd`,
-`cpe`, `spans`, `splices`, `spliceModel`, `connectors`, `connectorModel`, `thirdParty`, `allowanceDb`,
-`marginDb`, `wavelength`, `direction`, `txDbm`); no endpoint hands a caller's body to it, since
-`/api/design/link` builds that design from its own named options, so over the HTTP surface the refusal
-is the PON budget's; the link's own option list is guarded separately (§ Site-to-site links).
+`cpe`, `spans`, `splices`, `spliceModel`, `connectors`, `connectorModel`, `splitters`, `thirdParty`,
+`allowanceDb`, `marginDb`, `wavelength`, `direction`, `txDbm`). `splitters` is on that list because the
+active budget really does meet the key - to refuse it - so a singular `splitter` is a near miss of
+`splitters` and names it rather than suggesting nothing: `budget.pointToPoint({ headEnd: { model:
+"sfp-plus-10g-lr-10km" }, cpe: { model: "sfp-plus-10g-lr-10km" }, splitter: { model: "plc-1x8-sca" }
+})` answers `the active budget does not read the design field "splitter" - did you mean "splitters"?
+… Fields it reads: direction, wavelength, headEnd, cpe, spans, splices, spliceModel, connectors,
+connectorModel, splitters, thirdParty, allowanceDb, marginDb, txDbm`. No endpoint hands a caller's body
+to it, since `/api/design/link` builds that design from its own named options, so over the HTTP surface
+the near-miss refusal is the PON budget's; the link's own option list is guarded separately (§
+Site-to-site links).
+
+A `splitters` key with content is refused outright - not read, and not dropped from the loss and the
+bill: `the active budget does not read "splitters": an active link is two optics and fibre, and a
+splitter is a PON element, so this design puts 1 splitter (plc-1x8-sca) on a network that cannot be
+built. … Remove the splitters, or budget the PON they belong to with opticalBudget.` An absent key,
+`null` or `[]` is "no splitter" and budgets normally, so a form that always sends `splitters: []` is
+not wrong - it is how the PON budget and the active budget share one form.
 
 `/api/design/length` reads nine options — `routeM`, `overlengthPct`, `splices`, `spliceReserveM`,
 `closures`, `closureReserveM`, `dropReserveM`, `drumM`, `minimumPurchaseM` — and refuses a near miss
