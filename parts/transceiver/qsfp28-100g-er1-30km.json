@@ -1,0 +1,23 @@
+{
+  "kind": "transceiver",
+  "model": "qsfp28-100g-er1-30km",
+  "vendor": "generic",
+  "label": "QSFP28 100GBASE-ER1-30 single-lambda 30 km",
+  "speedMbps": 100000,
+  "wavelengthNm": 1310,
+  "reachM": 30000,
+  "txPowerDbmMin": 0,
+  "txPowerDbmMax": 5.6,
+  "rxSensitivityDbm": -14.7,
+  "rxOverloadDbm": -3.4,
+  "polish": "upc",
+  "sourceUrl": "https://100glambda.com/specifications/send/2-specifications/11-100g-lr1-20-er1-30-er1-40-technical-specs-rev-1p1",
+  "notes": "100GBASE-ER1-30, the single-lambda 100G rung between LR1 (10 km) and ER4 (40 km), per the 100G Lambda MSA 100G-LR1-20 / 100G-ER1-30 / 100G-ER1-40 specification Rev 1.1 (also the baseline IEEE 802.3cn-2019 adopted as 100GBASE-ER1-30): one 53.125 GBd PAM4 carrier in the 1304.5-1317.5 nm window, 30 km of G.652 with KP-FEC, duplex LC/UPC, BER 2.4e-4 before decode (clause 140.1.1 reference). The class figures, average powers as this engine subtracts them: mean launch 0.0..+5.6 dBm, average receive -14.7..-3.4 dBm, receiver sensitivity (OMAouter) -12.5 dBm and -13.9+TDECQ above a 1.4 dB eye closure, stressed receiver sensitivity -10.0 dBm, transmitter off below -15 dBm. That is 0.0 - (-14.7) = 14.7 dB of channel insertion loss at the floor and 5.6 - (-3.4) = 9.0 dB at the ceiling, i.e. the MSA's 9-15 dB class. Corroboration that these are the class and not one sheet's reading: Precision Optical PRE-QSFP28-ER1-30 (Belden) prints 0..+5.6 launch, -3.4 receiver overload and -12.5 dBm OMA sensitivity; Gigalight GQS-SPO101-ES1CA and Huawei's 100Gbps-QSFP28-SMF-1309.1nm(TX)/1304.5nm(RX)-30km-commercial module (02314VQB) print the same 0..+5.6 / -14.7..-3.4 pair. WHY THE ROW EXISTS: the 100G ladder was single-lambda only at 2 km (FR1, 4.0 dB) and 10 km (LR1, 6.3 dB) and then jumped to the four-lane ER4 at 40 km (18.0 dB, four LAN-WDM carriers budgeted at the top lane), so a 20-30 km 100G span could only be quoted on four EMLs and a lane hand-wave. Measured on this engine at 0.35 dB/km (G.652.D): a 25 km span reads -2.45 dB of headroom, fail, on LR1, and 9.25 dB, ok, on ER4; this row reads 5.95 dB, ok, on one carrier and one wavelength the cables publish attenuation for. Reach and loss on this row, measured: 20 km = 7.0 dB -> 7.7 dB of headroom, ok; 25 km = 8.75 dB -> 5.95 dB, ok; the last length that still reads ok is 27.7 km (9.695 dB, 5.01 dB of headroom) and 27.72 km is exactly 5.00; 30 km = 10.5 dB -> 4.2 dB, marginal; past 30 km the reach verdict fails first (33.4 km = 11.69 dB, headroom 3.01 dB, fail). Overload is the sharp end and it is not hypothetical: the launch floor 0.0 dBm sits ABOVE the -3.4 dBm receive maximum, so the class needs at least 3.4 dB of ODN loss and 9.0 dB to be safe at the top of the window. Measured: a 1 m bare pair fails on overload and the verdict asks for a 9 dB pad, 5 km asks for 8 dB, 20 km is ok but warns that the far end is 2 dB over at the 5.6 dBm ceiling (a 2 dB pad), and 25 km warns for 1 dB. So this is a 20-30 km optic: a short duct run on it needs the pad the budget names, and it does not replace ER4 - ER4's 18.0 dB still carries 40 km, four lanes or not. Class figures from the recommendation and the MSA, not one measured module: replace the row with the module actually purchased before pricing a build - the pad, and the module's own receive ceiling, move with the part.",
+  "tags": [
+    "100000",
+    "1310nm",
+    "100g",
+    "single-lambda",
+    "long-reach"
+  ]
+}
