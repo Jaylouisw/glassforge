@@ -112,7 +112,7 @@ what turns a `PUT` into a `400`.
 ```
 POST /api/design/synthesise
   { demand, headEnd: { lat, lon, name? }, technology?, routeFactor?, marginDb?,
-    network?, maxSnapM?, joinToleranceM?, ladder?, overlengthPct?,
+    network?, maxSnapM?, joinToleranceM?, ladder?, overlengthPct?, kmeansIterations?,
     pon?: { ratios, olt, ont, maxDropM },
     active?: { headEndOptic, cpeOptic, optics: [{ headEndOptic, cpeOptic }] },
     costs?, applyToProject? }
@@ -181,6 +181,17 @@ reshapes the whole plan: the same eight-house estate quotes 707.3 m of design le
 755.4 m at `{"overlengthPct":10}` (707.3 / 1.03 x 1.10 = 755.4), while `{"overlengthPct":"ten"}` is
 `the design reads "overlengthPct" as a percentage of design length and got "ten" (a string)` and
 `{"ladder":["nope"]}` names the cable models the catalogue has.
+
+`kmeansIterations` (default 8, a whole number ≥ 1) is the number of assignment/re-centring passes the PON
+clusterer runs before it places splitter sites. It changes the plant, not a label: on the thirteen-house L
+the design tests use, one pass leaves the 1:8 candidate on 4 splitter sites and 14,812.2 fibre-metres,
+while two or more passes contract it to 2 sites and 13,555 - a different design and, on the default
+objective, a different ranking. Zero or fewer is refused because the assignment never runs: the candidate
+would carry no ONT and win the ranking on 0 fibre-metres (`... and the candidate is a plant with no ONT,
+ranked feasible on 0 fibre-metres`). A fraction is refused too - the loop runs `iteration < maxIterations`,
+so 1.5 would mean two passes nobody chose - and `"3"`, `null`, `true` are refused by name rather than
+defaulted, like every other present-but-unreadable option. See
+[AUTO-DESIGN.md](AUTO-DESIGN.md#pon).
 
 `pon` and `active` are blocks of named options, and a block of another shape is a `400` rather than a
 substitution. The blocks are merged into the defaults, so a value the design cannot read used to be

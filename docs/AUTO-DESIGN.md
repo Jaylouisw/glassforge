@@ -108,7 +108,13 @@ term is a total nobody can spend.
 
 1. **Cluster** the demand with deterministic k-means, k = ⌈n / ratio⌉. Centres are medoids (a real
    address, so a box can be placed); the cluster count rises until every cluster is within the
-   splitter ratio **and** within `pon.maxDropM`.
+   splitter ratio **and** within `pon.maxDropM`. The number of passes is the `kmeansIterations` option
+   (default 8, a whole number ≥ 1), and it is not cosmetic: on the thirteen-house L in
+   `test/design-clustering-iterations.test.js` one pass leaves the 1:8 candidate on 4 splitter sites
+   and 14,812.2 fibre-metres, while eight passes reach 2 sites and 13,555 - a different plant and a
+   different ranking. Zero or fewer is refused rather than run, because an assignment that never
+   happens answers no clusters and the candidate ranks feasible with no ONT on 0 fibre-metres; a
+   fraction and a string are refused by name (see [API.md](API.md#auto-design)).
 2. **Feeder**: a minimum spanning tree from the head-end through a closure at every splitter site.
    Each splitter hangs off its closure on a 1 m tail. That tail is not decoration: without it the
    feeder would pass *through* splitter nodes and a path to the third site would be charged three
