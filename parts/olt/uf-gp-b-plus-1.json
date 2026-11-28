@@ -1,0 +1,18 @@
+{
+  "kind": "olt",
+  "model": "uf-gp-b-plus-1",
+  "vendor": "Ubiquiti",
+  "label": "Ubiquiti UF-GP-B+ GPON OLT SFP, class B+, 1 port",
+  "pon": "gpon",
+  "class": "B+",
+  "txPowerDbmMin": 1.5,
+  "txPowerDbmMax": 5,
+  "rxSensitivityDbm": -28,
+  "rxOverloadDbm": -8,
+  "budgetDb": 28,
+  "ports": 1,
+  "maxSplitRatio": 64,
+  "notes": "Datasheet figures, and they are the class: Ubiquiti's UFiber GPON datasheet prints UF-GP-B+ as TX power range 1.5 to 5 dBm, RX power range -28 to -8 dBm, 1490 nm TX / 1310 nm RX, SC/UPC, 20 km, and those are ITU-T G.984.2 class B+ field for field (+1.5..+5 dBm OLT mean launch, -28 dBm receiver sensitivity, -8 dBm overload, 28 dB ODN), so the row is the class in a pluggable rather than a vendor measurement dressed up as one. Why a one-port row exists: every other OLT in this catalogue is an 8- or 16-port card, and a plant is a tree with exactly one root, so a 12-subscriber hamlet, a farm or a single commercial building cannot be drawn without buying ports nobody lights; a one-port root lets the design name the module actually fitted, and the optics do not change with the port count, so the class verdict is gpon-b-plus-8's. maxSplitRatio is 64, like every other B+ row here, because a 1:128 cascade is 23.8 dB of the 28 dB class (plc-1x128-sca: 21.07 dB split plus 2.73 dB excess) before the first metre of fibre. Ubiquiti markets up to 128 ONU clients per port, which is the GPON logical limit and not a loss claim: measured on this engine at 100 m with plc-1x128-sca and uf-nano-g, ODN 24.62 dB downstream and headroom 3.88 dB against a class headroom of 3.38 dB, so the optics would pass and the only fault is the cascade, refused as splitter cascade is 1:128, beyond the OLT limit of 1:64. A plan that genuinely needs 1:128 wants the C+ module. One trap the row cannot hide: the port is SC/UPC while this catalogue's splitters and closures are SC/APC, and a UPC plug into an APC adapter is a reflective mismatch, so patch through a UPC-to-APC adaptor lead and count its connector pairs. These are the recommendation's class limits as the manufacturer reprints them, not a measured module: replace the row with the SFP actually purchased before construction, because the budget moves with its optics.",
+  "sourceUrl": "https://dl.ubnt.com/ds/uf_gpon.pdf",
+  "tags": ["gpon", "b+", "1-port", "sfp", "ubiquiti"]
+}
