@@ -210,6 +210,13 @@ function cableToBuy(opts) {
  * already refuses a span with no measured length for this reason; this is the same refusal on the
  * drawn-route form, naming what a route needs.
  *
+ * A route that has the points but measures nothing - every tap on the same spot - is the same answer
+ * one step further in: measured on 03a7f81, `{"points":[{"lat":52,"lon":4},{"lat":52,"lon":4}]}`
+ * answered 200 with `routeM: 0, drums: 0, purchaseM: 0`, because the count guard above only caught a
+ * route too short to have points. A drawn route with no length is refused by what it measured, and a
+ * route whose measured length rounds away (four millimetres) is refused by that figure rather than
+ * priced as 0.00 m, for the same reason `billOfMaterials` refuses a span with no measured length.
+ *
  * A point the route cannot place is refused by its index. `distanceM` checks both ends of a segment
  * and says "distanceM needs two { lat, lon } coordinates", which names an internal function, no
  * position and no file - on an imported 40-point route that is a hunt. The empty cell is the classic
@@ -228,8 +235,25 @@ function cableToBuyForRoute(points, opts) {
       JSON.stringify(points[i]) + '. Every point is measured, so a point the route cannot place is ' +
       'refused rather than skipped: skipping it would shorten the cable without shortening the plan');
   }
-  const routeM = geo.pathLengthM(points);
-  return cableToBuy(Object.assign({}, opts || {}, { routeM: routeM }));
+  const measuredM = geo.pathLengthM(points);
+  // A route that measures nothing is not measured - two taps on one spot are a route the caller drew
+  // and a length of 0.00 m, and the purchase that came out of it was zero drums of cable. The two
+  // clauses are told apart because they are different mistakes: coincident points say the route was
+  // not drawn across the ground, and a sub-centimetre route says the figure the calculation rounds
+  // to is zero.
+  if (round(measuredM, 2) <= 0) {
+    // Printed to four places, and below that floor it says so: a route 0.011 mm long is not
+    // "0 m", and a sentence whose two clauses both read zero explains nothing.
+    const shown = round(measuredM, 4);
+    const why = measuredM === 0
+      ? 'every point is in the same place'
+      : shown > 0
+        ? 'it measures ' + shown + ' m, which rounds to 0.00 m'
+        : 'it measures under 0.0001 m, which rounds to 0.00 m';
+    throw new TypeError('the drawn route has no measurable length - ' + why +
+      '. A route that cannot be measured is not a purchase of 0 m: draw it across the ground, or send `routeM` directly');
+  }
+  return cableToBuy(Object.assign({}, opts || {}, { routeM: measuredM }));
 }
 
 /**
