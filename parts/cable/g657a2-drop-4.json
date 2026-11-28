@@ -1,0 +1,26 @@
+{
+  "kind": "cable",
+  "model": "g657a2-drop-4",
+  "vendor": "generic",
+  "label": "G.657.A2 drop 4F",
+  "fiberCount": 4,
+  "fibersPerTube": 4,
+  "construction": "tight-buffer",
+  "fiberStandard": "G.657.A2",
+  "use": [
+    "drop"
+  ],
+  "drumM": 1000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Four fibres, tight-buffered flat drop in one tube, so the strands address as T01-F01 blue, F02 orange, F03 green, F04 brown per TIA-598 - one cable to a four-port tap instead of two g657a2-drop-2 runs down the same span. Why the rung exists: the drop family stopped at two fibres and the next size up in this catalogue is twelve (g657a2-indoor-12, an indoor riser), so the only four-fibre cable a short span could name was g652d-loose-12 - twelve fibres of gel-filled outdoor loose tube to light four. This row is that missing rung. What it does NOT do, measured on this engine rather than assumed: it is not auto-selected. engine/design.js's cableForSpan gives drop treatment (cableForDistribution, then a rung of the caller's ladder) only up to two fibres and otherwise asks cableFor(Math.max(12, fibres)), so a 4-fibre span is billed g652d-loose-12 even when this row is in the ladder - measured: cableForSpan(4, 100, [...loose rows..., g657a2-drop-4, g657a2-drop-2, g657a2-drop-1]) answers g652d-loose-12, and cableFor(4, same ladder) answers g657a2-drop-4. The 12-fibre floor above two fibres is a deliberate rule (it is what stops a building-to-building run being bought as drop cable), so changing it is an engine change and lives in that lane, not in a part file. Until then this cable is reached by naming it on a span (`cable`) or through cableFor, which is how a planner who stocks four-fibre drop gets it into a BOM. Attenuation is the same typical installed row every drop, feeder and indoor cable here carries (0.35 / 0.22 / 0.21 dB/km), and deliberately so: G.657.A2 publishes the same attenuation maxima as G.652.D - 0.40 dB/km over 1310-1625 nm and 0.30 dB/km over 1530-1565 nm - so the two families do not differ in attenuation and one row is justified. 0.35 sits under the first maximum and 0.21 under the second; 1490 nm is a typical, interpolated value, because neither the ITU-T recommendation nor any sheet this catalogue cites publishes a 1490 nm figure, so 0.22 is not a citation. All three are typical installed performance, not a limit, and must be replaced with the purchased cable's test report before construction. What the row does not buy is bend loss in the budget: G.657.A2 allows 0.1 dB for one turn at 10 mm radius at 1550 nm (0.5 dB at 7.5 mm) and this catalogue budgets no macrobend at all, so the grade only helps if the crew holds the radius. 1000 m is a flat-drop putup, not a standard - 500 to 2000 m reels are sold - so replace drumM with the putup of the cable actually ordered.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.657/en",
+  "tags": [
+    "generic",
+    "g.657.a2",
+    "4f"
+  ]
+}
