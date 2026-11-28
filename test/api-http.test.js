@@ -335,6 +335,27 @@ async function main() {
     assert.ok(imported.body.routeM > 50);
   });
 
+  // A recorded track is a Placemark with no geometry this importer reads, and the answer used to be
+  // a bare `unsupported: 1` with `skipped: []` - a count with no name. The network importer answered
+  // the same bytes with `(0 point(s) were found instead)`, which says the file held points when it
+  // held a track. Both now name the placemark and what it holds.
+  const trackKml = '<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2" ' +
+    'xmlns:gx="http://www.google.com/kml/ext/2.2"><Document>' +
+    '<Placemark><name>Walk to depot</name><gx:Track>' +
+    '<gx:coord>-0.1 51.5 0</gx:coord><gx:coord>-0.101 51.501 0</gx:coord>' +
+    '</gx:Track></Placemark></Document></kml>';
+  const trackImport = await request('POST', '/api/import/kml', Buffer.from(trackKml), { 'Content-Type': 'application/vnd.google-earth.kml+xml' });
+  const trackNetwork = await request('POST', '/api/import/network', Buffer.from(trackKml), { 'Content-Type': 'application/vnd.google-earth.kml+xml' });
+  test('a track import answers the count and the name, and the refusal names it', function () {
+    assert.strictEqual(trackImport.status, 200, JSON.stringify(trackImport.body));
+    assert.strictEqual(trackImport.body.unsupported, 1);
+    assert.strictEqual(trackImport.body.skipped.length, 1, JSON.stringify(trackImport.body.skipped));
+    assert.strictEqual(trackImport.body.skipped[0].name, 'Walk to depot');
+    assert.ok(/gx:Track/.test(trackImport.body.skipped[0].reason), trackImport.body.skipped[0].reason);
+    assert.strictEqual(trackNetwork.status, 400, JSON.stringify(trackNetwork.body));
+    assert.ok(trackNetwork.body.error.indexOf('Walk to depot') !== -1, trackNetwork.body.error);
+  });
+
   const demandCsv = 'label,lat,lon\nCasa 1,51.5000,-0.1000\nCasa 2,51.5005,-0.0998\nCasa 3,51.5010,-0.0996\nCasa 4,51.5015,-0.0994';
   const parsedDemand = await request('POST', '/api/import/demand', { demand: demandCsv });
   test('a demand list is parsed and reported before anything is designed', function () {

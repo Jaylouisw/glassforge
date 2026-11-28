@@ -41,10 +41,25 @@ export interface KmlPlacemark {
   lengthM: number | null;
 }
 
+/**
+ * A Placemark that held nothing this importer could read, with the reason it was left out.
+ *
+ * `unsupported` has been a bare count since the first import, and a count is not a name: a caller
+ * with a file of recorded tracks was told three placemarks were unsupported and could not find out
+ * which three. The list is the count's other half, and `classify` folds it into `skipped` so every
+ * surface reads one list of what did not make it.
+ */
+export interface UnsupportedPlacemark {
+  name: string | null;
+  reason: string;
+}
+
 export interface ParsedKml {
   name: string | null;
   placemarks: KmlPlacemark[];
   unsupported: number;
+  /** The placemarks behind `unsupported`, named. Its length is `unsupported`. */
+  unsupportedPlacemarks?: UnsupportedPlacemark[];
   /**
    * Coordinate tuples in the whole document that could not be read and were dropped. Optional
    * because a `ParsedKml` assembled by hand - or by a caller that predates the field - may not
@@ -80,6 +95,8 @@ export interface ClassifiedKml {
   routes: KmlRoute[];
   points: KmlPoint[];
   skipped: SkippedGeometry[];
+  /** Placemarks with no readable geometry: the same figure `ParsedKml.unsupported` reports. */
+  unsupported: number;
   duplicates: number;
   /** Tuples the parser could not read, for the whole file - never a blank cell read as 0. */
   droppedCoordinates: number;
@@ -283,6 +300,33 @@ function geometriesOf(xml: string): { geometries: KmlGeometry[]; dropped: number
 }
 
 /**
+ * Why a Placemark contributed no geometry, in the words the caller can act on.
+ *
+ * The test is the tags the body still holds, not a guess: a `<LineString>` with one coordinate and a
+ * `<gx:Track>` are different mistakes - one is a route that lost a bend, the other is a geometry this
+ * importer never reads - and the person fixing the file needs to know which. A bare count told them
+ * neither.
+ */
+function unsupportedReason(body: string): string {
+  if (/<gx:Track\b/i.test(body)) {
+    return 'a Google Earth track (gx:Track) - this importer reads Point, LineString and polygon ' +
+      'coordinates, not recorded tracks';
+  }
+  if (/<Model\b/i.test(body)) return 'a 3D Model - not a cable route or a property';
+  if (/<(?:[A-Za-z0-9_.-]+:)?(?:GroundOverlay|ScreenOverlay|PhotoOverlay)\b/i.test(body)) {
+    return 'an image overlay - not a cable route or a property';
+  }
+  if (/<(?:[A-Za-z0-9_.-]+:)?(?:Polygon|LinearRing)\b/i.test(body)) {
+    return 'a polygon with fewer than three readable coordinates';
+  }
+  if (/<(?:[A-Za-z0-9_.-]+:)?LineString\b/i.test(body)) {
+    return 'a LineString with fewer than two readable coordinates';
+  }
+  if (/<(?:[A-Za-z0-9_.-]+:)?Point\b/i.test(body)) return 'a Point with no readable coordinate';
+  return 'no Point, LineString or polygon geometry';
+}
+
+/**
  * Parse KML text.
  * Returns `{ name, placemarks, unsupported }`. `placemarks` holds **one entry per geometry**, so a
  * Placemark with a MultiGeometry of three lines is three entries; `unsupported` counts Placemarks
@@ -298,6 +342,9 @@ export function parseKml(text: unknown): ParsedKml {
   const docName = doc === null ? null : firstText(doc, 'name');
 
   const placemarks: KmlPlacemark[] = [];
+  // Named, not only counted: `unsupported` is what a caller sees, and a count with no name left a
+  // user with three dropped tracks and no way to find out which three.
+  const unsupportedPlacemarks: UnsupportedPlacemark[] = [];
   let unsupported = 0;
   let droppedCoordinates = 0;
   for (const body of blocks(xml, 'Placemark')) {
@@ -308,6 +355,7 @@ export function parseKml(text: unknown): ParsedKml {
     const description = firstText(body, 'description');
     if (!geometries.length) {
       unsupported++;
+      unsupportedPlacemarks.push({ name: name || null, reason: unsupportedReason(body) });
       continue;
     }
     for (const geometry of geometries) {
@@ -324,6 +372,7 @@ export function parseKml(text: unknown): ParsedKml {
     name: docName,
     placemarks: placemarks,
     unsupported: unsupported,
+    unsupportedPlacemarks: unsupportedPlacemarks,
     droppedCoordinates: droppedCoordinates
   };
 }
@@ -394,6 +443,16 @@ export function classify(parsed: ParsedKml | null | undefined, opts?: ClassifyOp
     }
   }
 
+  // The placemarks the parse could not read at all, folded into the same list as the geometry it
+  // could read but skipped: one list of everything that did not make it, each with its reason.
+  // `parsed.unsupportedPlacemarks` is optional because a `ParsedKml` assembled by hand may predate
+  // it - the count is then carried and the names are not, which is honest about what is known.
+  const unread = Array.isArray(parsed?.unsupportedPlacemarks) ? parsed.unsupportedPlacemarks : [];
+  for (const u of unread) {
+    skipped.push({ name: u.name, type: 'unsupported', reason: u.reason });
+  }
+  const unsupported = typeof parsed?.unsupported === 'number' ? parsed.unsupported : unread.length;
+
   const routeM = routes.reduce(function (n, r) { return n + (r.lengthM === null ? 0 : r.lengthM); }, 0);
   // The parse already counted every tuple it could not read, including the ones inside a placemark
   // that lost its only coordinate and is reported as unsupported. Report that figure rather than
@@ -405,6 +464,7 @@ export function classify(parsed: ParsedKml | null | undefined, opts?: ClassifyOp
     routes: routes,
     points: points,
     skipped: skipped,
+    unsupported: unsupported,
     duplicates: duplicates,
     droppedCoordinates: droppedCoordinates,
     routeM: Math.round(routeM * 10) / 10

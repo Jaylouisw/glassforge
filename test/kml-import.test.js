@@ -92,7 +92,17 @@ test('classification separates routes from points and says what it skipped', fun
   const result = kml.classify(kml.parseKml(SAMPLE));
   assert.strictEqual(result.routes.length, 1);
   assert.strictEqual(result.points.length, 1);
-  assert.strictEqual(result.skipped.length, 1, 'a polygon is reported, not silently dropped');
+  // Two entries now: the polygon, and 'Just a folder' - the placemark that holds no geometry at all.
+  // This read 1 until the count grew a name: an empty placemark was counted in `unsupported` and then
+  // dropped before `classify` saw it, so the list meant to name everything that vanished omitted the
+  // one thing that vanished completely.
+  assert.strictEqual(result.skipped.length, 2, 'the polygon and the empty placemark are both reported');
+  assert.strictEqual(result.skipped.filter(function (s) { return s.type === 'Polygon'; }).length, 1,
+    'a polygon is reported, not silently dropped');
+  const unread = result.skipped.filter(function (s) { return s.type === 'unsupported'; });
+  assert.strictEqual(unread.length, 1);
+  assert.strictEqual(unread[0].name, 'Just a folder');
+  assert.strictEqual(unread[0].reason, 'no Point, LineString or polygon geometry');
   assert.ok(result.routeM > 100);
   assert.strictEqual(result.points[0].lat, 51.501);
 });
@@ -292,4 +302,50 @@ test('an entity this importer cannot resolve is left as written, and CDATA is li
   const cafe = byName(parsed, 'Café &nbsp;stop &#1114112;');
   assert.ok(cafe, 'the sentence keeps what the file wrote, got ' +
     JSON.stringify(parsed.placemarks.map(function (p) { return p.name; })));
+});
+
+// A Placemark with nothing this importer can read is counted (`unsupported`) and then its name was
+// lost: `/api/import/kml` answered `unsupported: 3` with `skipped: []`, so a user with a file of
+// recorded tracks was told three things were unsupported and which three were a secret. The street
+// importer was worse - the same file was refused as "the KML contains no LineStrings ... (0 point(s)
+// were found instead)", a sentence that says the file held points when it held tracks. `classify`
+// already promises `skipped` is "anything else, with the reason, so the user is not told 'imported
+// 40 items' and left to discover that 12 of them vanished"; a placemark with no readable geometry is
+// the case that vanished hardest, because `parseKml` dropped it before `classify` ever saw it.
+const TRACK = '<?xml version="1.0"?><kml xmlns="http://www.opengis.net/kml/2.2" ' +
+  'xmlns:gx="http://www.google.com/kml/ext/2.2"><Document>' +
+  '<Placemark><name>Walk to depot</name><gx:Track>' +
+  '<when>2026-11-01T10:00:00Z</when><when>2026-11-01T10:01:00Z</when>' +
+  '<gx:coord>-0.1 51.5 0</gx:coord><gx:coord>-0.101 51.501 0</gx:coord>' +
+  '</gx:Track></Placemark>' +
+  '<Placemark><name>Feeder B</name><LineString>' +
+  '<coordinates>-0.2,51.5 -0.21,51.5</coordinates></LineString></Placemark>' +
+  '</Document></kml>';
+
+test('a placemark with no readable geometry is named, not only counted', function () {
+  const parsed = kml.parseKml(TRACK);
+  assert.strictEqual(parsed.unsupported, 1, 'one placemark holds nothing this importer reads');
+  assert.strictEqual(parsed.unsupportedPlacemarks.length, 1, 'the count and the list agree');
+  assert.strictEqual(parsed.unsupportedPlacemarks[0].name, 'Walk to depot');
+  assert.ok(/gx:Track/.test(parsed.unsupportedPlacemarks[0].reason),
+    'the reason names what the file holds, got ' + JSON.stringify(parsed.unsupportedPlacemarks[0].reason));
+  const classified = kml.classify(parsed);
+  assert.strictEqual(classified.unsupported, 1, 'the classified answer carries the count too');
+  const unread = classified.skipped.filter(function (s) { return s.type === 'unsupported'; });
+  assert.strictEqual(unread.length, 1, 'it is in the one list of what did not make it, got ' +
+    JSON.stringify(classified.skipped));
+  assert.strictEqual(unread[0].name, 'Walk to depot');
+  assert.ok(/gx:Track/.test(unread[0].reason));
+});
+
+test('a street file that holds only a track says which placemark it could not read', function () {
+  const trackOnly = TRACK.replace(/<Placemark><name>Feeder B<\/name>[\s\S]*?<\/Placemark>/, '');
+  const err = throws(function () { street.buildGraph(trackOnly, {}); }, 'no LineStrings',
+    'a track is not a street');
+  // The old sentence said "0 point(s) were found instead" - the file held a track, not points - and
+  // named nothing. The placemark and the reason are both in it now.
+  assert.ok(err.message.indexOf('Walk to depot') !== -1,
+    'the refusal names the placemark, got: ' + err.message);
+  assert.ok(err.message.indexOf('gx:Track') !== -1,
+    'the refusal names what the placemark holds, got: ' + err.message);
 });
