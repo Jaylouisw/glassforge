@@ -1,0 +1,22 @@
+{
+  "kind": "closure",
+  "model": "fosc-600c-inline-288",
+  "vendor": "CommScope",
+  "label": "FOSC 600-C in-line closure, 288 splices (3 x 96-way D trays)",
+  "type": "inline",
+  "ports": 4,
+  "spliceCapacity": 288,
+  "trays": 3,
+  "sourceUrl": "https://www.tvcinc.com/shared-downloads/0000003248-fosc-600-tc-565-ds.pdf",
+  "notes": "The 288-splice rung of the FOSC 600-C: the same 828 x 274 mm, 152 mm-high housing as fosc-600c-inline-216, ordered with 96-splice D trays (3 x 96 = 288) instead of the 72-way trays that row takes. Figures are CommScope FOSC-600 data sheet PS-322662-EU (01/16), previously TC-565-DS-9-02-14, table Dimensions and capacities: 600 C is 828 mm long, 152 mm high, 274 mm wide; in-line single element splicing is 288 fibres in 3 trays; in-line ribbon splicing is 576 fibres in 2 ribbon trays; butt single element is 480 in 5 trays and butt ribbon 864 in 3. The tray order is the capacity: the same sheet ordering table offers 36, 72, S96 (96 SMOUV protectors, 45 mm), L96 (96 SMOUV, 60 mm), A72 and A96 (ANT protectors) and RT (24 ribbon splices), and 3 x 96 is what makes 288. That is why one housing carries two rows here: PA-317451.2-AE (05/16), the sheet fosc-600c-inline-216 and fosc-600d-inline-504 cite, prints the 600 C in-line as 3 D trays of 72 = 216 and the 600 D in-line as 504, while this 01/16 sheet prints 3 trays of 96 = 288 and 672 for the 600 D in-line. Neither sheet is wrong, they count different trays: a planner ordering 72-way trays has the 216 row, a planner ordering the 96-way S96/L96 order has this one, and a 72-way order must not be quoted 288. Why the row exists, measured on this engine: the catalogue sells g652d-ribbon-288, and a 288F trunk through a feeder joint reads closure \"Feeder joint\" would carry 288 splices, capacity 216 in fosc-600c-inline-216; engine/link.js could only answer a 288-splice joint with \"inline closures that would: fosc-600d-inline-504 (504)\" - a 254 mm-high trunk dome with 216 unused seats for a joint that fits the smaller housing. Measured again through engine/link.js with the row in place, a 288-splice joint names fosc-600c-inline-288 (288) first. Ribbon is the case that needs it: 2 D-ribbon trays in-line hold 576 mass splices on the same sheet, so the 288F ribbon trunk is inside this box both ways - the 288 here counts strands, which is the number the plant bills per strand, not the ribbon trays. ports is 4, one 4-port gel block (order code 4; code 8 ships two blocks for 8, code 6 two 3-port blocks), matching fosc-600c-inline-216 and fosc-600d-inline-504. The housing cable capacity is larger - up to sixteen separate cable ports in the sheet features and 4 multi-out ports (16 cables) on the CommScope product page - so engine/network.js over-port warning fires at 5 cables while the box still takes more; the same convention, and the same caveat, as its two siblings. Traps. This sheet prints order code C as 125 mm high in its ordering tree against 152 mm in its own dimensions table, so the height to quote is 152 mm and C is the code letter. A 96-splice tray order takes SMOUV (S96, 45 mm) or ANT (A96) protectors; a 60 mm SMOUV order is the L96 code - confirm the protector with the tray. A full 288 leaves no spare tray, so a joint expected to grow belongs in fosc-600d-inline-504, not here. Capacity also moves with slack storage, which the sheet says itself. None of this is a measured build: every figure is one vendor data sheet published capacity, so replace the row with the closure and tray order actually purchased before ordering.",
+  "tags": [
+    "commscope",
+    "inline",
+    "feeder",
+    "trunk",
+    "288",
+    "96-way",
+    "smouv",
+    "ribbon"
+  ]
+}
