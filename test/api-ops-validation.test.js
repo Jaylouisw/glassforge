@@ -518,6 +518,46 @@ async function main() {
     assert.strictEqual(afterBadRename.body.name, 'Names');
   });
 
+  // ------------------------------------------------------------------ half a placement
+  // A node is placed by `lat` and `lon`, and `lng` is the spelling every map library sends (the demand
+  // import already reads it, `LON_NAMES`). `/ops` stored `lat` and `lon: null` from `{ lat, lng }` and
+  // answered 200 - the plan drew that node at the centre of the canvas - and `PUT` accepted the same
+  // half a pair out of a hand-edited file. Both writers now refuse it in one sentence.
+  const placeId = (await request('POST', '/api/projects', { name: 'Placement' })).body.id;
+  const withLng = await op(placeId, {
+    op: 'add-node', node: { type: 'olt', model: 'gpon-c-plus-8', lat: 51.5, lng: -0.1 }
+  });
+  test('a node added with lng answers 200 with the coordinate stored as lon', function () {
+    assert.strictEqual(withLng.status, 200, brief(withLng));
+    assert.strictEqual(withLng.body.nodes[0].lat, 51.5);
+    assert.strictEqual(withLng.body.nodes[0].lon, -0.1);
+    assert.strictEqual(withLng.body.nodes[0].lng, undefined);
+  });
+  const halfNode = await op(placeId, { op: 'add-node', node: { type: 'ont', model: 'gpon-ont-4ge', lat: 51.5 } });
+  test('a node added with half a placement is a 400 naming the node and the missing axis', function () {
+    assert.strictEqual(halfNode.status, 400, brief(halfNode));
+    assert.strictEqual(halfNode.body.error,
+      'node "n2" has a latitude and no longitude - a placement is lat and lon together, or neither ' +
+      '(null = not placed on a map yet)');
+  });
+  const storedPlace = await request('GET', '/api/projects/' + placeId);
+  const putHalf = await request('PUT', '/api/projects/' + placeId, {
+    nodes: storedPlace.body.nodes.concat([
+      { id: 'n9', type: 'ont', model: 'gpon-ont-4ge', lat: 51.6, lon: null }
+    ])
+  });
+  test('PUT refuses a hand-edited half placement, because a PUT body never passes through apply()', function () {
+    assert.strictEqual(putHalf.status, 400, brief(putHalf));
+    assert.deepStrictEqual(putHalf.body.errors, [
+      'node "n9" has a latitude and no longitude - a placement is lat and lon together, or neither ' +
+      '(null = not placed on a map yet)'
+    ]);
+  });
+  const afterHalf = await request('GET', '/api/projects/' + placeId);
+  test('neither refusal left a half-placed node on disk', function () {
+    assert.deepStrictEqual(afterHalf.body.nodes.map(function (n) { return n.id; }), ['n1']);
+  });
+
   const badNodeName = await op(nameId, { op: 'add-node', node: { type: 'ont', model: 'gpon-ont-4ge', name: 5 } });
   test('an added node whose name is not a string is refused, naming the node', function () {
     assert.strictEqual(badNodeName.status, 400, brief(badNodeName));

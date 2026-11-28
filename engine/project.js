@@ -107,14 +107,24 @@ function apply(project, operation, opts) {
           ? 'this project already has an OLT node'
           : 'this project already has a head-end node');
       }
+      const id = input.id || nextId(next.nodes, 'n');
+      // A placement is a pair. `lng` is the alias for `lon` that the map libraries send and the demand
+      // import already reads (`network.lonFromInput`), and one axis on its own used to be stored as a
+      // valid node that the canvas drew at the centre of the view. Answered 200, drawn nowhere near
+      // where it was put; both refusals carry the same sentence as the validator, because it is one
+      // rule with two writers.
+      const wantedLon = network.lonFromInput(input, id);
+      if (wantedLon.error) return fail(wantedLon.error);
       const node = {
-        id: input.id || nextId(next.nodes, 'n'),
+        id: id,
         type: input.type,
         model: input.model || null,
         name: input.name || null,
         lat: input.lat === undefined ? null : input.lat,
-        lon: input.lon === undefined ? null : input.lon
+        lon: wantedLon.lon === undefined ? null : wantedLon.lon
       };
+      const placement = network.placementFault(node);
+      if (placement) return fail(placement);
       if (next.nodes.some(function (n) { return n.id === node.id; })) return fail('node id "' + node.id + '" already exists');
       next.history = snapshot(project, operation.op + ' ' + node.id, o.now);
       next.nodes.push(node);
@@ -215,9 +225,20 @@ function apply(project, operation, opts) {
         return fail('node "' + node.id + '" is a ' + node.type + ' - update-node cannot change the type of a node to "' +
           String(patch.type) + '"; patch takes name, model, lat and lon, and a node of another kind is a remove and an add');
       }
-      for (const key of ['name', 'model', 'lat', 'lon']) {
+      const wantedLon = network.lonFromInput(patch, node.id);
+      if (wantedLon.error) return fail(wantedLon.error);
+      for (const key of ['name', 'model', 'lat']) {
         if (patch[key] !== undefined) node[key] = patch[key];
       }
+      // `lng` lands in `lon`: the model has one longitude field and nothing reads the other spelling.
+      if (patch.lon !== undefined) node.lon = patch.lon;
+      else if (wantedLon.lon !== undefined) node.lon = wantedLon.lon;
+      // The pair is the placement, so the check is on the node the patch leaves behind: moving one
+      // axis of a placed node is a normal edit, but placing one axis of an unplaced node - or nulling
+      // one axis of a placed one - leaves half a node that `validate` used to call valid and the
+      // canvas drew at the centre.
+      const placement = network.placementFault(node);
+      if (placement) return fail(placement);
       next.history = snapshot(project, operation.op + ' ' + node.id, o.now);
       next.updatedAt = nowIso(o.now);
       return { project: next };
@@ -226,10 +247,13 @@ function apply(project, operation, opts) {
     case 'move-node': {
       const node = next.nodes.find(function (n) { return n.id === operation.id; });
       if (!node) return fail('unknown node "' + operation.id + '"');
-      if (typeof operation.lat !== 'number' || typeof operation.lon !== 'number') return fail('move-node needs numeric lat and lon');
+      // Same alias as `add-node`: a map library that panned the map sends `lng`.
+      const wantedLon = network.lonFromInput(operation, node.id);
+      if (wantedLon.error) return fail(wantedLon.error);
+      if (typeof operation.lat !== 'number' || typeof wantedLon.lon !== 'number') return fail('move-node needs numeric lat and lon');
       next.history = snapshot(project, operation.op + ' ' + node.id, o.now);
       node.lat = operation.lat;
-      node.lon = operation.lon;
+      node.lon = wantedLon.lon;
       next.updatedAt = nowIso(o.now);
       return { project: next };
     }

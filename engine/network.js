@@ -732,6 +732,53 @@ function nameProblem(name, what) {
   return (what || 'the project name') + ' must be a string, got ' + jsonTypeName(name);
 }
 
+/**
+ * The longitude a caller meant, accepting `lng` as the alias `lon`.
+ *
+ * `lng` is the spelling every map library but GeoJSON uses, and `demand.js` already reads it off an
+ * import (`LON_NAMES`). The edit path stored only `lon`, so a node added with `{ lat, lng }` kept its
+ * latitude and lost its longitude - answered 200, validated clean, and drawn at the centre of the
+ * canvas. An alias, not a second field: the caller's value lands in `lon` and `lng` is not copied
+ * onto the node, because nothing downstream reads it. Two spellings with two different values is a
+ * question the caller has to answer, so it is refused by name rather than resolved by picking one.
+ *
+ * Returns `{ lon, error }`; `lon` is undefined when neither spelling was supplied.
+ */
+function lonFromInput(input, id) {
+  const hasLon = input.lon !== undefined && input.lon !== null;
+  const hasLng = input.lng !== undefined && input.lng !== null;
+  if (hasLon && hasLng && input.lon !== input.lng) {
+    return {
+      error: 'node "' + (id || input.id) + '" is given lon ' + quotedValue(input.lon) + ' and lng ' +
+        quotedValue(input.lng) + ' - lon and lng are one field and the values disagree'
+    };
+  }
+  if (hasLon) return { lon: input.lon };
+  if (hasLng) return { lon: input.lng };
+  return { lon: input.lon };
+}
+
+/**
+ * A node's placement is a pair: `lat` and `lon`, or `null` on both.
+ *
+ * `null` on both is "not placed on a map yet" - a legitimate state for a node added from the palette,
+ * drawn at the centre until somebody clicks. One axis of a pair is neither state: a map library that
+ * sent `{ lat }`, or an edit that set one axis of an unplaced node, stored a node `validate` called
+ * valid and the projection drew at the centre, so a plan's OLT sat in the middle of an arbitrary
+ * view. The write gate refuses the half pair before it is stored and the validator names it in a
+ * hand-edited file - the same sentence from both, because it is one rule.
+ *
+ * Returns the refusal, or null when the placement is a pair or absent.
+ */
+function placementFault(node) {
+  const hasLat = node.lat !== undefined && node.lat !== null;
+  const hasLon = node.lon !== undefined && node.lon !== null;
+  if (hasLat === hasLon) return null;
+  return 'node "' + node.id + '" has a ' +
+    (hasLat ? 'latitude and no longitude' : 'longitude and no latitude') +
+    ' - a placement is lat and lon together, or neither (null = not placed on a map yet)';
+}
+
 function jsonTypeName(value) {
   if (value === null) return 'null';
   if (Array.isArray(value)) return 'an array';
@@ -786,11 +833,29 @@ function validate(plant, registry) {
     }
     // `null` means "not placed on a map yet", which is a legitimate state for a node added from the
     // palette. Only a present-but-wrong value is an error.
-    if (node.lat !== undefined && node.lat !== null && (typeof node.lat !== 'number' || !isFinite(node.lat) || Math.abs(node.lat) > 90)) {
+    const latPresent = node.lat !== undefined && node.lat !== null;
+    const lonPresent = node.lon !== undefined && node.lon !== null;
+    let axisFault = false;
+    if (latPresent && (typeof node.lat !== 'number' || !isFinite(node.lat) || Math.abs(node.lat) > 90)) {
       errors.push('node "' + node.id + '" has an invalid latitude');
+      axisFault = true;
     }
-    if (node.lon !== undefined && node.lon !== null && (typeof node.lon !== 'number' || !isFinite(node.lon) || Math.abs(node.lon) > 180)) {
+    if (lonPresent && (typeof node.lon !== 'number' || !isFinite(node.lon) || Math.abs(node.lon) > 180)) {
       errors.push('node "' + node.id + '" has an invalid longitude');
+      axisFault = true;
+    }
+    // `lng` is the alias the write ops accept (`lonFromInput`), so a saved file that still carries it
+    // was written by something that did not go through them. Naming the spelling is the difference
+    // between "your coordinate was dropped" and "half a placement" for the same stored node.
+    if (node.lng !== undefined && node.lng !== null && !lonPresent) {
+      errors.push('node "' + node.id + '" has "lng" and no "lon" - a saved node is placed by lat and lon, ' +
+        'and nothing reads lng');
+      axisFault = true;
+    }
+    // One axis of a pair is neither placed nor unplaced, and the projection draws it dead centre.
+    if (!axisFault) {
+      const placement = placementFault(node);
+      if (placement) errors.push(placement);
     }
     // A node's name is printed too: the canvas label, the splice page title, the closure-capacity
     // warning. `apply()` copied it out of the request body raw, so `{ name: {} }` was stored as an
@@ -1215,6 +1280,8 @@ module.exports = {
   capacity: capacity,
   validate: validate,
   nameProblem: nameProblem,
+  lonFromInput: lonFromInput,
+  placementFault: placementFault,
   isSpanCount: isSpanCount,
   isBundleCount: isBundleCount,
   routeLengthM: routeLengthM,
