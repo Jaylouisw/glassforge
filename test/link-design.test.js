@@ -62,6 +62,30 @@ test('the two legs are edge-disjoint and the report says 0 m shared', function (
   assert.ok(r.diversity.sentence.indexOf('edge-disjoint') !== -1, r.diversity.sentence);
 });
 
+test('a single-protection circuit names the caller, not the graph, as the reason it has one leg', function () {
+  // The grid offers two edge-disjoint legs - the `diverse` call measures them at 526.5 m and 637.7 m
+  // with 0 m shared. A circuit asked for `protection: 'single'` has one leg because it was told to,
+  // not because the duct cannot carry a protected pair, and the sentence used to claim the latter on
+  // this same fixture (gh#118): "the graph offers a single route between the sites". A planner reads
+  // that sentence to decide whether to commission a second route.
+  const diverse = gridLink();
+  assert.strictEqual(diverse.legs.length, 2);
+  assert.strictEqual(diverse.diversity.sharedM, 0, 'the pair is edge-disjoint');
+  const single = gridLink({ protection: 'single' });
+  assert.strictEqual(single.legs.length, 1);
+  assert.strictEqual(single.diversity.sentence.indexOf('the graph offers a single route'), -1,
+    'the graph offers two, so the sentence may not say one: ' + single.diversity.sentence);
+  assert.ok(single.diversity.sentence.indexOf('"single"') !== -1,
+    'the sentence names the setting that asked for one leg: ' + single.diversity.sentence);
+  // A corridor with no second way round is also one leg when 'single' is asked for, and the sentence
+  // still names the setting - it makes no claim about a graph it did not compare routes on.
+  const corridor = { edges: [{ id: 'duct', coords: [p(51.5, -0.1020), p(51.5, -0.0960)] }] };
+  const only = link.design({ sites: { a: A, b: B }, network: corridor, optics: ER, protection: 'single' }, registry);
+  assert.strictEqual(only.legs.length, 1);
+  assert.strictEqual(only.diversity.sentence.indexOf('the graph offers a single route'), -1,
+    only.diversity.sentence);
+});
+
 test('a ring graph gives two edge-disjoint legs of equal length', function () {
   const ring = { edges: [
     { id: 'AB', coords: [p(51.5, -0.1), p(51.5, -0.099)] },
