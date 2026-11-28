@@ -159,7 +159,26 @@ test('an unconnected node is a warning, not a refusal', function () {
   p.nodes.push({ id: 'n7', type: 'ont', model: 'gpon-ont-1ge', name: 'Floating' });
   const result = engine.network.validate(p, registry);
   assert.deepStrictEqual(result.errors, []);
-  assert.ok(result.warnings.some(function (w) { return w.indexOf('not connected') !== -1; }), result.warnings.join(' | '));
+  // The warning names the root the plant has - an OLT here - not the `headend` node type, which this
+  // project does not contain (the budget has said "the OLT receiver" since it learned to tell the two
+  // technologies' ends apart).
+  const message = result.warnings.filter(function (w) { return w.indexOf('not connected') !== -1; })[0];
+  assert.ok(message && message.indexOf('not connected to the OLT') !== -1, result.warnings.join(' | '));
+  assert.ok(message.indexOf('head-end') === -1, message);
+});
+
+// The same warning on an active plant names the head-end, because that is the root it has.
+test('the not-connected warning names the head-end on an active plant', function () {
+  const p = {
+    nodes: [
+      { id: 'h1', type: 'headend', model: 'qsfp-40g-lr4-10km' },
+      { id: 'c1', type: 'ont', model: 'qsfp-40g-lr4-10km' }
+    ], spans: []
+  };
+  const result = engine.network.validate(p, registry);
+  assert.deepStrictEqual(result.errors, []);
+  const message = result.warnings.filter(function (w) { return w.indexOf('not connected') !== -1; })[0];
+  assert.ok(message && message.indexOf('not connected to the head-end') !== -1, result.warnings.join(' | '));
 });
 
 test('a long drop is a warning', function () {
