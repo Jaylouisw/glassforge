@@ -1,0 +1,27 @@
+{
+  "kind": "cable",
+  "model": "g652d-ribbon-48",
+  "vendor": "generic",
+  "label": "G.652.D ribbon 48F",
+  "fiberCount": 48,
+  "fibersPerTube": 12,
+  "construction": "ribbon",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Four ribbons of 12, one ribbon per tube position, the same construction as g652d-ribbon-96 two units deeper. 48F is the second standard entry of the ordering table g652d-ribbon-96's row cites (Lightera/Prysmian AccuRibbon DC: 24, 48, 72, 96, 120, 144, 216, 288, 432, 864). Why this rung exists: with the ribbon ladder at 96/144/216/288/432, design.cableFor buys 96F for every span of 95 fibres or fewer, so a 33-to-48 fibre distribution span is quoted double the cable it carries - the same defect gh#93 fixed one rung higher, where a 96-fibre span was bought as 144F. `use` carries `distribution` as well as `feeder`, matching the loose-tube rung at the same count; the ribbon rows at 96 fibres and above are feeder-only because those counts are trunks. Attenuation is typical installed performance, not a G.652.D limit: 0.35 dB/km at 1310 nm under the recommendation's 0.40 dB/km maximum (1310-1625 nm), 0.21 dB/km at 1550 nm under its 0.30 dB/km maximum (1530-1565 nm). 1490 nm is interpolated - no ITU-T recommendation publishes a 1490 nm figure - so 0.22 dB/km is typical, not a citation. drumM 2,000 m follows the 96/144/216 rows; set it to the reel actually ordered. Not in DEFAULT_LADDER (no ribbon row is), so it reaches a design through the design ladder option; the part alone does not re-rank existing designs. Replace all three attenuation figures with the bought cable's test report for a construction-grade budget.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.652/en",
+  "tags": [
+    "generic",
+    "g.652.d",
+    "ribbon"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "kind": "cable",
+  "model": "g652d-ribbon-72",
+  "vendor": "generic",
+  "label": "G.652.D ribbon 72F",
+  "fiberCount": 72,
+  "fibersPerTube": 12,
+  "construction": "ribbon",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Six ribbons of 12, one ribbon per tube position, the TIA-598 tube colours 1-6 of g652d-loose-72 in ribbon form. 72F is the third standard entry of the ordering table g652d-ribbon-96's row cites (Lightera/Prysmian AccuRibbon DC: 24, 48, 72, 96, 120, 144, 216, 288, 432, 864). Why this rung exists: without it a 49-to-72 fibre span on a ribbon ladder is bought as 96F - measured by driving design.cableForSpan(60, ribbonLadder, registry), a 60-fibre span answers g652d-ribbon-96, thirty-six fibres of cable nobody asked for. That is the identical case gh#34 fixed for loose tube by adding g652d-loose-72, and the ribbon family never got the same rung. `use` carries `distribution` as well as `feeder`, matching the loose-tube rung at the same count; the ribbon rows at 96 fibres and above are feeder-only because those counts are trunks. Attenuation is typical installed performance, not a G.652.D limit: 0.35 dB/km at 1310 nm under the recommendation's 0.40 dB/km maximum (1310-1625 nm), 0.21 dB/km at 1550 nm under its 0.30 dB/km maximum (1530-1565 nm). 1490 nm is interpolated - no ITU-T recommendation publishes a 1490 nm figure - so 0.22 dB/km is typical, not a citation. drumM 2,000 m follows the 96/144/216 rows rather than a 72F sheet, which commonly prints a longer reel; set it to the reel actually ordered. Not in DEFAULT_LADDER (no ribbon row is), so it reaches a design through the design ladder option; the part alone does not re-rank existing designs. Replace all three attenuation figures with the bought cable's test report for a construction-grade budget.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.652/en",
+  "tags": [
+    "generic",
+    "g.652.d",
+    "ribbon"
+  ]
+}
