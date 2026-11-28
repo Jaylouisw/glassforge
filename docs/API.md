@@ -496,14 +496,26 @@ The **Checks** section opens its budget warnings with one plant-level sentence a
 window, built by `budget.launchWindowNote` — the same sentence a synthesised design puts in its
 `warnings`, so the page a crew signs off and the report that chose the design cannot disagree about it.
 It states the share of the estate in the band and the pad to buy, once, and the per-ONT warnings stay
-underneath it because a warning names the ONT it is about. Measured on a C+ OLT with a 1:8 cassette
-200 m away and two ONTs on 30 m drops (ODN 11.25 dB, so `ok` on both verdicts), the line reads:
+underneath it because a warning names the ONT it is about. A PON is two passes over one ODN, and a pad
+is loss in both directions, so the size the note names is the larger of the two and its `padBinds`
+says which direction set it. Measured on a C+ OLT with a 1:8 cassette 200 m away and two ONTs on
+30 m drops - ODN 11.251 dB downstream, 11.281 dB upstream - the line reads:
 
 ```
 2 of 2 ONTs are inside the overload point only at the bottom of the OLT gpon-c-plus-8 launch window:
-worst 3.75 dB over at the 7 dBm top, so 4 dB of inline pad at the OLT carries the design to full
-launch - as it stands it holds only while every line card lands at 3 dBm
+worst 3.75 dB over at the 7 dBm top, but the upstream direction is already over the OLT receiver's
+overload point at the floor launch, so one pad in this ODN serves both receivers and this plant takes
+the larger: 6 dB
 ```
+
+The note's fields come from that pad - `padDb 6`, `overDb 5.72`, `atTxDbm 5`, `maxPadDb 18` and
+`padBinds: "up"` - while the sentence itself keeps the band's own overshoot (3.75 dB at the 7 dBm
+top). This plant is not `ok` on both verdicts, and the page does not say it is: the downstream band
+is the 4 dB the top of the OLT window asks for, but the upstream pass puts the OLT receiver at
+-10.78 dBm against its -12 dBm overload point even at the ONT's +0.5 dBm floor launch, so the same
+Checks section opens with an error - `2 of 2 ONTs fail upstream at the OLT receiver - Casa 1: ...
+fit a 6 dB inline pad ...` - and the two sentences name one pad, not two. Fitting the 4 dB the
+downstream band alone asks for leaves the OLT receiver 2 dB over at the top of the ONT's window.
 
 One pad at the OLT is only the right purchase when every ONT in the band needs the same size. A band
 that needs a 4 dB pad on one drop and a 2 dB pad on another, or an estate with only part of its ONTs in
