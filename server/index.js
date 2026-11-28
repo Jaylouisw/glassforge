@@ -1129,7 +1129,10 @@ function printPage(req, res, project, registry) {
         // `label` is the cable-qualified tray address (`C02/T01-F06` on a bundled span); it equals
         // `address` on a single-cable span, so the sheet reads the same as before there.
         return [row.span, { text: String(row.strand), cls: 'num' }, row.label,
-          { html: '<span class="swatch" style="background:' + escapeHtml(row.hex) + '"></span>' + escapeHtml(row.colour) },
+          // `colourLabel` carries the TIA-598 marking on a repeated position (13-24 a black tracer,
+          // 25-36 a double one), so a 24-fibre tray does not print its first and thirteenth fibre as
+          // two `blue`s. A row on the base twelve has no label and prints the base colour as before.
+          { html: '<span class="swatch" style="background:' + escapeHtml(row.hex) + '"></span>' + escapeHtml(row.colourLabel || row.colour) },
           spliceTarget(row, point)];
       })));
     }
