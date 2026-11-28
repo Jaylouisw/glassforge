@@ -18,6 +18,10 @@
 //   pon: { maxDropM: -5 }            no house is within -5 m of a splitter, so nothing is reachable;
 //                                    it designed 8 splitter sites at 557.9 m and ranked it best -
 //                                    cheaper-looking than the shared tree, and unbuildable.
+//   pon: { ratios: [3] } (pon only)  a whole split with no splitter part: the search skipped it and
+//                                    the refusal said only "no candidate topology could be built for
+//                                    technology pon" - no ratio, no plc-1x3-sca - while the same
+//                                    request under auto carried the reason in `notes`.
 //   active: { optics: 'sfp-1g...' }  not a list, so the three DEFAULT pairs were searched and a
 //                                    10G LR-10KM design came back as the answer.
 //   active: { optics: [{}] }         each end took the default of its generation, pairing a 10G
@@ -155,6 +159,40 @@ test('a block the run does not read is not refused, because it is not a setting'
   // ...and "auto" reads both blocks, so the same block is refused when the search may use it.
   throws(function () { design({ technology: 'auto', active: { optics: 'nope' } }); }, 'active.optics',
     'an active block under technology auto');
+});
+
+test('a ratio the catalogue has no splitter for is refused by name, not by blaming the estate', function () {
+  // 1:3 is a legal split - whole, at least 2 - so the option guards above pass it; the search then
+  // skips it because there is no `plc-1x3-sca` part. With nothing else to build, the refusal said
+  // only `no candidate topology could be built for technology "pon"`, while the same request under
+  // `auto` had already written `PON 1:3 skipped: no splitter part "plc-1x3-sca" in the catalogue`
+  // into `notes`: the cause known and thrown away. A ratio is the caller's input, so this is a
+  // TypeError (a 400 at the endpoint) naming the ratio, the part looked up and the rungs that exist.
+  const err = throws(function () { design({ technology: 'pon', pon: { ratios: [3] } }); },
+    'plc-1x3-sca', 'a PON at a ratio with no splitter part');
+  assert.ok(err instanceof TypeError, 'a TypeError, so the caller is blamed and not the estate');
+  assert.ok(err.message.indexOf('1:3') !== -1, 'names the ratio it could not build: ' + err.message);
+  // The tail is the catalogue's, sorted as everything else sorts it, so the first eight rungs are
+  // the 128/16/2/32 sizes; the point is that a rung that exists is named beside the one that does not.
+  assert.ok(err.message.indexOf('plc-1x16-sca') !== -1,
+    'names a splitter part the catalogue does have: ' + err.message);
+  assert.ok(err.message.indexOf('no candidate topology could be built') === 0,
+    'keeps the sentence callers already match on, in front: ' + err.message);
+});
+
+test('one unbuildable ratio beside a buildable one is a note, not a refusal', function () {
+  // `pon.ratios` is a search list, so a rung the catalogue lacks costs that candidate and nothing
+  // else: the 1:8 plant is still designed, and the skip is named for the caller.
+  const mixed = design({ technology: 'pon', pon: { ratios: [3, 8] } });
+  assert.ok(mixed.best && mixed.best.label.indexOf('1:8') !== -1,
+    'the buildable ratio is the one built: ' + (mixed.best && mixed.best.label));
+  assert.ok(mixed.notes.some(function (n) { return n.indexOf('plc-1x3-sca') !== -1; }),
+    'the skipped ratio is named in notes: ' + JSON.stringify(mixed.notes));
+  // And `auto` still falls through to the active topologies with the same note, as it always has.
+  const auto = design({ pon: { ratios: [3] } });
+  assert.ok(auto.ok && auto.candidates.length, 'auto still finds a design');
+  assert.ok(auto.notes.some(function (n) { return n.indexOf('PON 1:3 skipped') !== -1; }),
+    'auto keeps the skip note: ' + JSON.stringify(auto.notes));
 });
 
 done();

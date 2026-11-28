@@ -1147,8 +1147,21 @@ function buildActiveHomeRun(demand, opts, registry, optic, graph) {
   });
 }
 
+/**
+ * The splitter part a split ratio is looked up as.
+ *
+ * One name in one place. The search, the "skipped" note and the refusal that names what was missing
+ * all spell the part, and they disagreed: for `pon: { ratios: [3] }` the note said
+ * `plc-1x3-sca` while the refusal thrown when nothing was left said only `no candidate topology
+ * could be built for technology "pon"` - the caller's ratio blamed on the estate, with the one
+ * fact that explains it (the part does not exist) already written down and thrown away.
+ */
+function splitterModelFor(ratio) {
+  return 'plc-1x' + ratio + '-sca';
+}
+
 function buildPon(demand, opts, registry, ratio, graph) {
-  const splitterModel = 'plc-1x' + ratio + '-sca';
+  const splitterModel = splitterModelFor(ratio);
   if (!registry.has('splitter', splitterModel)) return null;
 
   const factor = opts.routeFactor;
@@ -1653,11 +1666,15 @@ function synthesise(demandInput, userOptions, registry) {
   const wantsPon = opts.technology === 'auto' || opts.technology === 'pon';
   const wantsActive = opts.technology === 'auto' || opts.technology === 'active';
 
+  const skippedRatios = [];
   if (wantsPon) {
     for (const ratio of opts.pon.ratios) {
       const candidate = buildPon(demand, opts, registry, ratio, graph);
       if (candidate) candidates.push(candidate);
-      else notes.push('PON 1:' + ratio + ' skipped: no splitter part "plc-1x' + ratio + '-sca" in the catalogue');
+      else {
+        skippedRatios.push(ratio);
+        notes.push('PON 1:' + ratio + ' skipped: no splitter part "' + splitterModelFor(ratio) + '" in the catalogue');
+      }
     }
     if (!candidates.length) notes.push('no PON candidate could be built from the requested ratios');
   }
@@ -1670,7 +1687,20 @@ function synthesise(demandInput, userOptions, registry) {
       candidates.push(buildActiveHomeRun(demand, opts, registry, optic, graph));
     }
   }
-  if (!candidates.length) throw new Error('no candidate topology could be built for technology "' + opts.technology + '"');
+  if (!candidates.length) {
+    // Nothing was left to rank, and "no candidate topology could be built" is the symptom, not the
+    // cause. A ratio the search had to skip is the cause, so it is named with the part looked up and
+    // the splitter models the catalogue does have (SPEC 8: an unknown model names the models that
+    // exist) - the same remedy every other unknown-model refusal carries. The generic sentence stays
+    // in front of it, because callers and docs already match on it.
+    const unreachable = skippedRatios.length
+      ? ' - ' + skippedRatios.map(function (ratio) {
+        return '1:' + ratio + ' needs splitter part "' + splitterModelFor(ratio) +
+          '", which the catalogue does not have';
+      }).join('; ') + registry.knownModelsTail('splitter')
+      : '';
+    throw new TypeError('no candidate topology could be built for technology "' + opts.technology + '"' + unreachable);
+  }
 
   // A money objective with a hole in its price list is refused before anything is ranked. The hole
   // belongs to the caller's input, so it is a 400 at the API (see `asBadRequest`), and the message
