@@ -1,0 +1,30 @@
+{
+  "kind": "cable",
+  "model": "g652d-adss-288",
+  "vendor": "Corning",
+  "label": "Corning SOLO ADSS 288F aerial, dual jacket, G.652.D",
+  "fiberCount": 288,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder"
+  ],
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Corning SOLO All-Dielectric Self-Supporting Cables, 2-288 Fibers, family spec sheet 0009_NAFTA_AEN (Corning Optical Communications, revision 2026-01-20): the 288-fibre rows on that sheet, built as 24 active tubes of 12 fibres in 24 tube positions, the tube count the sheet prints for the 288 rows. Figures here are the Span Code 2 row - 421 kg/km, 23.9 mm nominal diameter, minimum bend radius 358 mm installation / 239 mm operation - because it is the lightest build of the count and the one a short FTTH pole span wants; the same 288 count is sold heavier for longer spans (Span Code 6: 24.3 mm / 434 kg/km, A: 24.8 / 449, C: 25.0 / 456, E: 25.3 / 462.8) and the span tables on sheets 5-19 of the family spec pick the code against NESC light/medium/heavy loading, so read the code off the span table before buying. Construction, from the same sheet: two polyethylene jackets (inner and outer) with a water-swellable tape under each, a dielectric central element and dielectric strength members, waterblocking that removes the flooding compound, ITU-T G.652.D (OS2) fibre, ANSI/ICEA S-87-640 design and test criteria, USDA Rural Development listed, storage -40 to 75 C, installation -30 to 70 C, operation -40 to 70 C, RoHS 2011/65/EU. Why the row exists: the aerial family in this catalogue is the EMEA ADSS Lite line (012/024/036/048/060/072/096/144ELE-T3322A20), whose own 144F sheet prints 'single-layer stranded construction up to 144 fibers' - so the aerial rungs stopped at 144 by product line, not by design, while the duct ribbon family runs to 432. Corning's US SOLO ADSS line is the family above 144: this sheet's first page is headed '2-288 Fibers' and prints 288-fibre rows on five span codes. Without this row a pole trunk above 144 strands has no aerial product to name: engine/design.js cableFor answers with the LARGEST rung in the ladder when nothing fits, and its builder then sets bundles = ceil(fibres / fiberCount) (design.js emitDistributionTree / emitFeederTree), so the shortfall is bought as parallel cables rather than refused - and the ladder warning in design.js only inspects spans that landed on a DROP row, so nothing is said about it. Measured on main at e74ab05: 96 houses on a 12 x 8 grid at 1 m grid steps, two strands per ONT, technology active, includeAllPlants, ladder [g652d-adss-144, g652d-adss-96, g652d-adss-48, g652d-loose-24, g652d-loose-12, drop rungs] ranks the active tree feasible and bills span s-root-d1 as 192 strands of g652d-adss-144, bundles 2, over 1,334.3 m - two 144-fibre lashed runs, 6,269.68 m of design length on g652d-adss-144, rounded to 4 x 2,000 m drums and 8,000 m bought, doubled pole load, no warning. With this row in the same ladder the same spans are one g652d-adss-288 each, bundles 1, 3,024.85 m of design length on that model, 2 drums and 4,000 m bought - half the reels and half the metres for the same fibres, because 8,000 x 144 = 4,000 x 288 = 1,152,000 bought fibre-metres either way. Fibre-metres do not move (1,334.3 x 2 x 144 = 1,334.3 x 1 x 288 = 384,278.4), so the fibre-metres objective and the ranking of candidates are unchanged and only the bill of materials and the pole loading change. Attenuation, and exactly what kind of figure it is: the family sheet's transmission table prints MAXIMUM 0.4 dB/km at 1310 nm, 0.4 at 1383 nm and 0.3 at 1550 nm for the standard single-mode option (code 01, the E fibre); this row carries 0.35 / 0.22 / 0.21, the same typical installed row every other cable here carries, so one aerial span is not budgeted at a factory maximum while its duct neighbours are budgeted at typicals - and 1490 nm is interpolated between the two published windows, not a citation from Corning or ITU-T. The sheet's 0.4 dB/km at 1310 nm is 0.05 above the 0.35 here, more than the ADSS Lite line's 0.01, so hold this supplier to 0.4 in the acceptance test and read the as-built OTDR before signing a budget. No drumM, the family decision: the sheet publishes no standard delivery length in the block read here, and a declared ceiling would bill a long reel for a short aerial spur, so the engine falls back to engine/length.js's 2,000 m default and the purchase line carries that - enter the reel actually ordered. What the engine does not model, and one trap: CABLE_USES has no aerial value, so aerial-ness lives in the tags and this note and nothing in the planner reads it; nothing checks span, sag, ice or wind loading or the span code against the pole route, and nothing metallic means nothing to bond or earth at a joint. The trap is the tie-break: cableFor answers with the SMALLEST cable that fits and breaks an equal fibre count on model id, and g652d-adss-288 sorts before g652d-loose-144 and g652d-ribbon-288, so a ladder naming this row beside a duct or ribbon twin buys aerial cable for every 288-strand span in the plant - name this row instead of the duct twin, not beside it, unless the whole run is on poles. One product data sheet, not a measured build: replace with the cable and span code actually purchased and its as-built attenuation before ordering.",
+  "sourceUrl": "https://www.corning.com/catalog/coc/documents/product-family-specifications/0009_NAFTA_AEN.pdf",
+  "tags": [
+    "corning",
+    "adss",
+    "aerial",
+    "g.652.d",
+    "288f",
+    "dielectric",
+    "solo",
+    "dual-jacket"
+  ]
+}
