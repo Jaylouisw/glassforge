@@ -1106,6 +1106,12 @@ function spliceTable(plant, registry) {
           label: at.label,
           colour: at.address.fiberColor.name,
           hex: at.address.fiberColor.hex,
+          // The base colour alone names a fibre twice once a position repeats: 13-24 are the same
+          // twelve with a black tracer, 25-36 with a double one. The sheet carries the marking as a
+          // field and the marked name as the string a plan prints. `colour` stays the base name for
+          // every caller that already reads it (the swatch is that colour).
+          marking: at.address.fiberColor.marking || null,
+          colourLabel: at.address.fiberColor.label || at.address.fiberColor.name,
           via: others.length ? 'splice' : 'parked',
           port: null,
           splicedTo: others
@@ -1195,6 +1201,8 @@ function splitterPoint(node, local, idOf, depth, registry) {
         label: at.label,
         colour: at.address.fiberColor.name,
         hex: at.address.fiberColor.hex,
+        marking: at.address.fiberColor.marking || null,
+        colourLabel: at.address.fiberColor.label || at.address.fiberColor.name,
         via: isInput ? 'splitter-input' : 'splitter-port',
         port: isInput ? null : ++port,
         splicedTo: []

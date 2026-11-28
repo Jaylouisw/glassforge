@@ -414,7 +414,9 @@
       const sw = el('span', { class: 'swatch' });
       sw.style.background = at.address.fiberColor.hex;
       td.appendChild(sw);
-      td.appendChild(el('span', { text: at.address.fiberColor.name }));
+      // `label` carries the TIA-598 tracer where the position repeats a colour (a 24-fibre tube's
+      // F13 is `blue with black tracer`, not a second plain `blue` beside F01).
+      td.appendChild(el('span', { text: at.address.fiberColor.label || at.address.fiberColor.name }));
       tr.appendChild(td);
       table.appendChild(tr);
     }
