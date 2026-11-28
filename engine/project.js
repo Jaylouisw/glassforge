@@ -41,7 +41,7 @@ const LAT_LIMIT = 90;
 const LON_LIMIT = 180;
 
 /** A value as the caller sent it: JSON where JSON can say it, `String` otherwise (`JSON.stringify(NaN)` is `null`). */
-function showCoordinate(value) {
+function showValue(value) {
   if (typeof value === 'number' && !isFinite(value)) return String(value);
   const text = JSON.stringify(value);
   return text === undefined ? String(value) : text;
@@ -50,7 +50,7 @@ function showCoordinate(value) {
 /** One coordinate the plant can hold, or a sentence naming the one it cannot. */
 function coordinateProblem(label, value, limit) {
   if (typeof value !== 'number' || !isFinite(value) || Math.abs(value) > limit) {
-    return label + ' must be a number between -' + limit + ' and ' + limit + ', got ' + showCoordinate(value);
+    return label + ' must be a number between -' + limit + ' and ' + limit + ', got ' + showValue(value);
   }
   return null;
 }
@@ -123,6 +123,49 @@ function nextId(list, prefix) {
   return prefix + (max + 1);
 }
 
+/**
+ * What is wrong with a project's `history`, in the caller's words - or `null` when it can be undone.
+ *
+ * `history` is the list this engine writes: an array of `{ at, op, state: { name, nodes, spans } }`,
+ * one entry per edit, capped at 50. An undo restores the last entry's `state`, so a history that is
+ * not a list is not "no history" - it is a field nothing can be restored from.
+ *
+ * Two doors write it. `PUT /api/projects/:id` merges the caller's body into the saved project, so a
+ * client that posted its own bookkeeping (`{"history": "x"}`) stored a string and answered 200; the
+ * next `/undo` answered 500 `history.pop is not a function` and the next `/ops` answered 500
+ * `project.history.slice is not a function` - the server blamed for the shape of a field the caller
+ * sent, with the internal method named instead of the field. A project file is the other door: it is
+ * JSON somebody can edit, and it never met the write gate.
+ *
+ * The sentence names the field, what arrived and the entry it needs, the way every other refusal on
+ * this model does; the server turns it into a 400 because the caller's body is the cause.
+ */
+function historyProblem(project) {
+  const history = project ? project.history : undefined;
+  // Absent is the empty history: `createProject` writes `[]`, and a project saved before undo
+  // existed has no field at all - both mean "nothing to go back to".
+  if (history === undefined || history === null) return null;
+  if (!Array.isArray(history)) {
+    return 'history must be an array of undo entries, got ' + showValue(history) +
+      ' - an undo restores the state an entry records, and the list this engine writes is ' +
+      '{ at, op, state: { name, nodes, spans } }; a history that is not a list cannot be undone';
+  }
+  for (let i = 0; i < history.length; i++) {
+    const entry = history[i];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return 'history[' + i + '] is not an undo entry, got ' + showValue(entry) +
+        ' - each entry is { at, op, state: { name, nodes, spans } }';
+    }
+    const state = entry.state;
+    if (!state || typeof state !== 'object' || Array.isArray(state) ||
+        !Array.isArray(state.nodes) || !Array.isArray(state.spans)) {
+      return 'history[' + i + '] has no state with nodes and spans - an undo restores that state, ' +
+        'so an entry without one is not a previous plant to go back to';
+    }
+  }
+  return null;
+}
+
 function snapshot(project, op, clock) {
   const history = (project.history || []).concat([{
     at: nowIso(clock),
@@ -150,6 +193,11 @@ function apply(project, operation, opts) {
   const o = opts || {};
   if (!project) return { error: 'no project' };
   if (!operation || !operation.op) return { error: 'operation.op is required' };
+  // `snapshot` appends to the history, so a field that is not a list used to make this op *throw* -
+  // `project.history.slice is not a function` out of `/ops` (or, worse, `concat` on a string wrote
+  // `x[object Object]` back as the history). `apply` returns a refusal for bad input instead.
+  const historyIssue = historyProblem(project);
+  if (historyIssue) return { error: historyIssue };
 
   const next = {
     id: project.id,
@@ -388,6 +436,10 @@ function replacePlant(project, plant, opts) {
   if (!plant || !Array.isArray(plant.nodes) || !Array.isArray(plant.spans)) {
     return { error: 'replacePlant needs a plant with nodes and spans' };
   }
+  // The snapshot below appends to the history; a string history made `concat` answer
+  // `x[object Object]` and saved it, so an applied design could corrupt a project it was applied to.
+  const historyIssue = historyProblem(project);
+  if (historyIssue) return { error: historyIssue };
   const next = {
     id: project.id,
     name: project.name,
@@ -401,8 +453,13 @@ function replacePlant(project, plant, opts) {
   return { project: next };
 }
 
-/** Take back the last edit. Returns `{ project, undone }`; the oldest state falls off at 50. */
+/** Take back the last edit. Returns `{ project, undone }`; the oldest state falls off at 50.
+ * A project whose `history` is not the list of entries this engine writes is refused with a
+ * TypeError naming the field (`historyProblem`) - the server answers it as a 400, because a
+ * project file is the caller's JSON and a shape nothing can be restored from is their body. */
 function undo(project) {
+  const historyIssue = historyProblem(project);
+  if (historyIssue) throw new TypeError(historyIssue);
   const history = (project.history || []).slice();
   if (!history.length) return { project: project, undone: null };
   const last = history.pop();
@@ -451,6 +508,7 @@ module.exports = {
   apply: apply,
   replacePlant: replacePlant,
   undo: undo,
+  historyProblem: historyProblem,
   check: check,
   summary: summary,
   nextId: nextId
