@@ -27,8 +27,10 @@
   }
 
   function bounds(nodes) {
+    // A project's JSON can hold `null` where a node belongs; the validator names that entry by
+    // position, and the drawing skips it rather than throwing where a picture was asked for.
     const placed = (nodes || []).filter(function (n) {
-      return typeof n.lat === 'number' && typeof n.lon === 'number' && isFinite(n.lat) && isFinite(n.lon);
+      return !!n && typeof n.lat === 'number' && typeof n.lon === 'number' && isFinite(n.lat) && isFinite(n.lon);
     });
     if (!placed.length) return null;
     let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
@@ -77,6 +79,7 @@
 
     const out = [];
     for (const node of nodes || []) {
+      if (!node) continue;
       if (typeof node.lat !== 'number' || typeof node.lon !== 'number' || !isFinite(node.lat) || !isFinite(node.lon)) {
         out.push(Object.assign({}, node, { x: width / 2, y: height / 2, placed: false }));
         continue;
