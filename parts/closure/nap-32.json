@@ -1,0 +1,18 @@
+{
+  "kind": "closure",
+  "model": "nap-32",
+  "vendor": "generic",
+  "label": "NAP 32-port",
+  "type": "nap",
+  "ports": 33,
+  "spliceCapacity": 48,
+  "trays": 4,
+  "notes": "The 32-drop box: 32 SC/APC drop adapters plus the one feeder entry that reaches them, so 33 cable ports. `ports` counts CABLES into the box, not adapter positions - engine/network.js compares the spans that touch a node against it and docs/PARTS.md states the rule - and a box sold as 32-port carrying a full load of drops is 32 drops and the feeder, 33. The 32/48/4 figures are the class, each from a published sheet, not a measurement: Whyte Series F WFDB-CAS-32 (datasheet on Farnell, 4502921) prints '32 Way', splice capacity 48, cassette splitter position up to 32, 32 x 60 mm splice protectors, six cable access ports top and six bottom, 420 x 350 x 130 mm, UV-resistant ABS, IP65, -40 to +80 C, TIA-598 labelling. Altice Labs FL_NAP - ODP BOXES v1.5 (2025-10) offers its ODP boxes in 8, 12, 16, 24 and 32 customer sizes and prints CRO 34SC/APC 1:32 WM at 34 SC/APC ports with a 1x32 splitter fitted and up to 60 fibres, and PDO32 16x2LC at up to 180 splices (15 x 12). AOA Tech FDB-32 prints '32 ports & splice', one 1x32 PLC splitter, 350 x 340 x 120 mm, IP65. Splice capacity across the class therefore runs 48 to 180; this row takes 48, which holds the 33 fusions a fully loaded box makes (a feeder spliced through plus 32 drops on pigtails) with 15 spare, and 4 trays is 48 at twelve per tray. Three traps. First, the Altice 34 adapter positions are 32 drops plus two inputs for a splitter INSIDE the box; this row carries one feeder entry, 33, because the engine puts a splitter on its own node (a 1x32 site is splitter-box territory, not this box) and a box that also passes the feeder on is a cascaded variant, a different SKU - name it rather than expect 33 to absorb a second multicore cable. Second, the sheets' six-plus-six cable glands are entries for multicore cables and slack, not 32 more cable ports; the drops arrive on the adapters. Third, `ports` is not the duplex count: Altice's PDO32 is 16 position pairs of LC, which is the same 32 customers in a different adapter, and this row is the SC/APC shape the rest of the FTTH catalogue patches to. Why this row exists, measured on main (3c92a08): the family ran 8, 12, 16 and 24 and stopped, so the largest box took 26 cables. Driving engine/design.synthesise on 32 houses bound to 32 streets with pon.ratios [32] - a ratio in the engine's own DEFAULTS.pon.ratios - ranks the PON feasible and buys a nap-24 for the point where the 32 drop cables converge; engine/network.validate then reports closure has 32 cables into 26 ports, six drops with nowhere to land, and the bill of materials still names the box. This row is the one a hand-drawn 32-drop site or a bare 1:32 splitter site names. It does not change auto-design's pick: engine/design.js's CLOSURE_LADDER is nap-8/nap-16/nap-24 and chooses by port count, so teaching synthesis to buy a 33-port box is an engine change and a separate PR. Replace these figures with the datasheet of the box actually purchased before ordering.",
+  "sourceUrl": "https://www.farnell.com/datasheets/4502921.pdf",
+  "tags": [
+    "nap",
+    "32-port",
+    "fdb",
+    "distribution-box"
+  ]
+}
