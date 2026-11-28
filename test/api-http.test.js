@@ -82,9 +82,44 @@ async function main() {
   });
 
   const missingPart = await request('GET', '/api/parts/cable/not-a-cable');
-  test('an unknown part is a 404 with an error body', function () {
+  const unknownKind = await request('GET', '/api/parts/banana/anything');
+  const unknownKindQuery = await request('GET', '/api/parts?kind=banana');
+  test('an unknown part model is a 404 that names the models that exist', function () {
     assert.strictEqual(missingPart.status, 404);
     assert.ok(missingPart.body.error.indexOf('no cable part') !== -1);
+    // SPEC §8: an unknown part model is an error naming the models that do exist, up to eight in
+    // plain string order, then `, ...` when the catalogue holds more. `registry.get` has answered
+    // that way for every other reader (the plant validator, the BOM, `/ops`) since
+    // `knownModelsTail` was hoisted out of it, but this endpoint still answered
+    // `no cable part with model "not-a-cable"` and left the planner with a mistyped model no
+    // remedy in the answer. Measured on main at 2350dad.
+    const listed = String(missingPart.body.error).split('known models: ')[1];
+    assert.ok(listed, 'the refusal names the models that exist: ' + missingPart.body.error);
+    const cables = partsA.body.parts.cable.map(function (c) { return c.model; });
+    // Cable holds more than eight models, so the sentence carries the first eight and `, ...`.
+    // Both figures come from the catalogue, never hand-written: the parts lane adds a rung without
+    // touching this file, and an eight-model list that drifts is the drift SPEC §8 warns about.
+    assert.ok(/, \.\.\.$/.test(listed), 'the list is cut at eight with `, ...`: ' + listed);
+    const names = listed.replace(/, \.\.\.$/, '').split(', ');
+    assert.strictEqual(names.length, 8, 'eight models, got ' + names.length);
+    assert.deepStrictEqual(names, cables.slice().sort().slice(0, 8),
+      'plain string order, the first eight of the catalogue: ' + names.join(', '));
+    assert.ok(missingPart.body.error.indexOf('not-a-cable') !== -1, 'the refusal names what was asked for');
+  });
+  test('an unknown part kind is refused as a kind, naming the kinds that exist', function () {
+    // `no banana part with model "anything"` named a kind the catalogue does not have and hid the
+    // eight it does: a caller who typed `cabel` read a sentence about a part, not about the kind.
+    // The same fault through the query string was a 400 that named no kinds either.
+    const kinds = Object.keys(partsA.body.parts).join(', ');
+    assert.strictEqual(unknownKind.status, 400, JSON.stringify(unknownKind.body));
+    assert.ok(unknownKind.body.error.indexOf('unknown part kind "banana"') !== -1, unknownKind.body.error);
+    assert.ok(unknownKind.body.error.indexOf('expected one of ' + kinds) !== -1,
+      'the refusal names the kinds: ' + unknownKind.body.error);
+    assert.ok(unknownKind.body.error.indexOf('no banana part') === -1,
+      'a kind is not a part: ' + unknownKind.body.error);
+    assert.strictEqual(unknownKindQuery.status, 400);
+    assert.ok(unknownKindQuery.body.error.indexOf('expected one of ' + kinds) !== -1,
+      'the query form names the kinds too: ' + unknownKindQuery.body.error);
   });
 
   // A create names an OLT model, so it can name one that does not exist. This used to answer 201 and
