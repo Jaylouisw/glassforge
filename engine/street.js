@@ -35,6 +35,7 @@ const DEFAULT_JOIN_M = 1.5;        // KML lines from different drawings rarely s
 const DEFAULT_MAX_SNAP_M = 250;    // farther than this from any street, a property is not connected
 const CROSSING_EPS_M = 0.05;       // shallower than this off the other line is a graze
 const TWIN_EPS_DEG = 1e-6;         // ~0.11 m: a second copy of a drawing, not a second alignment
+const INTERIOR_CELL_M = 100;       // edge-index cell for the vertex pass: an edge is a street segment long
 
 function isNum(v) { return typeof v === 'number' && isFinite(v); }
 function round(n, places) {
@@ -353,6 +354,16 @@ function nearestOnEdges(graph, point) {
  * where the main road has no vertex at the junction. Merging only coincident vertices leaves the two
  * lines as separate components, so nothing on the side street is reachable from the main road - and
  * every property there comes back "not on the street network".
+ *
+ * The pass tests nodes against edges, and it used to test **every node against every edge**: V x E
+ * pairs, quadratic in the size of the drawing, and the bounding-box rejection only made each pair
+ * cheap. A 100 x 100 grid of 100 m streets (10,000 nodes, 19,800 edges, a 10 km town) spent 34.6 s
+ * here on 2026-11-28 - the import had not returned, so no design could run (gh#226). The edges are
+ * indexed once, by the grid cells their bounding box covers, and a node visits only the cells its own
+ * plus-or-minus tolerance box covers. An edge within the tolerance of the node has a bounding box
+ * that overlaps that box at a point, and that point is in a cell both of them cover, so a candidate
+ * cannot be missed; the bbox test and the projection then run on that short list, in the same edge-id
+ * order as before, so the splits - and the graph - are the ones the full scan produced.
  */
 function splitAtInteriorVertices(graph, tol) {
   let splits = 0;
@@ -371,15 +382,69 @@ function splitAtInteriorVertices(graph, tol) {
     boxes.set(edge.id, box);
     return box;
   }
+
+  // The index cell is an edge-scale step, not the join tolerance: a street segment is tens to
+  // hundreds of metres, and a cell the width of a join tolerance would put a town in one bucket
+  // again. One latitude fixes both steps for the whole drawing - a town spans a fraction of a degree,
+  // and a wider drawing only covers more cells than it needs, which costs candidates, never misses
+  // one.
+  const latStep = INTERIOR_CELL_M / 111132.95;
+  const first = graph.nodes.values().next().value;
+  const refLat = first ? first.lat : 0;
+  const lonStep = INTERIOR_CELL_M / (111319.49 * Math.max(0.01, Math.cos(refLat * Math.PI / 180)));
+  const buckets = new Map();
+  function cellKeys(box) {
+    const keys = [];
+    const gx0 = Math.floor(box.minLon / lonStep);
+    const gx1 = Math.floor(box.maxLon / lonStep);
+    const gy0 = Math.floor(box.minLat / latStep);
+    const gy1 = Math.floor(box.maxLat / latStep);
+    for (let gx = gx0; gx <= gx1; gx++) {
+      for (let gy = gy0; gy <= gy1; gy++) keys.push(gx + ':' + gy);
+    }
+    return keys;
+  }
+  function indexEdge(edge) {
+    for (const key of cellKeys(boxOf(edge))) {
+      let bucket = buckets.get(key);
+      if (!bucket) { bucket = []; buckets.set(key, bucket); }
+      bucket.push(edge.id);
+    }
+  }
+  function unindexEdge(edgeId) {
+    const box = boxes.get(edgeId);
+    if (!box) return;
+    for (const key of cellKeys(box)) {
+      const bucket = buckets.get(key);
+      if (!bucket) continue;
+      const at = bucket.indexOf(edgeId);
+      if (at >= 0) bucket.splice(at, 1);
+      if (!bucket.length) buckets.delete(key);
+    }
+    boxes.delete(edgeId);
+  }
+  for (const edge of graph.edges.values()) indexEdge(edge);
+
   const nodeIds = Array.from(graph.nodes.keys()).sort(cmp);
   for (const nodeId of nodeIds) {
     const node = graph.nodes.get(nodeId);
-    // A node outside an edge's bounding box (widened by the tolerance) cannot project onto it, and on
-    // a town-sized import that rejection is most of the work: the projection itself is the expensive
-    // half, and this pass is quadratic without it.
     const latPad = tol / 111132.95;
     const lonPad = tol / (111319.49 * Math.max(0.01, Math.cos((node.lat * Math.PI) / 180)));
-    const edgeIds = Array.from(graph.edges.keys()).sort(cmp);
+    const gx0 = Math.floor((node.lon - lonPad) / lonStep);
+    const gx1 = Math.floor((node.lon + lonPad) / lonStep);
+    const gy0 = Math.floor((node.lat - latPad) / latStep);
+    const gy1 = Math.floor((node.lat + latPad) / latStep);
+    const candidates = new Set();
+    for (let gx = gx0; gx <= gx1; gx++) {
+      for (let gy = gy0; gy <= gy1; gy++) {
+        const bucket = buckets.get(gx + ':' + gy);
+        if (!bucket) continue;
+        for (const edgeId of bucket) candidates.add(edgeId);
+      }
+    }
+    // Sorted, because a node within tolerance of two edges must cut them in the order the full scan
+    // did - the split halves get fresh ids, and their order is what a re-run reproduces.
+    const edgeIds = Array.from(candidates).sort(cmp);
     for (const edgeId of edgeIds) {
       const edge = graph.edges.get(edgeId);
       if (!edge || edge.a === nodeId || edge.b === nodeId) continue;
@@ -392,9 +457,13 @@ function splitAtInteriorVertices(graph, tol) {
       const before = edge.geometry.slice(0, found.segIndex).concat([node]);
       const after = [node].concat(edge.geometry.slice(found.segIndex));
       removeEdge(graph, edgeId);
-      boxes.delete(edgeId);
-      graph.addEdge(edge.a, nodeId, before);
-      graph.addEdge(nodeId, edge.b, after);
+      unindexEdge(edgeId);
+      // The halves are indexed as they appear, so a node visited later can cut one of them too.
+      // addEdge answers with an existing twin when the half repeats one already in the graph, and
+      // that twin is indexed already.
+      for (const half of [graph.addEdge(edge.a, nodeId, before), graph.addEdge(nodeId, edge.b, after)]) {
+        if (half && !boxes.has(half.id)) indexEdge(half);
+      }
       splits++;
     }
   }
