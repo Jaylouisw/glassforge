@@ -811,8 +811,38 @@ function opticLabel(model, registry) {
     ' ' + optic.model.replace(/^sfp(28|\+)?-/, '').toUpperCase();
 }
 
-function closureModelFor(degree) {
-  return degree <= 8 ? 'nap-8' : degree <= 16 ? 'nap-16' : 'mufa-inline-24';
+// The NAP ladder, smallest first: the units a branch point is actually sold in (`ports` counts
+// CABLES - 8 drops and their feeder entry is 9 - the same field engine/network.js warns against).
+const CLOSURE_LADDER = ['nap-8', 'nap-16', 'nap-24'];
+
+/**
+ * The enclosure for a branch point, chosen by the cables that reach it.
+ *
+ * It used to be chosen by the tree **degree**, and anything above 16 fell through to
+ * `mufa-inline-24` - a straight-through in-line joint with four cable ports. Measured on an imported
+ * star (a duct chamber where 20 ways meet, the ordinary case in street geometry), a 21-cable junction
+ * was designed into that 4-port dome, ranked `feasible`, and put on the bill of materials; the
+ * catalogue's `nap-24` (26 ports) was never chosen by any path. Degree is also the wrong count: every
+ * cable in a bundle enters the box (`splicesAtClosure` counts the same way), so a 3-way node fed by
+ * 2 x 12F is six cables at the tray, not three - and it was bought as a 9-port NAP-8.
+ *
+ * Smallest box that takes the cables, else the largest, the rule `cableFor` follows for fibre count:
+ * a junction too big for the catalogue is bought as the biggest NAP and `network.validate` names the
+ * shortfall ("has N cables into M ports") rather than being hidden behind a smaller dome.
+ */
+function closureForCables(cables, registry) {
+  let best = null;
+  let largest = null;
+  for (const model of CLOSURE_LADDER) {
+    if (!registry.has('closure', model)) continue;
+    const part = registry.get('closure', model);
+    if (!largest || part.ports > largest.ports) largest = part;
+    if (part.ports < cables) continue;
+    if (!best || part.ports < best.ports ||
+        (part.ports === best.ports && cmpIds(part.model, best.model) < 0)) best = part;
+  }
+  if (best) return best.model;
+  return largest ? largest.model : CLOSURE_LADDER[CLOSURE_LADDER.length - 1];
 }
 
 // ---------------------------------------------------------------- plant builders
@@ -839,13 +869,31 @@ function emitTerminalTree(plant, tree, cfg, registry) {
     return onRoot.has(key) ? cfg.rootPlantId : idOf.get(key);
   }
 
+  // Every edge's cable and bundle count, computed once. The box at each end is chosen by the cables
+  // that enter it, so the count has to exist before the closures are created - and the span emitted
+  // afterwards has to be the same cable, because two passes that re-derive it can disagree.
+  const edgeRuns = tree.edges.map(function (edge) {
+    const fibres = Math.max(cfg.minFibres, edge.terminals * cfg.fibresPerTerminal);
+    const cable = cableForSpan(fibres, edge.lengthM, cfg.ladder, registry);
+    return { edge: edge, fibres: fibres, cable: cable, bundles: Math.max(1, Math.ceil(fibres / cable.fiberCount)) };
+  });
+  const cablesAt = new Map();
+  for (const run of edgeRuns) {
+    cablesAt.set(run.edge.from, (cablesAt.get(run.edge.from) || 0) + run.bundles);
+    cablesAt.set(run.edge.to, (cablesAt.get(run.edge.to) || 0) + run.bundles);
+  }
+  for (const node of tree.nodes) {
+    // Every drop that hangs off the node is a cable in the box too.
+    if (node.attachTerminals.length) cablesAt.set(node.key, (cablesAt.get(node.key) || 0) + node.attachTerminals.length);
+  }
+
   for (const node of tree.nodes) {
     if (node.isRoot) continue;
     if (onRoot.has(node.key)) { idOf.set(node.key, cfg.rootPlantId); continue; }
     if (node.degree >= 2 || node.attachTerminals.length) {
       const id = cfg.prefix + 'c-' + node.key;
       plant.nodes.push({
-        id: id, type: 'closure', model: closureModelFor(node.degree),
+        id: id, type: 'closure', model: closureForCables(cablesAt.get(node.key) || 0, registry),
         name: (node.attachTerminals.length ? node.attachTerminals[0] + ' ' : '') + 'closure ',
         lat: node.lat, lon: node.lon
       });
@@ -882,24 +930,22 @@ function emitTerminalTree(plant, tree, cfg, registry) {
     }
   }
 
-  for (const edge of tree.edges) {
+  for (const run of edgeRuns) {
+    const edge = run.edge;
     const from = plantIdOf(edge.from);
     const to = plantIdOf(edge.to);
     // Both ends are the same place: the edge contracted onto the root is not a span, and charging it
     // is what bought the 24-fibre drum (gh#39).
     if (from === to) continue;
-    const fibres = Math.max(cfg.minFibres, edge.terminals * cfg.fibresPerTerminal);
-    const cable = cableForSpan(fibres, edge.lengthM, cfg.ladder, registry);
-    const bundles = Math.max(1, Math.ceil(fibres / cable.fiberCount));
     plant.spans.push({
       id: cfg.prefix + 's-' + edge.from + '-' + edge.to,
       from: from, to: to,
-      cable: cable.model,
+      cable: run.cable.model,
       lengthM: edge.lengthM,
       // The span's capacity is every cable in the bundle; listing one cable's run hid the fibres
       // the second cable carries from the ledger and from the splice sheet.
-      strands: strandList(fibres, cable.fiberCount * bundles),
-      bundles: bundles,
+      strands: strandList(run.fibres, run.cable.fiberCount * run.bundles),
+      bundles: run.bundles,
       purpose: cfg.purpose,
       feedsOnts: edge.terminals,
       route: edge.route
@@ -913,11 +959,27 @@ function emitFeederTree(plant, tree, cfg, registry) {
   const closureOf = new Map();
   idOf.set(tree.rootId, cfg.rootPlantId);
 
+  // The feeder's own cable count, for the same reason as the terminal tree: each site's closure is
+  // chosen by the cables entering it - the feeder legs plus the 1 m splitter tail - not its degree.
+  const edgeRuns = tree.edges.map(function (edge) {
+    const fibres = Math.max(12, edge.terminals);
+    const cable = cableFor(fibres, cfg.ladder, registry);
+    return { edge: edge, fibres: fibres, cable: cable, bundles: Math.max(1, Math.ceil(fibres / cable.fiberCount)) };
+  });
+  const cablesAt = new Map();
+  for (const run of edgeRuns) {
+    cablesAt.set(run.edge.from, (cablesAt.get(run.edge.from) || 0) + run.bundles);
+    cablesAt.set(run.edge.to, (cablesAt.get(run.edge.to) || 0) + run.bundles);
+  }
+  for (const node of tree.nodes) {
+    if (node.attachTerminals.length) cablesAt.set(node.key, (cablesAt.get(node.key) || 0) + 1);
+  }
+
   for (const node of tree.nodes) {
     if (node.isRoot) continue;
     const closureId = cfg.prefix + 'fc-' + node.key;
     plant.nodes.push({
-      id: closureId, type: 'closure', model: closureModelFor(node.degree),
+      id: closureId, type: 'closure', model: closureForCables(cablesAt.get(node.key) || 0, registry),
       name: 'Feeder closure', lat: node.lat, lon: node.lon
     });
     closureOf.set(node.key, closureId);
@@ -936,18 +998,16 @@ function emitFeederTree(plant, tree, cfg, registry) {
     }
   }
 
-  for (const edge of tree.edges) {
-    const fibres = Math.max(12, edge.terminals);
-    const cable = cableFor(fibres, cfg.ladder, registry);
-    const bundles = Math.max(1, Math.ceil(fibres / cable.fiberCount));
+  for (const run of edgeRuns) {
+    const edge = run.edge;
     plant.spans.push({
       id: cfg.prefix + 'f-' + edge.from + '-' + edge.to,
       from: idOf.get(edge.from), to: idOf.get(edge.to),
-      cable: cable.model,
+      cable: run.cable.model,
       lengthM: edge.lengthM,
       // Capacity is every cable in the bundle, the same rule as the distribution tree above.
-      strands: strandList(fibres, cable.fiberCount * bundles),
-      bundles: bundles,
+      strands: strandList(run.fibres, run.cable.fiberCount * run.bundles),
+      bundles: run.bundles,
       purpose: 'feeder',
       feedsSplitters: edge.terminals,
       route: edge.route
