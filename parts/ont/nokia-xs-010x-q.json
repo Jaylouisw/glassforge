@@ -1,0 +1,22 @@
+{
+  "kind": "ont",
+  "model": "nokia-xs-010x-q",
+  "vendor": "Nokia",
+  "label": "Nokia ONT XS-010X-Q, XGS-PON SFU, 1x 10G RJ-45",
+  "pon": "xgs-pon",
+  "txPowerDbmMin": 4,
+  "txPowerDbmMax": 9,
+  "rxSensitivityDbm": -28,
+  "rxOverloadDbm": -9,
+  "ports": {
+    "10ge": 1
+  },
+  "notes": "Every optical figure is Nokia's own print for this unit, in the XGS PON uplinks section of the Nokia ONT XS-010X-Q data sheet (CID207690): 4 dBm ~ 9 dBm launch power, -28 dBm ~ -9 dBm for receiving, 1260-1280 nm upstream / 1575-1580 nm downstream, SC/APC, 9.95328 Gbit/s each way, ITU-T G.9807.1. The vendor prints the class rather than a better part: 4..9 dBm launch, -28 dBm sensitivity and -9 dBm overload are G.9807.1's class N ONU figures (met in the presence of the GPON and video overlay), which is why this row budgets identically to the generic xgs-pon-ont-1xge - the 13 dB the receiver needs in front of it is the same 13 dB, and choosing a Nokia unit buys a product name and a port, not a decibel. Why the row exists: the catalogue's XGS-PON CPE was a class figure with no product behind it, so an XGS plant could not name the ONT that goes on the wall - the same gap the Nokia G-010G-Q rows close for a B+ plant. One LAN port, 100M/1G/2.5G/5G/10G BASE-T RJ-45 auto-negotiating; the engine reports `ports` and does not budget it, and a 10G port does not make the service 10G: the PON carries 9.95328 Gbit/s shared by the splitter ratio, about 311 Mbit/s of average downstream per ONT behind a 1:32. Overload is the verdict this row produces on a short ODN, and it is the class's minimum ODN loss doing its job: +4 dBm at the launch floor into -9 dBm needs 13 dB of loss in front of the receiver, +9 dBm at the ceiling needs 18 dB. Measured on 1 km of g652d-loose-12 (0.22 dB) against xgs-pon-n2-8, budgeted at 1490 nm because that is the downstream window the cable catalogue publishes: the receiver arrives at +3.78 dBm and the engine answers `fail` with a 16 dB inline pad (7 dBm launch ceiling minus -9 dBm overload). This is CPE, not a slot optic: as kind `ont` it cannot be the transceiver at a site-to-site link end, and the registry refuses it there by name. 12 VDC/1A, <8.6 W, -5..45 C ambient, desktop or wall mount. Replace this row with the ONT actually purchased, and check its receiver before construction, because the overload point is the figure a short plant fails on.",
+  "sourceUrl": "https://onestore.nokia.com/asset/f/207690",
+  "tags": [
+    "xgs-pon",
+    "nokia",
+    "10ge",
+    "sfu"
+  ]
+}

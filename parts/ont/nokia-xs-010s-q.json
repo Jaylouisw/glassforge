@@ -1,0 +1,23 @@
+{
+  "kind": "ont",
+  "model": "nokia-xs-010s-q",
+  "vendor": "Nokia",
+  "label": "Nokia ONT XS-010S-Q, XGS-PON SFP ONT, 10GE to host",
+  "pon": "xgs-pon",
+  "txPowerDbmMin": 4,
+  "txPowerDbmMax": 9,
+  "rxSensitivityDbm": -28,
+  "rxOverloadDbm": -9,
+  "ports": {
+    "10ge": 1
+  },
+  "notes": "The catalogue's first ONT that is an SFP, and that is the whole reason the row exists: an XGS-PON subscriber can be served by plugging an ONT into a switch, a mobile station, an Ethernet access device, a router or a DSLAM rather than mounting a box on a wall, and a catalogue with only wall-mounted ONTs cannot name that build. The optical figures are Nokia's data sheet for this unit (CID207691), and they are the same G.9807.1 class N ONU window as the RJ-45 sibling nokia-xs-010x-q: 4 dBm ~ 9 dBm launch power, -28 dBm ~ -9 dBm for receiving, 1260-1280 nm upstream / 1575-1580 nm downstream, SC/APC, 9.95328 Gbit/s each way. So no decibel is bought here either - the 13 dB minimum ODN loss is the class's - and the product is the form factor plus two printed limits that matter in the field. The sheet's own words, 'Comply with standard SFP+ MSA, but longer than standard SFP+', mean the module is longer than an SFP+ cage: it fits a host with room behind the cage and not a recessed one, so check the host before specifying it into a cabinet. And -40..85 C case temperature, 2.6 W: the only ONT in the catalogue rated below freezing, which is what an outside-plant switch or a street cabinet needs. 10GE towards the host device; the engine reports `ports` and does not budget it. Kind `ont` and not `transceiver` on purpose - it is CPE with a PON MAC and an OMCI management channel behind it, the engine's link mode reads transceiver rows only, and a link budget that treated this as a site optic would be describing a PON end as a point-to-point end. Overload behaves as on the RJ-45 row: against xgs-pon-n2-8 over 1 km of g652d-loose-12 the receiver would see +3.78 dBm at the +4 dBm launch floor, and the engine answers `fail` with a 16 dB pad for the 7 dBm launch ceiling. Replace this row with the unit actually bought, and confirm the host's cage depth and the OLT's launch window before ordering.",
+  "sourceUrl": "https://onestore.nokia.com/asset/f/207691",
+  "tags": [
+    "xgs-pon",
+    "nokia",
+    "10ge",
+    "sfp-ont",
+    "hardened"
+  ]
+}
