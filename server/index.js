@@ -277,7 +277,10 @@ function cataloguePayload(registry, kind, term) {
   const partsOut = {};
   const kinds = kind ? [kind] : engine.parts.KINDS;
   for (const k of kinds) {
-    if (engine.parts.KINDS.indexOf(k) === -1) throw Object.assign(new Error('unknown part kind "' + k + '"'), { status: 400 });
+    // Each kind the catalogue has, by name: a `cabel` typo is a request about the kind, and the
+    // kinds are the remedy. `engine/parts.js` answers this fault the same way.
+    if (engine.parts.KINDS.indexOf(k) === -1) throw Object.assign(new Error('unknown part kind "' + k +
+      '" - expected one of ' + engine.parts.KINDS.join(', ')), { status: 400 });
     partsOut[k] = registry.search(term, k);
   }
   return { counts: counts, parts: partsOut };
@@ -332,10 +335,25 @@ async function handle(req, res, ctx) {
 
   const partMatch = /^\/api\/parts\/([a-z]+)\/([a-z0-9._-]+)$/.exec(pathname);
   if (partMatch) {
-    if (!registry.has(partMatch[1], partMatch[2])) {
-      return fail(req, res, 404, 'no ' + partMatch[1] + ' part with model "' + partMatch[2] + '"');
+    const kind = partMatch[1];
+    const model = partMatch[2];
+    // An unknown *kind* is the request's mistake, not a missing part. `no banana part with model
+    // "anything"` named a kind the catalogue does not have and hid the eight it does, so a caller
+    // who typed `cabel` read a sentence about a part. The query form already answered 400 for the
+    // same fact; this path answered 404 with the kind treated as real. Same sentence both ways now.
+    if (engine.parts.KINDS.indexOf(kind) === -1) {
+      return fail(req, res, 400, 'unknown part kind "' + kind + '" - expected one of ' +
+        engine.parts.KINDS.join(', '));
     }
-    return sendJson(req, res, 200, registry.get(partMatch[1], partMatch[2]));
+    // A real kind with an unknown model is the 404, and it names the models that exist the way
+    // every other reader of the catalogue does (SPEC §8). This endpoint was the one surface left
+    // answering `no cable part with model "x"` with no tail - `knownModelsTail`'s own docstring
+    // records the same defect on the validator and the BOM, fixed one sentence at a time.
+    if (!registry.has(kind, model)) {
+      return fail(req, res, 404, 'no ' + kind + ' part with model "' + model + '"' +
+        registry.knownModelsTail(kind));
+    }
+    return sendJson(req, res, 200, registry.get(kind, model));
   }
 
   if (pathname === '/api/projects') {
