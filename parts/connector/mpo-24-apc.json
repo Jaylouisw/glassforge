@@ -1,0 +1,20 @@
+{
+  "kind": "connector",
+  "vendor": "senko",
+  "sourceUrl": "https://www.senko.com/wp-content/uploads/2024/06/Data-Sheet_MPO-Standard-Connector.pdf",
+  "polish": "apc",
+  "model": "mpo-24-apc",
+  "label": "MPO-24/APC connector pair (standard loss)",
+  "lossDb": 0.25,
+  "maxLossDb": 1,
+  "notes": "0.25 dB typical and 1.00 dB maximum are the single-mode APC 24-fibre standard-loss row of the SENKO MPO-PLUS 702/712 datasheet optical table (DS-MPO-000001-RevB-EN), both qualified by the sheet's asterisk 'based on master grade jumper to low loss random mating test'. The row is carried so the catalogue's answer to 'what does standard loss cost at 24 fibres' is the sheet's number rather than a guess, and the answer is a warning: 1.00 dB maximum is double the 12-fibre standard ceiling (0.70) and nearly three times the 24-fibre low-loss ceiling (0.35). Eight matings at the maximum would spend 8 dB of a GPON class B+ budget (28 dB) on connectors alone, before a metre of fibre. Neither figure meets a random-mating grade in IEC 61753-1 - grade B is 0.25 dB max, grade C 0.50 dB - which is the same finding the 12-fibre standard row records: multi-fibre standard loss is not a graded connector, and a plan that needs a grade names mpo-24-apc-lowloss. The typical is usable for budgeting; the maximum is not a range to design inside, it is what a poor polish, a bad lot or a dirty end-face costs across twenty-four paths at once. APC return loss >= 60 dB, IEC 61754-7 interface, 500 matings per TIA-568.3, 2.0-5.5 mm cable suitability. 24-fibre MPO is centre-key and does not mate with the 16F offset-key row here. The engine charges one mating per fibre path: connectors { model: 'mpo-24-apc', count: 2 } is 2 x 0.25 = 0.50 dB. Replace with measured loss, and note that a purchase order saying 'MPO-24' without a grade is an invitation to the 1.00 dB part.",
+  "tags": [
+    "connector",
+    "mpo",
+    "mtp",
+    "24f",
+    "ribbon",
+    "standard-loss",
+    "high-density"
+  ]
+}
