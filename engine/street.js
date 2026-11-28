@@ -281,7 +281,14 @@ class Graph {
 function buildGraph(input, opts) {
   const graph = new Graph(opts);
   const lines = parseNetwork(input);
-  if (!lines.length) throw new Error('no usable polylines in the network geometry (each needs at least two coordinates)');
+  // `normaliseLine` refuses every line it cannot read, so `lines` is empty only when the caller sent
+  // none at all. The sentence used to describe the old filter - "no usable polylines ... each needs
+  // at least two coordinates" - which named a reading of the input that no longer happens: an
+  // `{ edges: [] }` body was told its lines were unusable when it had sent no lines (gh#198).
+  if (!lines.length) {
+    throw new TypeError('the network geometry has no edges - an import needs at least one line of ' +
+      'two or more { lat, lon } coordinates');
+  }
   for (const line of lines) graph.addLine(line);
   planarize(graph);
   const stats = graph.stats();

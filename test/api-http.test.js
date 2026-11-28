@@ -391,6 +391,36 @@ async function main() {
     assert.ok(trackNetwork.body.error.indexOf('Walk to depot') !== -1, trackNetwork.body.error);
   });
 
+  // gh#195 made an unreadable vertex a refusal; nothing over HTTP pinned that the refusal is the 400
+  // `asBadRequest` exists to produce. A later change that let the error reach the generic handler
+  // would answer 500 - "the server broke" for a body the caller typed - and these requests are what
+  // catches it. The empty-list sentence is asserted too: it used to describe a filter that is gone.
+  const emptyNetwork = await request('POST', '/api/import/network', { edges: [] });
+  const blankVertex = { id: 'blank', coords: [{ lat: 51.5, lon: -0.1010 }, { lat: 51.5, lon: '' }] };
+  const blankNetwork = await request('POST', '/api/import/network', { edges: [blankVertex] });
+  const blankSynthesis = await request('POST', '/api/design/synthesise', {
+    demand: 'label,lat,lon\nCasa 1,51.5000,-0.1000\nCasa 2,51.5005,-0.0998',
+    headEnd: { lat: 51.5, lon: -0.1010, name: 'PoP' },
+    network: { edges: [blankVertex] }
+  });
+  test('an imported network with no edges is a 400 that says so, not a 500', function () {
+    assert.strictEqual(emptyNetwork.status, 400, JSON.stringify(emptyNetwork.body));
+    assert.ok(/the network geometry has no edges/.test(emptyNetwork.body.error), emptyNetwork.body.error);
+    assert.ok(/at least one line of two or more/.test(emptyNetwork.body.error), emptyNetwork.body.error);
+    assert.ok(emptyNetwork.body.error.indexOf('no usable polylines') === -1,
+      'the sentence still describes the filter that was removed: ' + emptyNetwork.body.error);
+  });
+  test('an unreadable vertex is a 400 naming the edge and the point, not a 500', function () {
+    // (lat 51.5, lon "") at point 2 of 2 of the one edge - the cell to fix, quoted.
+    const expected = 'network edge 1 of 1 "blank" has a coordinate that is not { lat, lon } at point 2 of 2';
+    assert.strictEqual(blankNetwork.status, 400, JSON.stringify(blankNetwork.body));
+    assert.ok(blankNetwork.body.error.indexOf(expected) !== -1, blankNetwork.body.error);
+    assert.ok(blankNetwork.body.error.indexOf('lon ""') !== -1, blankNetwork.body.error);
+    // The design endpoint builds the same graph, so it must answer the same way rather than 500.
+    assert.strictEqual(blankSynthesis.status, 400, JSON.stringify(blankSynthesis.body).slice(0, 300));
+    assert.ok(blankSynthesis.body.error.indexOf(expected) !== -1, blankSynthesis.body.error);
+  });
+
   const demandCsv = 'label,lat,lon\nCasa 1,51.5000,-0.1000\nCasa 2,51.5005,-0.0998\nCasa 3,51.5010,-0.0996\nCasa 4,51.5015,-0.0994';
   const parsedDemand = await request('POST', '/api/import/demand', { demand: demandCsv });
   test('a demand list is parsed and reported before anything is designed', function () {
