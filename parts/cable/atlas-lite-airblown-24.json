@@ -1,0 +1,30 @@
+{
+  "kind": "cable",
+  "model": "atlas-lite-airblown-24",
+  "vendor": "STL",
+  "label": "STL Atlas Lite air-blown 24F 200 um, 2.5 mm",
+  "fiberCount": 24,
+  "fibersPerTube": 24,
+  "construction": "loose-tube",
+  "fiberStandard": "G.657.A2",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "drumM": 4000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.26,
+    "1550": 0.23
+  },
+  "notes": "The 24-fibre rung of the air-blown duct family: 24 x 200 um fibres in one 2.5 mm unitube, blown into a microduct, which is how a 24-fibre feeder reaches a district without a 24-fibre loose-tube drum that needs a duct twice the diameter. The sheet offers G.657.A1 or G.657.A2 200 um fibre and this row prices G.657.A2 for the same reason the 12F row does - a blown cable takes a tight bend at a chamber. Attenuation is the sheet's MAXIMUM cabled figure at both published windows: 0.35 dB/km at 1310 nm and 0.23 dB/km at 1550 nm. It prints nothing at 1490 nm and a PON downstream is budgeted there, so 0.26 dB/km is the straight line between the two maxima - 0.23 + (0.35 - 0.23) x 60/240 - and is not a vendor measurement. `fibersPerTube` is 24, this catalogue's largest legal tube, so any splice on this cable lands in a 24-fibre tray and a closure with 12-fibre trays needs two of them per cable; nothing in the engine checks that, which is why it is written here. `drumM` is the sheet's 4 km standard length multiple and rounds in 4 km steps, so a 5.5 km run bills 8 km against a 2 km-drum cable's 6 km - the BOM shows it rather than hiding it. No drop in `use`: it is a duct feeder, not a house drop. Replace the attenuation figures with the bought cable's test report before ordering.",
+  "sourceUrl": "https://www.stl.tech/pdf/OFC-Briefcase-Datasheet-QR-Code/24/24F%20G.657.A1-200um%20Atlas%20Lite%E2%84%A2%20Air%20Blown%20Optical%20Fiber%20Cable.pdf",
+  "tags": [
+    "stl",
+    "air-blown",
+    "microduct",
+    "duct",
+    "200um",
+    "g.657.a2"
+  ]
+}
