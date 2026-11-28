@@ -1,0 +1,26 @@
+{
+  "kind": "cable",
+  "model": "g652d-loose-60",
+  "vendor": "generic",
+  "label": "G.652.D loose-tube 60F",
+  "fiberCount": 60,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Five tubes of 12, TIA-598 tube colours 1-5 (blue, orange, green, brown, slate); engine/fiber.js addresses the strands T01-F01 to T05-F12. Attenuation here is typical installed performance, not a G.652.D limit: 0.35 dB/km at 1310 nm sits under the recommendation's 0.40 dB/km maximum (1310-1625 nm), and 0.21 dB/km at 1550 nm under its 0.30 dB/km maximum (1530-1565 nm). 1490 nm is a typical, interpolated value: no ITU-T recommendation publishes a 1490 nm attenuation figure of its own (G.652.D's 0.40 dB/km maximum spans 1310-1625 nm but is not a 1490 nm specification), so 0.22 dB/km bridges the two published windows and is not a citation. Why this rung exists: the duct family shipped 12/24/48/72/96/144, and cableFor answers with the SMALLEST cable that fits, so a 49-60 fibre span was bought as 96F. Measured on this engine, design.cableFor(60, DEFAULT_LADDER, registry) answers g652d-loose-96 for a 1,200 m span: 96 x 1,200 = 115,200 fibre-metres against 60 x 1,200 = 72,000 for a 60F rung - 43,200 fibre-metres, more than a third of the drum, that the design never lights. The 72F rung above it (g652d-loose-72, gh#34) does not stand in for it: a 60-fibre span is 60, and with 72 named but not 60 the smallest-that-fits rule still lands on 96 above 72's own band. Sixty strands is five 12-fibre distribution legs out of one FDH, or a 1:64 splitter site with four spare strands. Six tubes of 10 is the other common 60F build; this row's fibresPerTube is 12 because the colour map, the splice sheet and engine/fiber.js addressing all follow tubes of 12, so a 6 x 10 cable ordered against this row splices under the wrong tube numbers - order the 5 x 12 build or add the 6 x 10 row. drumM 2,000 is the put-up to order rather than a figure from a vendor sheet - the same default the 24/48/96 rows carry - so set it to the reel actually bought. The row reaches a design only when the ladder names it: DEFAULT_LADDER in engine/design.js lists 144/96/48/24/12, so the shipped default still buys 96F for a 60-fibre span. Pass this model in the design ladder option (the API validates every ladder entry against this catalogue) or add it to the default in an engine change - the part alone does not re-rank existing designs. All three attenuation figures are typical values: replace them with the bought cable's test report for a construction-grade budget.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.652/en",
+  "tags": [
+    "generic",
+    "g.652.d"
+  ]
+}
