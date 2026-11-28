@@ -1,0 +1,19 @@
+{
+  "kind": "closure",
+  "model": "fosc-450b6-inline-144",
+  "vendor": "CommScope",
+  "label": "FOSC 450 B6 in-line closure, 144 splices",
+  "type": "inline",
+  "ports": 17,
+  "spliceCapacity": 144,
+  "trays": 6,
+  "notes": "The 96-to-216 rung: a 144-fibre through-joint, the size the catalogue's own feeder cable makes (g652d-loose-144 is sold here for exactly this joint). Figures are CommScope's FOSC 450 Gel-Sealed Fiber Optic Splice Closure Product Ordering Guide, Sixth Edition (2026), 'Closure Capacities and Characteristics' chart and the family page: the 450 B6 is 24 in long by 9.8 in diameter, 13 lb, takes SIX cable entry ports each with multi-cable capability, and its single-fibre capacity with SM12 modules is 144 - six B-size trays at 24 splices a tray (the same chart gives 72 with SM6 modules, 12 a tray, which is why the row takes the SM12 order and says so). The same chart's ribbon columns are 432 flat matrix / 864 rollable, six trays at 72 and 144 mass splices per tray, so the 144F ribbon joint fits here too; the tray table on the same guide fits the FOSC B tray (12/24 single, 72 mass) to the 450 B6, which is what makes 6 x 24 = 144 and 6 x 72 = 432 add to the published figures rather than being assumed. `ports` is 17, not 6: the housing has six entry ports, but each is a multi-cable gel block and the family page states the capacity as 'up to 16 drop cables in addition to a feed-through cable' - 17 cables - and PARTS.md asks this field for the cables the box takes, never its port count and never its adapter count. The engine's over-port warning therefore fires at 18 cables, where the box really is full. Why this row exists: measured on engine/link.js, a 144-fibre leg through one interior joint (144 splices, one per strand) was answered with 'inline closures that would: fosc-600c-inline-216 (216), fosc-600d-inline-504 (504)' - a 216-splice 32.6 in trunk box with 72 unused positions, or a 504-splice box with 360 unused, for the commonest feeder joint there is. The 450 B6 is the same vendor's published rung between fosc-400b4-inline-96 and fosc-600c-inline-216, and its 144 seats exactly this joint. Two traps travel with it. It is a single-ended dome, not a straight-through tube: every cable enters through the base seal, which is why CommScope calls the family 'single-ended' while the joint inside is an in-line splice of a through cable - the row is typed `inline` because that is the job it does, not because it is a tube. And capacity is a function of the tray ordered, not the housing: SM6 modules give 96, SM12 give 144, FIST modules are not offered in this size (the chart prints N/A for B6), and a closed 144-splice order leaves no spare tray - a joint expected to grow belongs in the 216. CommScope's A and B family pages also disagree with the chart for the B Short size (144 in the text, 120 in the bar chart), which is why this row is the B6 and not the smaller BS. These are the guide's published capacities, not a counted tray stack, and capacity moves with the tray type and order code: replace this row with the closure actually purchased and the trays it ships with.",
+  "sourceUrl": "https://webresources.commscope.com/download/assets/Ordering+Guide:+FOSC+450+Fiber+Optic+Splice+Closures/2329b9463bd611f0b0a3d2e4a07eb9db",
+  "tags": [
+    "commscope",
+    "fosc",
+    "inline",
+    "144f",
+    "splice-closure"
+  ]
+}

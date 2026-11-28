@@ -3,8 +3,9 @@
 // joints: mufa-inline-24 (24 splices) and fosc-600d-inline-504 (504). A through-joint in a 96F or 144F
 // cable therefore read as over-stuffed in the mufa, and the only boxes that fitted were a street
 // cabinet - a different product, not a joint - or a 35 mm trunk closure built for a 288F trunk. This
-// suite holds the FOSC 600-C row to the job it exists for: it is the smallest in-line closure that
-// joints a 144F cable, and it does not pretend to be the 288F box.
+// suite holds the FOSC 600-C row to the job it exists for: it is the first in-line closure that holds
+// MORE than a 144F joint - the 144 itself is fosc-450b6-inline-144 - and it does not pretend to be the
+// 288F box.
 const { test, assert, done } = require('./harness');
 const engine = require('../engine');
 
@@ -21,14 +22,17 @@ test('the FOSC 600-C row is 3 D trays of 72 splices, not a rounder number', func
   assert.strictEqual(c.ports, 4, 'one 4-port gel block is the base order code, as on the 600-D row');
 });
 
-test('it is the smallest in-line closure that joints a 144F cable', function () {
+test('it is the first in-line closure ABOVE a 144F joint, which now has its own 144-splice rung', function () {
   const inlines = registry.all('closure').filter(function (c) { return c.type === 'inline'; });
-  const fits = inlines.filter(function (c) { return c.spliceCapacity >= 144; })
+  const bigger = inlines.filter(function (c) { return c.spliceCapacity > 144; })
     .sort(function (a, b) { return a.spliceCapacity - b.spliceCapacity || (a.model < b.model ? -1 : 1); });
-  assert.ok(fits.length >= 1, 'no in-line closure holds 144 splices');
-  // Before this row the smallest was 504: a 144F joint bought a trunk box built for 288F.
-  assert.strictEqual(fits[0].model, 'fosc-600c-inline-216', 'smallest fitting in-line closure: ' + fits[0].model);
-  assert.strictEqual(fits[0].spliceCapacity, 216, '216 is the first capacity at or above 144');
+  assert.ok(bigger.length >= 1, 'no in-line closure holds more than 144 splices');
+  // This used to assert that 216 was the smallest capacity at or above 144 - true while the ladder
+  // jumped 96 -> 216 and a 144F joint bought 72 unused positions. fosc-450b6-inline-144 seats the
+  // 144F through-joint exactly (held by test/parts-fosc-450b6.test.js), so this row's claim is now
+  // the rung above: the first box for a chamber that splices more than one 144F cable.
+  assert.strictEqual(bigger[0].model, 'fosc-600c-inline-216', 'smallest box above 144 splices: ' + bigger[0].model);
+  assert.strictEqual(bigger[0].spliceCapacity, 216, '3 trays x 72 = 216, the first capacity above 144');
 });
 
 /** OLT -<feeder>-> joint -<feeder>-> handhole -<drop>-> ONT: every strand of the cable is spliced. */
