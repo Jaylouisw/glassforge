@@ -25,14 +25,14 @@ The server binds `127.0.0.1:8000` by default (`HOST`, `PORT`), and stores projec
 ```
 GET /api/health
 → { ok: true, name: "glassforge", version: "0.4.0",
-    parts: { total: 128, byKind: { cable: 30, splitter: 14, olt: 16, ont: 7, transceiver: 32,
-                                  closure: 15, connector: 12, splice: 2 } },
+    parts: { total: 131, byKind: { cable: 30, splitter: 14, olt: 16, ont: 7, transceiver: 32,
+                                  closure: 15, connector: 15, splice: 2 } },
     projects: 0, uptimeS: 3 }
 ```
 
 `version` is `package.json`'s. `parts.total` and `parts.byKind` are the catalogue on disk, so they
 change whenever a part is added. The block above is a **snapshot, not a contract**: re-recorded on
-`main` at `af03cab` (the 800GBASE-DR8 row, gh#203) on 2026-11-28, it is illustrative and will drift
+`main` at `cead552` (the 16/24-position APC rows, gh#210) on 2026-11-28, it is illustrative and will drift
 as the catalogue grows. The authorities are the endpoint itself and `node scripts/count-parts.js`,
 whose `--check` mode keeps README's copy of that line honest — re-record the block with the command
 below, never by editing the numbers by hand.
