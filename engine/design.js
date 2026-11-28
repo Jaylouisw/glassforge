@@ -496,7 +496,17 @@ function cableFor(requiredFibres, ladder, registry) {
 }
 
 /**
- * Distribution cable: a drop rung of the caller's ladder for one or two fibres, the ladder above that.
+ * The largest rung a short span may take when the catalogue does not call it a drop.
+ *
+ * This is the size half of the original rule, kept for a ladder of small custom cables that names no
+ * drop rung at all: one or two fibres over a short run is a drop's job whatever the product is
+ * called. Above two fibres only a catalogued drop gets past it (`cableForDistribution`).
+ */
+const SMALL_RUNG_MAX_FIBRES = 2;
+
+/**
+ * Distribution cable: the smallest rung of the caller's ladder that carries the fibres - a drop rung
+ * of any size, or any rung of two fibres or fewer - and the ladder's 12-fibre floor above that.
  *
  * This named `g657a2-drop-1` / `g657a2-drop-2` straight out of the catalogue, which is the defect the
  * head of `cableForSpan` was fixed for, one branch deeper. A caller who stocks one cable
@@ -511,11 +521,20 @@ function cableFor(requiredFibres, ladder, registry) {
  * nothing in it fits, and a 1-fibre rung is not a cable a two-fibre span can use, so a rung that
  * cannot carry the count is not taken as the drop and the span goes to the 12-fibre floor of the
  * ladder instead.
+ *
+ * A cable is a drop because the catalogue says so (`use`, see `isDropCable`), not because of its
+ * fibre count - and the family does not stop at two: a four-fibre flat drop feeds a four-port tap
+ * where the alternative is two two-fibre drops down one span, and an active tree's short spans
+ * really carry three and four fibres (a four-ONT branch is a four-strand span over tens of metres).
+ * `fibres <= 2` was a stand-in for "is a drop" that was only true while the catalogue stopped at
+ * `g657a2-drop-2`; with a four-fibre rung in the ladder it billed a 100 m four-fibre span twelve
+ * fibres of gel-filled outdoor loose tube on a 2000 m drum (gh#144). A drop rung is taken at any
+ * size; a non-drop rung still only under the original two-fibre rule.
  */
 function cableForDistribution(requiredFibres, ladder, registry) {
-  if (requiredFibres <= 2) {
-    const rung = cableFor(requiredFibres, ladder, registry);
-    if (rung.fiberCount <= 2 && rung.fiberCount >= requiredFibres) return rung;
+  const rung = cableFor(requiredFibres, ladder, registry);
+  if (rung.fiberCount >= requiredFibres && (rung.fiberCount <= SMALL_RUNG_MAX_FIBRES || isDropCable(rung))) {
+    return rung;
   }
   return cableFor(Math.max(12, requiredFibres), ladder, registry);
 }
@@ -539,10 +558,14 @@ function isDropCable(cable) {
  *
  * Two fibres over 1.2 km is not a drop: it is a two-fibre cable run, and designing it as drop cable
  * produces a bill of materials nobody can buy (drop cable is not pulled between buildings or between
- * two data centres). Short two-fibre runs keep the drop cable, everything else goes to the ladder.
+ * two data centres). A short run keeps the drop cable, a drop rung of any size or a rung of two
+ * fibres or fewer (`cableForDistribution`); everything else goes to the ladder's 12-fibre floor.
+ * The fibre count is not the test for a short run - the length is - because the drop family now
+ * carries four fibres and the 12-fibre floor above two was what a catalogue that stopped at two
+ * implicitly said, not a rule about spans.
  */
 function cableForSpan(fibres, lengthM, ladder, registry) {
-  if (lengthM <= DROP_CABLE_MAX_M && fibres <= 2) {
+  if (lengthM <= DROP_CABLE_MAX_M) {
     return cableForDistribution(fibres, ladder, registry);
   }
   return cableFor(Math.max(12, fibres), ladder, registry);
@@ -1280,8 +1303,9 @@ function bomOf(plant, registry, opts) {
 /**
  * Spans the built plant puts on drop cable outside the drop class, one sentence per shape.
  *
- * `cableForSpan` already sends a span to the ladder above 300 m or above two fibres; when the ladder
- * has nothing there, `cableFor` answers with its largest rung, and when that rung is a drop cable the
+ * `cableForSpan` already sends a span to the ladder above 300 m and to a rung its fibres fit (any
+ * catalogued drop, or a rung of two fibres or fewer); when the ladder has nothing there, `cableFor`
+ * answers with its largest rung, and when that rung is a drop cable the
  * span is built anyway. `link.cableForFibres` refuses the same shape for a circuit. Here the span
  * exists in the plant, so the refusal reads it back rather than guessing: the sentence names the
  * span, the length or fibre count that left the class, and the rung the caller has to add.
@@ -1369,8 +1393,10 @@ function evaluate(plant, opts, registry, meta) {
   // longer than a drop, or carrying more fibres than its cable, that the ladder answered with drop
   // cable because `cableFor` falls back to the largest rung. That is how a 494.8 m feeder came out as
   // six bundled 2-fibre drop cables and ranked `ok` (gh#127). Drop cable is the last leg: at most
-  // `DROP_CABLE_MAX_M`, at most two fibres, one cable. A span outside that is a candidate refusal
-  // naming the rung that cannot buy it - not a silent BOM of drums nobody pulls.
+  // `DROP_CABLE_MAX_M` and one cable. The fibre count is the rung's (`cableForDistribution` only
+  // takes a drop that carries the span's fibres), so a drop span is over-fibred or bundled only when
+  // the largest rung answered a span nothing in the ladder fits. A span outside the class is a
+  // candidate refusal naming the rung that cannot buy it - not a silent BOM of drums nobody pulls.
   Array.prototype.push.apply(reasons, dropClassRefusals(plant, registry));
   failures.slice(0, 5).forEach(function (f) {
     reasons.push((f.name || f.ont) + ': ' + (f.error || (f.result && f.result.reasons.join('; '))));
