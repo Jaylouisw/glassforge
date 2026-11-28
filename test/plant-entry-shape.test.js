@@ -123,4 +123,51 @@ test('the plan projection skips an unreadable node instead of throwing', functio
   assert.strictEqual(projected.nodes[0].id, 'n1');
 });
 
+test('a null before the root is skipped too - the readers do not depend on list order', function () {
+  // The suite above appends the unreadable entry, so `find` meets the match first and never reads
+  // `null.id`. A file can hold the entry anywhere: a hand edit that lost a line, a merge that put a
+  // blank at the top. The capacity walk looked a node up by id with `find(function (n) { return n.id
+  // === step.id })` - unguarded - so a `null` at index 0 threw `Cannot read properties of null
+  // (reading 'id')` on the first step, and `GET /api/projects/:id` (which builds `derived.summary`
+  // through `capacity`) answered 500 for a project a user could not then open to fix.
+  const plant = pon();
+  plant.nodes.unshift(null);
+  assert.strictEqual(engine.network.validate(plant, registry).errors.length, 1, 'the validator still names it');
+  assert.strictEqual(engine.network.capacity(plant, registry).onts, 1);
+  assert.strictEqual(engine.network.stats(plant, registry).onts, 1);
+  assert.strictEqual(engine.project.summary(plant, registry).onts, 1);
+});
+
+test('a stored project with an unreadable entry is listed by name, not as an unreadable file', function () {
+  // `GET /api/projects` counts every file's nodes and ONTs to draw the picker, and counted
+  // `node.type` on the entries without the `n &&` guard the engine's readers carry. A project with
+  // one `null` among its nodes threw out of `store.listProjects`, the catch labelled the whole file
+  // "(unreadable) <id>.json" with a TypeError for a message - while `GET /api/projects/:id` on the
+  // same file answered the named fault. The file is readable and the entry is fixable; the list may
+  // not say the opposite, and it may not drop the name the user recognises.
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const store = require('../server/store');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gf-store-'));
+  try {
+    fs.mkdirSync(path.join(root, 'projects'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'projects', 'pnullnode01.json'), JSON.stringify({
+      id: 'pnullnode01', name: 'Fibre estate phase 2', createdAt: '2026-11-01T00:00:00Z',
+      updatedAt: '2026-11-20T00:00:00Z',
+      nodes: [null, { id: 'n1', type: 'olt', model: 'gpon-b-plus-8' }, { id: 'n2', type: 'ont', model: 'gpon-ont-1ge' }],
+      spans: [], history: [], version: 1
+    }));
+    const listed = store.listProjects(root);
+    assert.strictEqual(listed.length, 1);
+    assert.strictEqual(listed[0].error, undefined, 'a readable file is not "(unreadable)": ' + listed[0].error);
+    assert.strictEqual(listed[0].name, 'Fibre estate phase 2');
+    // The readable entries are counted; the `null` is the validator's to name, not a node.
+    assert.strictEqual(listed[0].nodes, 2);
+    assert.strictEqual(listed[0].onts, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 done();

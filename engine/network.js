@@ -584,7 +584,12 @@ function capacity(plant, registry) {
     const stack = oltOrHead ? [{ id: oltOrHead.id, ratio: 1, seen: new Set([oltOrHead.id]) }] : [];
     while (stack.length) {
       const step = stack.pop();
-      const node = (plant.nodes || []).find(function (n) { return n.id === step.id; });
+      // Guarded like every sibling read: `find` walks the list in order, so an entry before
+      // the match is dereferenced by the predicate. A `null` at index 0 is reached on the first
+      // step and threw `Cannot read properties of null (reading 'id')` out of `capacity`, which
+      // `project.summary` calls for `GET /api/projects/:id` - a 500 on a project the user cannot
+      // open to fix. Appending the entry hid this; the test now puts it first.
+      const node = (plant.nodes || []).find(function (n) { return isEntry(n) && n.id === step.id; });
       let ratio = step.ratio;
       if (node && node.type === 'splitter' && node.model && registry.has('splitter', node.model)) {
         ratio *= registry.get('splitter', node.model).ratio;
