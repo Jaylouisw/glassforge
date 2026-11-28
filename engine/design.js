@@ -506,6 +506,17 @@ function cableForDistribution(requiredFibres, ladder, registry) {
 const DROP_CABLE_MAX_M = 300;
 
 /**
+ * Is this cable a drop? The catalogue says so, on the one field a drop is bought for.
+ *
+ * `use` is catalogue metadata (`parts/cable/*.json`, validated by `parts.js`), and it is the only
+ * place the difference between a drop and a feeder is written down. A model check would do for the
+ * two drop models in the catalogue today and break silently at the third.
+ */
+function isDropCable(cable) {
+  return Array.isArray(cable.use) && cable.use.indexOf('drop') !== -1;
+}
+
+/**
  * The cable for a span that carries `fibres` over `lengthM`.
  *
  * Two fibres over 1.2 km is not a drop: it is a two-fibre cable run, and designing it as drop cable
@@ -1171,6 +1182,46 @@ function bomOf(plant, registry, opts) {
   return { lines: lines, cableM: cableM, designM: designM, fibreMetres: round(fibreMetres, 1) };
 }
 
+/**
+ * Spans the built plant puts on drop cable outside the drop class, one sentence per shape.
+ *
+ * `cableForSpan` already sends a span to the ladder above 300 m or above two fibres; when the ladder
+ * has nothing there, `cableFor` answers with its largest rung, and when that rung is a drop cable the
+ * span is built anyway. `link.cableForFibres` refuses the same shape for a circuit. Here the span
+ * exists in the plant, so the refusal reads it back rather than guessing: the sentence names the
+ * span, the length or fibre count that left the class, and the rung the caller has to add.
+ *
+ * One sentence per shape, not per span: a 40-house feeder is a dozen of them, and a reason list that
+ * repeats one failure buries the other reasons (the same rule `evaluate` applies to ONT failures).
+ */
+function dropClassRefusals(plant, registry) {
+  const seen = new Set();
+  const out = [];
+  for (const span of plant.spans) {
+    const cable = registry.get('cable', span.cable);
+    if (!isDropCable(cable)) continue;
+    const bundles = span.bundles || 1;
+    const fibres = span.strands ? span.strands.length : 0;
+    const addRung = 'add a distribution cable at 12 fibres or more to the ladder';
+    if (bundles > 1) {
+      const key = 'bundle:' + cable.model + ':' + fibres;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push('the cable ladder names no cable that carries ' + fibres + ' fibres: ' + cable.model +
+        ' is a ' + cable.fiberCount + '-fibre drop cable, and a span is not built by bundling drop ' +
+        'cable - ' + span.id + ' needs ' + fibres + ' fibres over ' + span.lengthM + ' m; ' + addRung);
+    } else if (span.lengthM > DROP_CABLE_MAX_M) {
+      const key = 'long:' + cable.model;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push('the cable ladder names no cable that carries ' + span.lengthM + ' m: ' + cable.model +
+        ' is a ' + cable.fiberCount + '-fibre drop cable and drop cable is the last leg, at most ' +
+        DROP_CABLE_MAX_M + ' m - ' + span.id + ' is ' + span.lengthM + ' m; ' + addRung);
+    }
+  }
+  return out;
+}
+
 function evaluate(plant, opts, registry, meta) {
   const structural = network.validate(plant, registry);
   const budgets = network.allOntBudgets(plant, registry, { marginDb: opts.marginDb, direction: 'down' });
@@ -1219,6 +1270,13 @@ function evaluate(plant, opts, registry, meta) {
       unresolved.slice(0, 5).join(', ') + (unresolved.length > 5 ? ', ...' : ''));
   }
   if (!structural.ok) Array.prototype.push.apply(reasons, structural.errors);
+  // The plant may be built, budgeted and still wrong in a way no validator clause covers: a span
+  // longer than a drop, or carrying more fibres than its cable, that the ladder answered with drop
+  // cable because `cableFor` falls back to the largest rung. That is how a 494.8 m feeder came out as
+  // six bundled 2-fibre drop cables and ranked `ok` (gh#127). Drop cable is the last leg: at most
+  // `DROP_CABLE_MAX_M`, at most two fibres, one cable. A span outside that is a candidate refusal
+  // naming the rung that cannot buy it - not a silent BOM of drums nobody pulls.
+  Array.prototype.push.apply(reasons, dropClassRefusals(plant, registry));
   failures.slice(0, 5).forEach(function (f) {
     reasons.push((f.name || f.ont) + ': ' + (f.error || (f.result && f.result.reasons.join('; '))));
   });
