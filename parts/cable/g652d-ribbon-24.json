@@ -1,0 +1,27 @@
+{
+  "kind": "cable",
+  "model": "g652d-ribbon-24",
+  "vendor": "generic",
+  "label": "G.652.D ribbon 24F",
+  "fiberCount": 24,
+  "fibersPerTube": 12,
+  "construction": "ribbon",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "drumM": 2000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Two ribbons of 12, one ribbon per tube position - the addressing g652d-ribbon-96, -144 and -216 already assume, two ribbon units rather than eight. 24F is a stocked ribbon count, not an invented one: g652d-ribbon-96's row cites Lightera/Prysmian's AccuRibbon DC ordering table, whose standard fibre counts run 24, 48, 72, 96, 120, 144, 216, 288, 432, 864, and this row is the first entry of that table. Why this rung exists: the ribbon family shipped 96/144/216/288/432, so a ladder built only from ribbon rows had no answer below 95 fibres and design.cableForSpan's smallest-that-fits rule answered g652d-ribbon-96 for a 12-, 24- or 48-fibre span. Measured on this engine: an 18-ONT PON estate on ladder [g652d-ribbon-432, -288, -216, -144, -96] bills 148,752.0 fibre-metres with all 37 spans on 96F ribbon, including a 619.3 m feeder carrying 12 strands; with the 24/48/72 rungs named in the same ladder it bills 37,188.0 and every span answers g652d-ribbon-24. A ribbon-only ladder names no drop rung, so one-fibre drop spans take this rung as well - name g657a2-drop-2 in the ladder if a drop product is what you stock. `use` carries `distribution` as well as `feeder`, matching the loose-tube rung at the same count; the ribbon rows at 96 fibres and above are feeder-only because those counts are trunks. Attenuation is typical installed performance, not a G.652.D limit: 0.35 dB/km at 1310 nm sits under the recommendation's 0.40 dB/km maximum (1310-1625 nm) and 0.21 dB/km at 1550 nm under its 0.30 dB/km maximum (1530-1565 nm). 1490 nm is interpolated: no ITU-T recommendation publishes a 1490 nm attenuation figure of its own, so 0.22 dB/km is a typical value bridging the two published windows and is not a citation. drumM is 2,000 m because the 96/144/216 ribbon rows floor there; a 24F ribbon is often put up longer, so set drumM to the reel actually ordered rather than reading this as a put-up figure. This row is not in DEFAULT_LADDER (no ribbon row is), so it reaches a design through the design ladder option or an engine change to the default; the part alone does not re-rank existing designs. Replace all three attenuation figures with the bought cable's test report for a construction-grade budget.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.652/en",
+  "tags": [
+    "generic",
+    "g.652.d",
+    "ribbon"
+  ]
+}
