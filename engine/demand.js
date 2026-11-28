@@ -15,6 +15,7 @@
  */
 
 const geo = require('./geo');
+const demandText = require('./demand-text');
 
 const LAT_NAMES = ['lat', 'latitude', 'y'];
 const LON_NAMES = ['lon', 'lng', 'long', 'longitude', 'x'];
@@ -242,6 +243,11 @@ function parseCsv(text, opts) {
   };
 }
 
+/** The row's own words, for a rejection's `text`: the address when it has one, else the label. */
+function rowText(row) {
+  return demandText.renderValue(isMissing(row.address) ? row.label : row.address);
+}
+
 function parseArray(rows) {
   const points = [];
   const rejected = [];
@@ -251,24 +257,39 @@ function parseArray(rows) {
       return;
     }
     if (isMissing(row.lat) || isMissing(row.lon)) {
-      rejected.push({ row: i + 1, reason: 'latitude or longitude is empty', text: row.address || row.label || '' });
+      rejected.push({ row: i + 1, reason: 'latitude or longitude is empty', text: rowText(row) });
       return;
     }
     const lat = numberOrNull(row.lat);
     const lon = numberOrNull(row.lon);
     if (lat === null || lon === null) {
-      rejected.push({ row: i + 1, reason: 'latitude/longitude are not numbers', text: row.address || row.label || '' });
+      rejected.push({ row: i + 1, reason: 'latitude/longitude are not numbers', text: rowText(row) });
       return;
     }
     if (!geo.isCoordinate({ lat: lat, lon: lon })) {
-      rejected.push({ row: i + 1, reason: 'lat/lon out of range', text: row.address || row.label || '' });
+      rejected.push({ row: i + 1, reason: 'lat/lon out of range', text: rowText(row) });
       return;
     }
-    // A label becomes the node's name in the design and is printed there (`web/scene.js` draws it,
-    // the splice page titles itself with it), so it is text. `{ label: 5 }` used to name the ONT
-    // node `5`, and the plant then carried a number where every reader expects a string.
-    const label = row.label || row.name || null;
-    points.push({ label: label === null ? null : String(label), address: row.address || null, lat: lat, lon: lon });
+    // A label and an address both become node names in the design and are printed there
+    // (`web/scene.js` draws them, the splice page titles itself with them), so both are text.
+    // `{ label: 5 }` used to name the ONT node `5`; `{ address: 5 }` was not stringified at all,
+    // so one numeric house number made every candidate fail validation with a node id and no row.
+    // `engine/demand-text.ts` is the one rule for both fields: a string is itself (blank is absent),
+    // a finite number is its decimal text, anything else is refused by row and field.
+    const labelValue = isMissing(row.label) ? row.name : row.label;
+    const label = isMissing(labelValue)
+      ? { ok: true, text: null }
+      : demandText.textField(labelValue, 'label');
+    if (label.ok === false) {
+      rejected.push({ row: i + 1, reason: label.reason, text: demandText.renderValue(labelValue) });
+      return;
+    }
+    const address = demandText.textField(row.address, 'address');
+    if (address.ok === false) {
+      rejected.push({ row: i + 1, reason: address.reason, text: demandText.renderValue(row.address) });
+      return;
+    }
+    points.push({ label: label.text, address: address.text, lat: lat, lon: lon });
   });
   return { points: points, rejected: rejected };
 }
