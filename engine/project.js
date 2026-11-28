@@ -329,9 +329,10 @@ function summary(project, registry) {
     nodes: (project.nodes || []).length,
     spans: (project.spans || []).length,
     onts: (project.nodes || []).filter(function (n) { return isEntry(n) && n.type === 'ont'; }).length,
-    routeM: Math.round((project.spans || []).reduce(function (n, s) {
-      return n + (isEntry(s) && s.lengthM ? s.lengthM : 0);
-    }, 0) * 10) / 10,
+    // The plant's own sum, not a second rule: `n + "100"` concatenates, so this line read two
+    // hand-edited 100 m spans as 100100 m while `stats.routeM` beside it read 0 (both are under
+    // `GET /api/projects/:id`'s `derived`). See `network.routeLengthM` - one definition.
+    routeM: Math.round(network.routeLengthM(project) * 10) / 10,
     capacity: registry ? network.capacity(project, registry) : null
   };
 }

@@ -926,9 +926,31 @@ function validate(plant, registry) {
   return { ok: errors.length === 0, errors: errors, warnings: warnings };
 }
 
+/**
+ * Every span's measured length, in metres - and only the spans that carry a length.
+ *
+ * One definition, two callers: `stats` and `project.summary` answer the same question about the same
+ * plant, and they used to answer it with two rules. `GET /api/projects/:id` carries both under
+ * `derived`, and `summary` tested the length for truthiness, so a project file whose span carried
+ * `"lengthM": "100"` - a hand edit, or a tool that stringified the number - was summed by JavaScript's
+ * `+`, which concatenates a string: two 100 m spans answered **100100 m** in `derived.summary.routeM`
+ * while `derived.stats.routeM` beside it answered 0 and `derived.errors` named both spans
+ * ("has no measured length"). `Infinity` read
+ * the same way in the other direction, and a non-finite sum is not a route either.
+ *
+ * A length that is not a number is not a length, and the plant already says so: this is the rule
+ * `validate` refuses with, so the counts agree with the refusal instead of inventing metres beside it.
+ * A `null` among the spans is skipped here too - `validate` names that entry, and the summary is
+ * built for the same project, so it must not dereference it.
+ */
+function routeLengthM(plant) {
+  const spans = (plant && Array.isArray(plant.spans)) ? plant.spans : [];
+  return spans.reduce(function (n, s) { return n + (isEntry(s) && isNum(s.lengthM) ? s.lengthM : 0); }, 0);
+}
+
 function stats(plant, registry) {
   const spans = plant.spans || [];
-  const routeM = spans.reduce(function (n, s) { return n + (isEntry(s) && isNum(s.lengthM) ? s.lengthM : 0); }, 0);
+  const routeM = routeLengthM(plant);
   return {
     nodes: (plant.nodes || []).length,
     spans: spans.length,
@@ -1167,5 +1189,6 @@ module.exports = {
   nameProblem: nameProblem,
   isSpanCount: isSpanCount,
   isBundleCount: isBundleCount,
+  routeLengthM: routeLengthM,
   stats: stats
 };
