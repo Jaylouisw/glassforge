@@ -329,6 +329,34 @@ function options(input, registry) {
     belowMin: 'A negative overlength quotes less cable than the route measures, which is a BOM nobody ' +
       'can pull.'
   });
+  // The clustering pass count is read - and a value the loop cannot use is refused, not run and not
+  // defaulted. This key was in DESIGN_OPTION_FIELDS from the first version of the guard and the design
+  // never read it: every call ran `DEFAULTS.kmeansIterations` whatever the caller sent, which is the
+  // silent fallback the guard beside it exists to prevent ("A design option the engine ignores does
+  // not narrow or widen anything"). A correctly spelled key that changes nothing is the one mistake a
+  // near-miss check cannot see.
+  //
+  // It moves real numbers. Measured on thirteen houses on an L (eight down one street, five along the
+  // other, the head end at the corner): one pass leaves the 1:8 candidate on 4 splitter sites and
+  // 14,812.2 fibre-metres, the 8-pass default on 2 sites and 13,555 - a different plant, and a
+  // different ranking on the default objective.
+  //
+  // It is a count of passes, so a fraction is not one of them (the loop runs `iteration < maxIterations`,
+  // so 1.5 silently means two), and zero is worse than no passes at all: with `maxIterations: 0` the
+  // assignment pass never runs, `clusterPoints` answers no clusters, and the candidate comes back with
+  // 0 ONT, 0 spans and `feasible: true` - a design that reaches nobody, ranked first on 0 fibre-metres.
+  designFields.assertNumberField(o, 'kmeansIterations', 1, 'the design', {
+    measure: 'a whole number of clustering passes',
+    unusable: 'A pass count the design cannot read falls back to ' + DEFAULTS.kmeansIterations +
+      ', so a caller who narrowed the search still gets every candidate clustered the default way.',
+    belowMin: 'Zero passes assigns nothing: the clustering answers no clusters and the candidate is a ' +
+      'plant with no ONT, ranked feasible on 0 fibre-metres.'
+  });
+  if (isNum(o.kmeansIterations) && !Number.isInteger(o.kmeansIterations)) {
+    throw new TypeError('the design reads "kmeansIterations" as a whole number of clustering passes and ' +
+      'got ' + o.kmeansIterations + '. The loop runs `iteration < maxIterations`, so a fraction is ' +
+      'rounded up into a count nobody chose - name the passes you want (e.g. 8).');
+  }
   designFields.assertChoiceField(o, 'technology', ['auto', 'pon', 'active'], 'the design', {
     wrong: 'A technology it cannot place is refused rather than searched: "PON" is not "pon", and the ' +
       'answer to it was "no candidate topology could be built", which blames the estate for a typo.'
@@ -363,7 +391,7 @@ function options(input, registry) {
     ladderSupplied: Array.isArray(o.ladder) && o.ladder.length > 0,
     overlengthPct: isNum(o.overlengthPct) ? o.overlengthPct : DEFAULTS.overlengthPct,
     costs: costModel(o.costs),
-    kmeansIterations: DEFAULTS.kmeansIterations,
+    kmeansIterations: isNum(o.kmeansIterations) ? o.kmeansIterations : DEFAULTS.kmeansIterations,
     includeAllPlants: !!o.includeAllPlants
   };
 }
