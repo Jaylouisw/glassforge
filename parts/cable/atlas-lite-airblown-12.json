@@ -1,0 +1,28 @@
+{
+  "kind": "cable",
+  "model": "atlas-lite-airblown-12",
+  "vendor": "STL",
+  "label": "STL Atlas Lite air-blown 12F, 2.3 mm",
+  "fiberCount": 12,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.657.A2",
+  "use": [
+    "distribution"
+  ],
+  "drumM": 4000,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.26,
+    "1550": 0.23
+  },
+  "notes": "The duct cable: twelve fibres in one 2.3 mm gel-filled unitube, installed by blowing into a single or bundled microduct - the product a route measured over an imported duct graph actually buys, which the catalogue did not stock (its other 12F rows are outdoor loose-tube on a 2 km drum and an indoor riser on a 4.1 km reel). The sheet offers the same design in G.652.D, G.657.A1 or G.657.A2; this row prices the G.657.A2 build, because a blown cable is bent hard at a chamber and the bend-insensitive grade is the one sold for it. Attenuation here is the sheet's MAXIMUM cabled attenuation, not a typical: 0.35 dB/km at 1310 nm and 0.23 dB/km at 1550 nm, so a budget built on this row is a worst case rather than a best one. The sheet publishes no 1490 nm figure, and a PON downstream is budgeted at 1490; the 0.26 dB/km in this row is the straight line between the two published maxima - 0.23 + (0.35 - 0.23) x (1550 - 1490) / (1550 - 1310) = 0.26 - and is nobody's measurement, so it must not be read as a vendor figure. `drumM` is the sheet's standard length multiple, 4 km, and it rounds in 4 km steps: a 5.5 km duct run bills 8 km of this cable where 2 km drums bill 6 km. `use` deliberately carries no drop: an air-blown cable is not a house drop and must never be selected for a sub-300 m span. Replace all three attenuation figures with the test report of the cable actually purchased before ordering.",
+  "sourceUrl": "https://www.stl.tech/pdf/OFC-Briefcase-Datasheet-QR-Code/12/12F%20G657A1%20Air%20Blown%20Optical%20Fiber%20Cable.pdf",
+  "tags": [
+    "stl",
+    "air-blown",
+    "microduct",
+    "duct",
+    "g.657.a2"
+  ]
+}
