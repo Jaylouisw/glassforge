@@ -181,7 +181,12 @@ function apply(project, operation, opts) {
           : Array.isArray(input.strands) ? input.strands.slice() : input.strands,
         splices: splices,
         closures: closures,
-        route: Array.isArray(input.route) ? input.route : null
+        // The drawn route is geometry, and the gate (network.validate) is what reads it - the
+        // same rule as strands above. Coercing a non-list to null here was a 200 that dropped the
+        // caller's field; a list is copied so the stored plant does not alias the request body,
+        // and anything else goes through untouched so the write names it.
+        route: input.route === undefined ? null
+          : Array.isArray(input.route) ? input.route.slice() : input.route
       };
       if (input.bundles !== undefined) span.bundles = input.bundles;
       if (input.dropReserveM !== undefined) span.dropReserveM = input.dropReserveM;

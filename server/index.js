@@ -810,9 +810,15 @@ function planSvg(project) {
     const a = placed.get(span.from);
     const b = placed.get(span.to);
     if (!a || !b || !a.placed || !b.placed) continue;
-    if (Array.isArray(span.route) && span.route.length > 2) {
+    // A project stored before the route gate (network.validate) may carry a point no projector can
+    // place. This page draws the points it can and falls back to the node-to-node line, so one bad
+    // entry cannot turn the plan a crew signs off into a 500 (gh#149).
+    const routePoints = Array.isArray(span.route)
+      ? span.route.filter(function (point) { return engine.geo.isCoordinate(point); })
+      : [];
+    if (routePoints.length > 2) {
       // A routed span is drawn along its street geometry, exactly as the canvas draws it.
-      const points = scene.projectPoints(span.route, {
+      const points = scene.projectPoints(routePoints, {
         width: width, height: height, scale: transform.scale, centre: transform.centre
       }).map(function (p) { return p.x + ',' + p.y; }).join(' ');
       parts.push('<polyline points="' + points + '" fill="none" stroke="#3d4b5a" stroke-width="2.5" ' +
