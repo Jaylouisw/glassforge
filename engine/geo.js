@@ -26,6 +26,9 @@ exports.EARTH_RADIUS_M = 6371008.8;
 function toRad(deg) {
     return (deg * Math.PI) / 180;
 }
+function toDeg(rad) {
+    return (rad * 180) / Math.PI;
+}
 /**
  * Type guard for anything that claims to be a coordinate. Takes `unknown` because the callers are
  * unmigrated JavaScript and API JSON: this function is the boundary where that gets checked.
@@ -58,13 +61,27 @@ function pathLengthM(points) {
         total += distanceM(pts[i - 1], pts[i]);
     return total;
 }
+/**
+ * The smallest box that covers the points - and a box that crosses the antimeridian says so.
+ *
+ * Latitude is a plain min/max. Longitude is not: min/max of 179.9 and -179.9 is a box 359.8 deg
+ * wide, so an estate either side of 180 was reported as covering the whole planet - the same raw
+ * subtraction `lonDelta` exists to refuse. The covered arc is the complement of the widest gap
+ * between the sorted longitudes, and when that gap is an interior one the box runs east from
+ * `minLon`, through 180, to `maxLon`, so **`minLon > maxLon` means the box crosses the
+ * antimeridian**. Width is `lonDelta(minLon, maxLon)`, and membership is
+ * `lonDelta(minLon, lon) <= lonDelta(minLon, maxLon)`; a raw `minLon <= lon <= maxLon` test is only
+ * valid on a box that does not cross.
+ *
+ * A tie between gaps keeps the wrap gap, so nothing about an ordinary drawing moves: longitudes
+ * that do not straddle 180 keep exactly the min/max they always had.
+ */
 function bbox(points) {
     if (!points || !points.length)
         return null;
     let minLat = Infinity;
     let maxLat = -Infinity;
-    let minLon = Infinity;
-    let maxLon = -Infinity;
+    const lons = [];
     for (const p of points) {
         if (!isCoordinate(p))
             continue;
@@ -72,26 +89,55 @@ function bbox(points) {
             minLat = p.lat;
         if (p.lat > maxLat)
             maxLat = p.lat;
-        if (p.lon < minLon)
-            minLon = p.lon;
-        if (p.lon > maxLon)
-            maxLon = p.lon;
+        lons.push(p.lon);
     }
     if (minLat === Infinity)
         return null;
-    return { minLat: minLat, maxLat: maxLat, minLon: minLon, maxLon: maxLon };
+    lons.sort(function (a, b) { return a - b; });
+    // The gap that wraps through 180 first: if it is the widest, the box does not cross and its
+    // min/max are the plain sorted ends.
+    let widest = lons[0] + 360 - lons[lons.length - 1];
+    let start = 0;
+    for (let i = 1; i < lons.length; i++) {
+        const gap = lons[i] - lons[i - 1];
+        if (gap > widest) {
+            widest = gap;
+            start = i;
+        }
+    }
+    if (start === 0) {
+        return { minLat: minLat, maxLat: maxLat, minLon: lons[0], maxLon: lons[lons.length - 1] };
+    }
+    return { minLat: minLat, maxLat: maxLat, minLon: lons[start], maxLon: lons[start - 1] };
 }
+/**
+ * The centre of a set of points, with longitude averaged the short way round.
+ *
+ * Longitude is an angle, so its mean is the mean *direction*, not the arithmetic mean of the
+ * numbers: the midpoint of 179.9 and -179.9 is the meridian, and adding the two and halving put a
+ * Fiji estate's centre on the prime meridian, 20000 km from every house. Latitude still averages
+ * plainly, because it is not periodic.
+ *
+ * A set spread evenly round the planet has no centre - the vector sum vanishes and the direction is
+ * arbitrary. It resolves to 0 deg deterministically rather than throwing, because a centre is a
+ * reporting convenience, not a figure anything is planned against.
+ */
 function centroid(points) {
     const pts = (points || []).filter(isCoordinate);
     if (!pts.length)
         return null;
+    if (pts.length === 1)
+        return { lat: pts[0].lat, lon: pts[0].lon };
     let lat = 0;
-    let lon = 0;
+    let sin = 0;
+    let cos = 0;
     for (const p of pts) {
         lat += p.lat;
-        lon += p.lon;
+        sin += Math.sin(toRad(p.lon));
+        cos += Math.cos(toRad(p.lon));
     }
-    return { lat: lat / pts.length, lon: lon / pts.length };
+    const lon = sin === 0 && cos === 0 ? 0 : toDeg(Math.atan2(sin, cos));
+    return { lat: lat / pts.length, lon: wrapLon(lon) };
 }
 /**
  * Longitude difference `to - from` taken the short way round, in (-180, 180].
@@ -185,9 +231,13 @@ function pointAt(points, fraction) {
         const seg = distanceM(pts[i - 1], pts[i]);
         if (walked + seg >= target) {
             const t = seg === 0 ? 0 : (target - walked) / seg;
+            // Longitude moves the short way: a route from 179.9 to -179.9 is 0.2 deg long, and its
+            // midpoint is on the meridian, not half way round the planet at 0 deg. Ordinary routes have
+            // a `lonDelta` equal to the plain difference, so nothing linear moves.
+            const dLon = lonDelta(pts[i - 1].lon, pts[i].lon);
             return {
                 lat: pts[i - 1].lat + (pts[i].lat - pts[i - 1].lat) * t,
-                lon: pts[i - 1].lon + (pts[i].lon - pts[i - 1].lon) * t
+                lon: wrapLon(pts[i - 1].lon + dLon * t)
             };
         }
         walked += seg;
