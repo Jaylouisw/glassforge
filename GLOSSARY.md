@@ -24,9 +24,11 @@ the validator and by the BOM by span and by field.
 
 Bundling buys **distribution or feeder cable, never a drop rung**. Drop cable is the last leg: legal
 only at or below `DROP_CABLE_MAX_M` (300 m, `engine/design.js`) with at most two fibres and one
-cable. A span outside that class — more fibres than the drop rung carries, or longer than 300 m —
-is not built out of bundled drop cable: the candidate is refused by name and the sentence says which
-rung is missing (the `dropClassRefusals` check in `engine/design.js`).
+cable. A span that cannot be built that way goes **up the ladder** to the smallest cable that carries
+it (a 4-fibre 100 m span on the default ladder is `g652d-loose-12`, not a refusal), and is refused by
+name only when the ladder has nothing bigger than the drop rung, so neither the fibres nor a leg over
+300 m can leave the drop class — the `dropClassRefusals` check in `engine/design.js` names the rung to
+add.
 
 **Head end** — where the provider's signal starts. `olt` for a PON, `headend` for an active
 point-to-point or active-over-tree design. The root node type selects the budget that is applied.

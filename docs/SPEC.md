@@ -144,12 +144,14 @@ sets it above one when the span's fibres do not fit the largest cable in the lad
 and the strand ledger both count every cable, while `routeM` stays the measured route.
 
 Bundles multiply a **distribution or feeder** cable; a drop rung is not bundled. Drop cable is the last
-leg, legal only at or below `DROP_CABLE_MAX_M` (300 m) with at most two fibres and one cable, so a span
-that needs more fibres than its drop rung carries, or more than 300 m of it, is a refused candidate, not
-a bundle: the reason names the span, the figure that left the class and the rung to add — e.g. `the cable
-ladder names no cable that carries 12 fibres: g657a2-drop-2 is a 2-fibre drop cable, and a span is not
-built by bundling drop cable - f-root-site-1 needs 12 fibres over 454.9 m; add a distribution cable at 12
-fibres or more to the ladder`.
+leg, legal only at or below `DROP_CABLE_MAX_M` (300 m) with at most two fibres and one cable. A span that
+cannot be built that way is not bundled out of drop cable: it goes **up the ladder** to the smallest cable
+that carries it — a 4-fibre 100 m span on the default ladder selects `g652d-loose-12`, not a refusal — and
+the candidate is refused by name only when the ladder has nothing bigger than the drop rung, so neither
+the fibres nor a leg over `DROP_CABLE_MAX_M` can leave the drop class. The reason names the span, the
+figure that left the class and the rung to add — e.g. `the cable ladder names no cable that carries 12
+fibres: g657a2-drop-2 is a 2-fibre drop cable, and a span is not built by bundling drop cable -
+f-root-site-1 needs 12 fibres over 454.9 m; add a distribution cable at 12 fibres or more to the ladder`.
 
 ## 6. Strands are addressed the way the tray is
 
