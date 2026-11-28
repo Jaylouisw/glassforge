@@ -80,6 +80,25 @@ Operations for `/ops`:
 
 A refused operation returns `400` with the reason and leaves the saved project untouched.
 
+A node is placed at `lat` **and** `lon`, or at neither: `null` on both is the legitimate "not placed on a
+map yet" state, and half a pair would be drawn at the centre of the canvas rather than where the node is.
+The edit enforces the pair where the value is still visible, so each of these is a `400` on the edit
+itself, not an error surfaced by the next `GET`:
+
+- `lng` is refused by name rather than dropped: `node.lng is not a field this model reads - did you mean
+  "lon"?` A node is placed at `lat` and `lon`; a longitude under the key most map libraries use was
+  stored as a node with no longitude and answered `200`.
+- one axis without the other — `add-node` with `lat` alone or `lon` alone, and an `update-node` patch
+  that sets one axis of an unplaced node: `node "n1" is placed with a latitude and no longitude - lat and
+  lon are one placement (null on both means "not on a map yet"), so a node is placed at both or neither`.
+  `{ "lat": null, "lon": null }` is still how a node is taken off the map.
+- a coordinate that is not a number in range: `lat: "51.5"` → `node.lat must be a number between -90 and
+  90, got "51.5"`; `lat: 91` → `... got 91`. `move-node` applies the same rule to both axes (`move-node.lat
+  must be a number between -90 and 90, got 999`).
+- `PUT` and a hand-edited file reach the same rule through `network.validate`, so a project stored with
+  `lat` and `lon: null` is refused with the "a node is at both or neither" sentence; `null` on both is
+  not a coordinate error.
+
 `summary.capacity` carries the OLT's limits (`ports`, `maxSplitRatio`, `splitterCascade`,
 `theoreticalMaxOnts`) and, per splitter site, `splitterPorts: [{ node, name, model, ratio,
 portsUsed, overbooked }]` — the ratio is the cassette's output count and `portsUsed` is the fibres
