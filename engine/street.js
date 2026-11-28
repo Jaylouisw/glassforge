@@ -43,23 +43,20 @@ function round(n, places) {
 }
 function cmp(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
 
-/** Accept the several shapes a caller may hand us and return `[{ id, coords }]`. */
+/**
+ * Accept the several shapes a caller may hand us and return `[{ id, coords }]` - or refuse an edge
+ * it cannot read, by position, id and value (`normaliseLine`), never by shortening it or dropping it.
+ */
 function parseNetwork(input) {
   if (!input) throw new Error('no network geometry: supply edges or KML');
 
   if (typeof input === 'string') {
     return fromKml(input);
   }
-  if (Array.isArray(input)) {
-    return input.map(function (line, i) { return normaliseLine(line, i); }).filter(Boolean);
-  }
+  if (Array.isArray(input)) return normaliseLines(input);
   if (input.kml) return fromKml(input.kml);
-  if (Array.isArray(input.edges)) {
-    return input.edges.map(function (edge, i) { return normaliseLine(edge, i); }).filter(Boolean);
-  }
-  if (Array.isArray(input.routes)) {
-    return input.routes.map(function (route, i) { return normaliseLine(route, i); }).filter(Boolean);
-  }
+  if (Array.isArray(input.edges)) return normaliseLines(input.edges);
+  if (Array.isArray(input.routes)) return normaliseLines(input.routes);
   throw new Error('network geometry must be KML text, an array of polylines, or { edges: [...] }');
 }
 
@@ -89,12 +86,61 @@ function fromKml(text) {
   return lines;
 }
 
-function normaliseLine(line, i) {
+function normaliseLines(list) {
+  return list.map(function (line, i) { return normaliseLine(line, i, list.length); });
+}
+
+/** How a bad value looked, so the user can find the cell: `""`, `null`, `51.5`, `undefined`. */
+function showValue(value) {
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'number') return String(value);
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  return typeof value;
+}
+
+/**
+ * One imported edge, or a refusal that names it.
+ *
+ * The filter that used to live here kept the coordinates it could read and joined the street across
+ * the gap: measured on this engine, a three-point street of two 692.6 m legs whose middle vertex
+ * carried a blank longitude (a blank spreadsheet cell) imported as ONE straight 692.2 m edge - 693 m
+ * of street gone, and the vertex that should have been a node was not one, so a property beside it
+ * was refused as "not on the street network": the candidate's symptom named, not the geometry fault
+ * the importer had already seen. A line whose every vertex was unreadable was dropped and not
+ * counted, so an import with one good road and one unreadable one answered `edges: 1` and said
+ * nothing about the missing road (gh#195).
+ *
+ * So an edge that cannot be read is refused here, by position and by value, before anything is
+ * measured. That is the same rule the KML reader applies one layer up (an unreadable placemark is
+ * named, not only counted, gh#176) and the same rule the BOM applies to a span: one undefendable
+ * metre spoils the design, so the answer is a 400 the caller can act on, never a shorter street.
+ */
+function normaliseLine(line, i, total) {
+  const where = 'edge ' + (i + 1) + ' of ' + total +
+    (line && typeof line.id === 'string' && line.id ? ' "' + line.id + '"' : '');
   const coords = line && (line.coords || line.points || line.geometry);
-  if (!Array.isArray(coords) || coords.length < 2) return null;
-  const clean = coords.filter(function (p) { return geo.isCoordinate(p); })
-    .map(function (p) { return { lat: p.lat, lon: p.lon }; });
-  if (clean.length < 2) return null;
+  if (!Array.isArray(coords)) {
+    throw new TypeError('network ' + where + ' has no coordinates - an edge needs a `coords` array ' +
+      'of at least two { lat, lon } points');
+  }
+  if (coords.length < 2) {
+    throw new TypeError('network ' + where + ' has ' + coords.length + ' coordinate' +
+      (coords.length === 1 ? '' : 's') + ' - a street edge needs at least two { lat, lon } points');
+  }
+  const clean = [];
+  for (let k = 0; k < coords.length; k++) {
+    const p = coords[k];
+    if (!geo.isCoordinate(p)) {
+      const got = p && typeof p === 'object'
+        ? 'lat ' + showValue(p.lat) + ', lon ' + showValue(p.lon)
+        : (p === null ? 'null' : 'a ' + typeof p);
+      throw new TypeError('network ' + where + ' has a coordinate that is not { lat, lon } at point ' +
+        (k + 1) + ' of ' + coords.length + ' (' + got + ') - dropping it would join the street ' +
+        'across the gap and measure a route that is not there');
+    }
+    clean.push({ lat: p.lat, lon: p.lon });
+  }
   return { id: line.id || 'e' + i, coords: clean };
 }
 
