@@ -178,9 +178,16 @@ function cableToBuy(opts) {
     overlengthPct: overlengthPct,
     overlengthM: overlengthM,
     splices: splices,
-    spliceReserveM: spliceReserveTotalM,
+    // The rate, not the total. These two keys are what the caller sets (`spliceReserveM: 30` means
+    // 30 m per splice), so the answer has to echo the same quantity under the same name or the
+    // response cannot be fed back: it used to return 2 x 30 = 60 under `spliceReserveM`, and
+    // re-sending that answer doubled the reserve (designM 1150 -> 1330 on a 1 km route). The totals
+    // carry their own names, the way `overlengthPct` (rate) and `overlengthM` (total) already did.
+    spliceReserveM: spliceReserveM,
+    spliceReserveTotalM: spliceReserveTotalM,
     closures: closures,
-    closureReserveM: closureReserveTotalM,
+    closureReserveM: closureReserveM,
+    closureReserveTotalM: closureReserveTotalM,
     dropReserveM: round(dropReserveM, 2),
     minimumPurchaseM: minimumPurchaseM,
     designM: designM,
