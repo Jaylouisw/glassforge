@@ -99,8 +99,12 @@ schedule shows; on a single-cable span the two are equal. An index past `fibersP
 refused by name (`strand index 25 is outside a 2 x 12-fibre bundle (24 fibres)`), never labelled a cable
 that does not exist.
 
-**Drop cable** — the small 1–2 fibre cable used on the last leg, only at or below `DROP_CABLE_MAX_M`
-(300 m). Anything longer goes to the 12-fibre ladder whatever the fibre count.
+**Drop cable** — the last-leg product, which the catalogue marks with `use: ["drop"]` rather than by its
+fibre count: `g657a2-drop-1`, `-2` and `-4` all ship, and a drop rung is taken at any count it carries,
+only at or below `DROP_CABLE_MAX_M` (300 m). The rung must be in the caller's ladder: `DEFAULT_LADDER`
+lists the 1- and 2-fibre rungs and not `g657a2-drop-4`, so a four-fibre short span is 12-fibre loose tube
+until that rung is stocked (open in gh#155). Anything longer goes to the ladder's 12-fibre floor whatever
+the fibre count.
 
 **Part** — a catalogue entry under `parts/<kind>/<model>.json`, carrying its figures, a `sourceUrl` and
 `notes` saying where each figure came from.
