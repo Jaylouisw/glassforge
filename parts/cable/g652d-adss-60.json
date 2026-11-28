@@ -1,0 +1,29 @@
+{
+  "kind": "cable",
+  "model": "g652d-adss-60",
+  "vendor": "Corning",
+  "label": "Corning ADSS 60F aerial, G.652.D",
+  "fiberCount": 60,
+  "fibersPerTube": 12,
+  "construction": "loose-tube",
+  "fiberStandard": "G.652.D",
+  "use": [
+    "feeder",
+    "distribution"
+  ],
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Corning 060ELE-T3322A20 product spec sheet (Corning Optical Communications ecatalog, revision date 2026-11-28): “Aerial Dielectric Self-Supporting Cable, ADSS 60 F, Single-mode (OS2), A-D2Y(T)2Y, (5 x 12)”. Five active loose tubes of 12 in twelve tube positions with seven filling elements, dielectric central element, dry core held by swellable elements, non-metallic strength members over the core, black polyethylene jacket, halogen-free; 15.1 mm nominal diameter, 161 kg/km, crush 3000 N/10 cm, max tensile 1700 N long-term / 4000 N short-term, min bend radius 265 mm installation / 225 mm operation, -5 to +50 C installation and -40 to +70 C operating and storage, Telcordia tube and fibre colour code, ITU-T G.652.D / IEC 60793-2-50 B1.3 fibre, cable cutoff 1260 nm, mode-field diameter 9.2 um at 1310 nm and 10.4 um at 1550 nm, dispersion <= 18 ps/(nm km) at 1550 nm and <= 22 at 1625 nm, PMD link design value <= 0.06 ps/sqrt(km). Why the row exists: the aerial ladder is 12/24/48/72/96/144, so a span over 48 fibres and no more than 72 was bought as 72F - 12 to 23 fibres spare, and a 60-fibre run paid for a whole tube it cannot fill. Measured on this engine, design.cableForSpan(56, 1200, ladder, registry) answers g652d-adss-72 on a ladder carrying the aerial rungs; with this row it answers 60F, 4 spare fibres instead of 16. 56 strands is a 28-house active tree at two strands a house, or a 48-drop site with a tube of spares - the count an aerial distribution run reaches when the 48F rung is short by a tube. Same 12-position stranded build and the same mechanicals as the 12/24/36/48F rows, and the filling elements run 11 minus the active tubes (ten at 24F, nine at 36F, eight at 48F, seven here); 60 = 5 x 12 is the vendor’s own build, not a ladder rounded to a multiple, and the part number in sourceUrl resolves to this sheet. Attenuation, and exactly what kind of figure it is: the sheet publishes MAXIMA only, 0.36 dB/km at 1310 nm, 0.36 at 1383 nm and 0.22 at 1550 nm, and no 1490 nm figure at all. This row carries 0.35 / 0.22 / 0.21, the same typical installed row g652d-adss-12, -24 and -48 carry, so an aerial span is budgeted on the same footing as its duct neighbours; 1490 nm is interpolated between the two published windows and is not a citation from Corning or ITU-T. Corning’s 0.36 at 1310 nm sits 0.01 dB/km above the 0.35 here: hold the supplier to 0.36 in acceptance and read the as-built OTDR before signing. drumM is deliberately absent, the family decision the 12/24/48/72 rows record: the sheet prints “Max. cable length per reel/drum 6000 m” in its Dimensions block, a ceiling rather than a put-up, and declaring it bills a 6 km reel for a short aerial spur - measured on engine/length.js for the sibling rows, 0.7 km of route buys 6,000 m at a 6000 m drum against 2,000 m at the engine default, and 12 km buys 18,000 against 14,000, the two agreeing only between 4.8 and 6 km. With no drumM the engine falls back to engine/length.js’s 2,000 m and the BOM row carries 2,000 m with no field saying whether that is a drum or the engine default, so enter the reel actually ordered. What is not modelled, and worth knowing before it bites: CABLE_USES has no “aerial” value, so nothing in the planner knows this cable hangs from poles - the tags and this note carry it - and no span, sag, ice or wind loading check exists, so a design will run the row over any span drawn and the pole-to-pole distance stays the planner’s decision; nothing metallic means nothing to bond or earth at a joint. Tie-break trap: cableFor answers with the SMALLEST cable that fits and breaks equal fibre counts on model id, and g652d-adss-* sorts before g652d-loose-*, so a ladder naming both an aerial and a duct rung at the same count buys the aerial one - name the row actually stocked, not both. This row is not in DEFAULT_LADDER (no aerial row is), so the part alone re-ranks nothing: it reaches a design through the design ladder option, or an engine change to the default. One product spec sheet’s figures, not a measured build: replace with the cable actually purchased and its as-built attenuation before ordering.",
+  "sourceUrl": "https://ecatalog.corning.com/optical-communications/AU/en/generate-product-specsheet/060ELE-T3322A20.pdf",
+  "tags": [
+    "corning",
+    "adss",
+    "aerial",
+    "g.652.d",
+    "60f",
+    "dielectric"
+  ]
+}
