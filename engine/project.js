@@ -71,6 +71,26 @@ function placementProblem(input, what) {
     coordinateProblem(what + '.lon', input.lon, LON_LIMIT);
 }
 
+/**
+ * The `id` an operation acts on, or the sentence that names the field it never carried.
+ *
+ * Four ops target an entry that already exists - `update-node`, `move-node`, `remove-node`,
+ * `remove-span` - and each looked up `operation.id` directly. With no `id` that is `undefined`, so
+ * the lookup missed and the refusal read `unknown node "undefined"`: a sentence that names a node
+ * the caller never wrote, sends them through the plant looking for it, and never says the field is
+ * the thing missing. `id: ""` (an untouched `<select>`, a row nobody picked) answered
+ * `unknown node ""` for the same reason. `add-span` refuses a missing `from` by naming the field
+ * and `rename` says `rename needs a name`; this is the same sentence for the same mistake.
+ *
+ * A real id that names nothing is still the caller's target being gone, and that message keeps
+ * quoting the id (`unknown node "n9"`) - the two cases are different mistakes.
+ */
+function opIdProblem(operation, op, action) {
+  const id = operation.id;
+  if (id !== undefined && id !== null && id !== '') return null;
+  return 'operation.id is required - ' + op + ' takes the id of the ' + action;
+}
+
 function cloneState(project) {
   return {
     name: project.name,
@@ -250,6 +270,8 @@ function apply(project, operation, opts) {
     }
 
     case 'update-node': {
+      const idFault = opIdProblem(operation, 'update-node', 'node to update');
+      if (idFault) return fail(idFault);
       const node = next.nodes.find(function (n) { return n.id === operation.id; });
       if (!node) return fail('unknown node "' + operation.id + '"');
       const patch = operation.patch || {};
@@ -288,6 +310,8 @@ function apply(project, operation, opts) {
     }
 
     case 'move-node': {
+      const idFault = opIdProblem(operation, 'move-node', 'node to move');
+      if (idFault) return fail(idFault);
       const node = next.nodes.find(function (n) { return n.id === operation.id; });
       if (!node) return fail('unknown node "' + operation.id + '"');
       // A move is a placement too: `lat: 999` was stored and read back as an invalid latitude only
@@ -303,6 +327,8 @@ function apply(project, operation, opts) {
     }
 
     case 'remove-node': {
+      const idFault = opIdProblem(operation, 'remove-node', 'node to remove');
+      if (idFault) return fail(idFault);
       const exists = next.nodes.some(function (n) { return n.id === operation.id; });
       if (!exists) return fail('unknown node "' + operation.id + '"');
       next.history = snapshot(project, operation.op + ' ' + operation.id, o.now);
@@ -313,6 +339,8 @@ function apply(project, operation, opts) {
     }
 
     case 'remove-span': {
+      const idFault = opIdProblem(operation, 'remove-span', 'span to remove');
+      if (idFault) return fail(idFault);
       const exists = next.spans.some(function (s) { return s.id === operation.id; });
       if (!exists) return fail('unknown span "' + operation.id + '"');
       next.history = snapshot(project, operation.op + ' ' + operation.id, o.now);
