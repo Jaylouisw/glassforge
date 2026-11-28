@@ -22,13 +22,27 @@ test('the 24-drop NAP is 24 adapters plus two feeder entries, and 48 splices', f
   assert.strictEqual(c.trays, 2, 'the double-layer body: splitter/slack layer and splice layer');
 });
 
-test('it is the largest NAP the catalogue holds - 24 drops had no box before it', function () {
+test('the 24-drop box is the rung below 32, and the only NAP with two feeder entries', function () {
+  // This test used to claim nap-24 was the LARGEST NAP in the catalogue ("24 drops had no box before
+  // it"), with nap-16 as the size below. That was true when the row was added and is no longer: a
+  // 32-drop site - one 1:32 splitter's worth of customers, and a ratio in the engine's own default
+  // list - is over-ported on this box (33 cables into 26 ports), so nap-32 now sits above it. A guard
+  // that still forbade a bigger NAP would forbid the row that fixes the 32-drop site, which is a
+  // guard encoding history rather than a rule.
+  // What is still true, and is what nap-24's 26 ports buy: it is the only NAP with TWO feeder entries,
+  // because COMtec's FDB-2-24A terminates two cables - the shape a cascaded site needs (26 cables in,
+  // not 25). nap-32 carries one entry and does not replace this row.
   const naps = registry.all('closure').filter(function (c) { return c.type === 'nap'; })
     .sort(function (a, b) { return b.ports - a.ports || (a.model < b.model ? -1 : 1); });
-  assert.strictEqual(naps[0].model, NAP, 'largest nap by cable ports: ' + naps[0].model);
-  // The sibling is 17 ports (16 drops + one entry); before this row the next size up was a joint.
-  assert.strictEqual(naps[1].model, 'nap-16');
-  assert.strictEqual(naps[1].ports, 17);
+  assert.strictEqual(naps[0].model, 'nap-32', 'largest nap by cable ports: ' + naps[0].model);
+  assert.strictEqual(naps[0].ports, 33);
+  assert.strictEqual(naps[1].model, NAP);
+  assert.strictEqual(naps[1].ports, 26);
+  // Adapters plus entries, per row. Only nap-24 spends two entries.
+  const ADAPTERS = { 'nap-8': 8, 'nap-12': 12, 'nap-16': 16, 'nap-24': 24, 'nap-32': 32 };
+  const twoEntries = naps.filter(function (c) { return c.ports - ADAPTERS[c.model] === 2; })
+    .map(function (c) { return c.model; });
+  assert.deepStrictEqual(twoEntries, [NAP], 'the cascaded box is the two-entry one: ' + twoEntries.join(', '));
 });
 
 /**
