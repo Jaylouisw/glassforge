@@ -136,9 +136,10 @@ comparing what it sent with the graph it got back can see where a segment went. 
 its two halves answers `edges: 2, duplicates: 2`.
 
 `demand` is CSV text or an array of `{ label?, address?, lat, lon }`. Rows without coordinates are
-refused by row number — geocoding is off by default — and the answer carries that parse beside the
-design: `demand` is `{ points, rejected, duplicates, meta, bbox }`, the same summary
-`POST /api/import/demand` returns, with every refused row as `{ row, reason, text }` and `row` the
+refused by row number — geocoding is off by default — and the answer carries that parse's summary
+beside the design: `demand` is `{ points, rejected, duplicates, meta, bbox }`, where `points` is the
+**count** of usable points the design was built from (a number, not the point array
+`POST /api/import/demand` returns), with every refused row as `{ row, reason, text }` and `row` the
 1-based line of the input, header included. A file whose lines 3 and 4 are missing a cell still answers a
 design for the one point that parsed (`demand.points: 1`) with both refusals named; one
 where nothing parsed is a `400 no usable demand points: 2 row(s) rejected (latitude or longitude
@@ -149,8 +150,9 @@ points straddle 180 deg: **`minLon > maxLon` means the box runs east from `minLo
 `maxLon`**, so its width is `lonDelta(minLon, maxLon)` and membership is
 `lonDelta(minLon, lon) <= lonDelta(minLon, maxLon)` rather than a raw `min <= lon <= max`. Two houses at
 179.9 and -179.9 are a 0.2 deg box, not a 359.8 deg one; a box that does not cross keeps
-`minLon <= maxLon` exactly as before. `demand.centre` is the mean position, with longitude averaged the
-short way round for the same reason.
+`minLon <= maxLon` exactly as before. No endpoint returns a centre: `engine.demand.prepare` computes
+one, but it is not on the wire, so a caller that wants it averages `points` from
+`POST /api/import/demand` itself.
 `network` switches the router from the straight-line factor to a street/duct graph;
 `/api/import/network` builds that graph and hands it back so the caller can preview it (and send it as
 `network` unchanged). `applyToProject` replaces the project's plant in one operation (one undo step)

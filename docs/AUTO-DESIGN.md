@@ -35,10 +35,11 @@ refused with `node "n-headend" uses unknown transceiver model "10G-LR-10KM"`.
 
 Each candidate is reported whether it wins or not, with its numbers and the reason it was refused.
 
-`demand` in the answer is that parse, not the points: `{ points, rejected, duplicates, meta, bbox }`,
-with each refused row's 1-based input line, reason and text — so the rows a design was built from sit
-beside the design rather than in a second call — and `headEnd` is the site it was given. The shape and
-the refusal are in [API.md](API.md#auto-design).
+`demand` in the answer summarises that parse: `{ points, rejected, duplicates, meta, bbox }`, where
+`points` is the **count** of usable points the design was built from — a number, not the point rows
+(`POST /api/import/demand` returns those) — and each refused row carries its 1-based input line, reason
+and text, so the refusals sit beside the design rather than in a second call. `headEnd` is the site it
+was given. The shape and the refusal are in [API.md](API.md#auto-design).
 
 ## In the UI
 
