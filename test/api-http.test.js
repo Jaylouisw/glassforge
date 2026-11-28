@@ -746,6 +746,19 @@ async function main() {
     assert.ok(noRoutePoints.body.error.indexOf('at least two') !== -1, noRoutePoints.body.error);
   });
 
+  // gh#164: a route that *has* length but rounds away is the same purchase order for nothing, one
+  // door in from the empty route above - and `routeM: 0` stays the pure calculation gh#151 kept.
+  const roundsAway = await request('POST', '/api/design/length', { routeM: 0.004 });
+  const zeroRoute = await request('POST', '/api/design/length', { routeM: 0 });
+  test('a route that rounds to 0.00 m is a 400, and a zero route is still a calculation', function () {
+    assert.strictEqual(roundsAway.status, 400,
+      'status ' + roundsAway.status + ': ' + JSON.stringify(roundsAway.body));
+    assert.ok(roundsAway.body.error.indexOf('rounds to 0.00 m') !== -1, roundsAway.body.error);
+    assert.strictEqual(zeroRoute.status, 200,
+      'a measured 0 m route is a calculation, not a refusal: ' + JSON.stringify(zeroRoute.body));
+    assert.strictEqual(zeroRoute.body.purchaseM, 0);
+  });
+
   // The body limit is mapped to a 413, and that status used to be unreachable: `readBody` answered an
   // over-limit body by destroying the request, which tears down the socket the refusal has to travel
   // on. The caller's next read was ECONNRESET ("socket hang up"), so an upload that was merely too

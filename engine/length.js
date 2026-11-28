@@ -76,6 +76,23 @@ function round(n, places) {
   return Math.round(n * f) / f;
 }
 
+/**
+ * Why a measured length is not a length, in the words the caller needs.
+ *
+ * Two answers both round to 0.00 m and are different mistakes: a route whose points are all in one
+ * place was not drawn across the ground, and a route a few millimetres long was drawn but cannot be
+ * quoted at the 2 dp this calculation rounds to. Below a tenth of a millimetre even the printed
+ * figure reads zero, so the sentence says the length is under the floor rather than claiming it
+ * measured 0 m.
+ */
+function unmeasuredWhy(measuredM) {
+  if (measuredM === 0) return 'every point is in the same place';
+  const shown = round(measuredM, 4);
+  return shown > 0
+    ? 'it measures ' + shown + ' m, which rounds to 0.00 m'
+    : 'it measures under 0.0001 m, which rounds to 0.00 m';
+}
+
 function nonNegative(value, field, fallback) {
   if (value === undefined || value === null) return fallback;
   if (!isNum(value) || value < 0) throw new TypeError(field + ' must be a non-negative number, got ' + value);
@@ -126,6 +143,18 @@ function cableToBuy(opts) {
   // symptom: a caller who sent `routeKM` has a route, just not in a unit this reads.
   designFields.assertKnownFields(o, OPTION_FIELDS, 'the cable calculation', PURCHASE_NEAR_MISS);
   if (!isNum(o.routeM) || o.routeM < 0) throw new TypeError('routeM is required and must be a non-negative number');
+  // gh#164. `routeM: 0` is a figure the caller measured - 0 m of route is 0 m of cable, and reserves
+  // are priced against it - but a *positive* route that rounds to 0.00 m is a route this answer
+  // cannot express. Measured on 19269af: `cableToBuy({ routeM: 0.004 })` answered `drums: 0` with a
+  // line reading "Purchase (0 x 2000 m drum)", the same purchase order for nothing gh#151 refused on
+  // the drawn-route form. The two doors left open were this one and the BOM's, and both are shut
+  // here and in `billOfMaterials` with the sentence the drawn form already used.
+  if (o.routeM > 0 && round(o.routeM, 2) <= 0) {
+    const shown = round(o.routeM, 4);
+    throw new TypeError('routeM ' + (shown > 0 ? shown + ' m' : 'is under 0.0001 m and') +
+      ' rounds to 0.00 m. A route that cannot be measured is not a purchase of 0 m: a sub-centimetre ' +
+      'route is a unit slip (metres sent as kilometres) or a route that was never drawn, so measure it again');
+  }
 
   const overlengthPct = nonNegative(o.overlengthPct, 'overlengthPct', DEFAULTS.overlengthPct);
   const spliceReserveM = nonNegative(o.spliceReserveM, 'spliceReserveM', DEFAULTS.spliceReserveM);
@@ -244,13 +273,7 @@ function cableToBuyForRoute(points, opts) {
   if (round(measuredM, 2) <= 0) {
     // Printed to four places, and below that floor it says so: a route 0.011 mm long is not
     // "0 m", and a sentence whose two clauses both read zero explains nothing.
-    const shown = round(measuredM, 4);
-    const why = measuredM === 0
-      ? 'every point is in the same place'
-      : shown > 0
-        ? 'it measures ' + shown + ' m, which rounds to 0.00 m'
-        : 'it measures under 0.0001 m, which rounds to 0.00 m';
-    throw new TypeError('the drawn route has no measurable length - ' + why +
+    throw new TypeError('the drawn route has no measurable length - ' + unmeasuredWhy(measuredM) +
       '. A route that cannot be measured is not a purchase of 0 m: draw it across the ground, or send `routeM` directly');
   }
   return cableToBuy(Object.assign({}, opts || {}, { routeM: measuredM }));
@@ -299,8 +322,21 @@ function billOfMaterials(plant, registry, opts) {
       throw new Error('span "' + (span.id || '#' + i) + '" has an invalid bundles count "' +
         String(span.bundles) + '" - a span runs one whole cable or more');
     }
+    // gh#164. The check above refuses a span with no length at all; a span longer than 0 but shorter
+    // than half a centimetre passed it and was priced at zero: on 19269af a 0.004 m span answered a
+    // line reading `{ routeM: 0, designM: 0 }` and a row reading `drums: 0, purchaseM: 0`, so the
+    // trace-back line disagreed with the map it is there to explain. Refused by the figure it
+    // measured, the way the drawn-route form refuses one that rounds away.
+    const spanRouteM = span.lengthM * bundles;
+    if (round(spanRouteM, 2) <= 0) {
+      const shown = round(spanRouteM, 4);
+      throw new Error('span "' + (span.id || '#' + i) + '" measures ' +
+        (shown > 0 ? shown + ' m' : 'under 0.0001 m') +
+        ', which rounds to 0.00 m - a span that cannot be measured is not a purchase of 0 m: ' +
+        'measure the route before building a BOM');
+    }
     const calc = cableToBuy({
-      routeM: round(span.lengthM * bundles, 2),
+      routeM: round(spanRouteM, 2),
       overlengthPct: o.overlengthPct,
       splices: splices,
       spliceReserveM: o.spliceReserveM,
