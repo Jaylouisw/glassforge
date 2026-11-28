@@ -1055,16 +1055,38 @@ function emitFeederTree(plant, tree, cfg, registry) {
   for (const node of tree.nodes) {
     if (node.attachTerminals.length) cablesAt.set(node.key, (cablesAt.get(node.key) || 0) + 1);
   }
+  const rootSited = tree.nodes.some(function (n) { return n.isRoot && n.attachTerminals.length; });
+  // A site on the root has no edge, so its closure's incoming cable is the OLT's 1 m patch, and it
+  // counts like any other cable entering a closure.
+  if (rootSited) {
+    const rootKey = tree.nodes.filter(function (n) { return n.isRoot; })[0].key;
+    cablesAt.set(rootKey, (cablesAt.get(rootKey) || 0) + 1);
+  }
 
-  for (const node of tree.nodes) {
-    if (node.isRoot) continue;
+  // A splitter site that snaps onto the root node - the head-end's own street vertex - is *attached*
+  // to the root and has no tree edge, so the loop below used to `continue` past it: no closure, no
+  // splitter, no tail, and `cfg.splitterPlantId` never learned the site. `buildPon` then read the
+  // missing splitter as "this site did not resolve" and refused every candidate naming the houses as
+  // unreachable. Measured on this engine with one site at the head-end vertex of a 333 m street and
+  // two houses on it: `{"network": {...}}` answered `2 address(es) are not on the street network or
+  // not reachable along it: d1, d2` while the same demand without a network designed at 416.4 m -
+  // the straight-line provider lifts a medoid that sits on its splitter site to the 1 m span floor
+  // (`euclidTree`), and this is the feeder half of the same rule. The OLT's 1 m patch into the
+  // closure is emitted with the closure, because a closure hanging off no span is a second component,
+  // not a plant.
+  const rootNode = tree.nodes.filter(function (n) { return n.isRoot; })[0];
+  let rootClosureId = null;
+
+  function addSite(node, atRoot) {
     const closureId = cfg.prefix + 'fc-' + node.key;
     plant.nodes.push({
       id: closureId, type: 'closure', model: closureForCables(cablesAt.get(node.key) || 0, registry),
       name: 'Feeder closure', lat: node.lat, lon: node.lon
     });
     closureOf.set(node.key, closureId);
-    idOf.set(node.key, closureId);
+    // The root keeps the head-end as its plant id: an edge leaving it is the OLT's own cable, and
+    // the patch below is the only span that lands in this closure.
+    if (!atRoot) idOf.set(node.key, closureId);
     if (node.attachTerminals.length) {
       const splitterId = cfg.prefix + 'spl-' + node.key;
       plant.nodes.push({
@@ -1082,6 +1104,28 @@ function emitFeederTree(plant, tree, cfg, registry) {
       });
       cfg.splitterPlantId.set(node.attachTerminals[0], splitterId);
     }
+    return closureId;
+  }
+
+  for (const node of tree.nodes) {
+    if (!node.isRoot) { addSite(node, false); continue; }
+    if (!rootSited) continue;
+    rootClosureId = addSite(node, true);
+  }
+
+  if (rootClosureId) {
+    // The patch is a real span, so it is billed like one - the same 12-fibre floor `euclidTree`
+    // applies to the root's own 1 m edge into a site that stands on it.
+    const patch = cableFor(12, cfg.ladder, registry);
+    plant.spans.push({
+      id: cfg.prefix + 'f-' + rootNode.key + '-self',
+      from: cfg.rootPlantId, to: rootClosureId,
+      cable: patch.model, lengthM: 1, bundles: 1,
+      strands: strandList(12, patch.fiberCount), purpose: 'feeder',
+      feedsSplitters: rootNode.attachTerminals.length,
+      // The gap is 0 m, so there is no geometry to draw - the same reading a 0 m spur's drop gets.
+      route: null
+    });
   }
 
   for (const run of edgeRuns) {
