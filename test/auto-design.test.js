@@ -224,6 +224,8 @@ test('a PON feeder does not cascade splitters that sit side by side', function (
 });
 
 test('cable is tapered, and a long span is never a drop cable', function () {
+  // This call passes no ladder option, so every pick below comes from DEFAULT_LADDER.
+  const ladder = engine.design.DEFAULTS.ladder;
   const out = engine.design.synthesise(street(20, 0.0005), { headEnd: HEAD_END, technology: 'active' }, registry);
   for (const span of out.plant.spans) {
     const cable = registry.get('cable', span.cable);
@@ -235,12 +237,31 @@ test('cable is tapered, and a long span is never a drop cable', function () {
       // used to exempt drops, which let the exception hide a 400 m spur on 1-fibre cable).
       assert.ok(cable.fiberCount >= 12, span.id + ' is ' + span.lengthM + ' m on ' + cable.model);
     } else {
+      // The pick is cableFor(required, ladder, registry) - the smallest RUNG of the caller's ladder
+      // that fits, never the smallest cable in the catalogue. This filter used the whole catalogue,
+      // which passed only while no rung existed inside a band an ordinary design spans. The aerial
+      // 36F row put one at 25-36 fibres, and a 32-strand short span on DEFAULT_LADDER buys
+      // g652d-loose-48 while g652d-adss-36 fits. Whether the default should name a 36F rung is gh#155,
+      // the open default-ladder question, so the guard is scoped to the ladder the design was given
+      // and the non-minimality it used to expose is pinned by the test below instead of being lost.
       const smaller = registry.all('cable').filter(function (c) {
-        return c.fiberCount >= required && c.fiberCount < cable.fiberCount && c.fiberCount >= 12;
+        return ladder.indexOf(c.model) !== -1 &&
+          c.fiberCount >= required && c.fiberCount < cable.fiberCount && c.fiberCount >= 12;
       });
       assert.strictEqual(smaller.length, 0, span.id + ' could have used a smaller cable than ' + cable.model);
     }
   }
+});
+
+test('the default ladder names no aerial 36F rung, so 32 strands are bought as 48F', function () {
+  // Named rather than hidden. The catalogue carries a 36F aerial rung and DEFAULT_LADDER lists no
+  // aerial row at all, so a 25-36 fibre span is bought as g652d-loose-48 until a default-ladder
+  // decision names the smaller rung - the same open question as g657a2-drop-4 (gh#155). This pins
+  // today's answer so that decision is a visible change and not a silent re-ranking.
+  assert.strictEqual(engine.design.cableForSpan(32, 120, engine.design.DEFAULTS.ladder, registry).model, 'g652d-loose-48');
+  assert.strictEqual(engine.design.cableForSpan(32, 1200, engine.design.DEFAULTS.ladder, registry).model, 'g652d-loose-48');
+  assert.strictEqual(engine.design.DEFAULT_LADDER.indexOf('g652d-adss-36'), -1, 'not a default rung');
+  assert.strictEqual(engine.design.DEFAULT_LADDER.indexOf('g652d-adss-60'), -1, 'not a default rung');
 });
 
 test('a cost model changes the objective, and the output says which one it used', function () {
