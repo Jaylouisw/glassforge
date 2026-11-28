@@ -10,6 +10,10 @@
  */
 
 const network = require('./network');
+// The same `suggestField` every other near miss in the engine is answered with: a key the op does
+// not read is either a typo of one it does (`nmae`, `modle`) or a field in the wrong place, and the
+// suggestion is what tells the caller which.
+const designFields = require('./design-fields');
 
 // A project's `nodes`/`spans` come from a JSON file and from `PUT` bodies, either of which can hold
 // `null` where an object belongs. `network.validate` names that entry; the summary below is built
@@ -89,6 +93,75 @@ function opIdProblem(operation, op, action) {
   const id = operation.id;
   if (id !== undefined && id !== null && id !== '') return null;
   return 'operation.id is required - ' + op + ' takes the id of the ' + action;
+}
+
+/**
+ * What is wrong with an `update-node`'s fields block - or `null` when it can be applied.
+ *
+ * `update-node` has one place for what it changes: `patch`, as the header above and the operations
+ * block in `docs/API.md` both say. Every other key on the op used to be *ignored*, so a field one
+ * level too high (`{ op:'update-node', id:'n2', model:'nap-16' }`) answered 200, changed no node
+ * and appended a history entry that undoes nothing. That is the same silence `/api/design/synthesise`
+ * was fixed for ("a key added to the design and forgotten here is a setting that never arrives"),
+ * one layer under it: the caller reads 200 as "the edit landed" and the model it named is on no
+ * node. Measured through `project.apply` on a healthy 1:8 estate before this guard: a flat `model`,
+ * a flat `name`, `patch: 'x'`, `patch: {}`, and `patch: { nmae: 'NAP 12' }` all answered with the
+ * unchanged plant.
+ *
+ * A patch that names a field the op does not read is refused rather than skipped, with the
+ * suggestion `design-fields` gives every other near miss: `nmae` is not a field, and applying
+ * nothing while saying 200 is how a rename goes missing. `type` and `lng` are left to the two
+ * refusals in `update-node` itself, whose sentences name the node and the field they belong to.
+ */
+const UPDATE_NODE_READS = ['name', 'model', 'lat', 'lon'];
+
+/** A value said back as the caller sent it, for the refusals that answer a shape. */
+function describeValue(value) {
+  if (value === null) return 'null';
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (Array.isArray(value)) return 'a list';
+  return String(value);
+}
+
+function patchProblem(operation) {
+  const example = '{"op":"update-node","id":"<node>","patch":{"name":"NAP 12"}}';
+  const reads = "patch takes name, model, lat and lon (a node’s type is a remove and an add)";
+  // The op's envelope is `op`, `id`, `patch`; anything else is a field that was meant for the patch
+  // and is answered rather than dropped.
+  const stray = Object.keys(operation).filter(function (key) {
+    return ['op', 'id', 'patch'].indexOf(key) === -1;
+  });
+  if (stray.length) {
+    const key = stray[0];
+    const suggestion = UPDATE_NODE_READS.indexOf(key) === -1
+      ? designFields.suggestField(key, UPDATE_NODE_READS)
+      : null;
+    return 'update-node reads "op", "id" and "patch" and has no top-level field "' + key + '"' +
+      (suggestion ? ' - did you mean "' + suggestion + '"?' : '.') +
+      ' A field outside the patch is applied to nothing, so the node is left as it was: send ' +
+      example + ' - ' + reads;
+  }
+  if (operation.patch === undefined) {
+    return 'update-node needs a patch of the fields it changes, e.g. ' + example + ' - ' + reads;
+  }
+  const patch = operation.patch;
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+    return 'update-node.patch must be an object of the fields it changes, got ' +
+      describeValue(patch) + ' - ' + reads;
+  }
+  const keys = Object.keys(patch);
+  if (!keys.length) {
+    return 'update-node.patch names no field - an edit that changes nothing is not recorded, ' +
+      'so send the field to change, e.g. ' + example + ' - ' + reads;
+  }
+  for (const key of keys) {
+    if (UPDATE_NODE_READS.indexOf(key) !== -1 || key === 'type' || key === 'lng') continue;
+    const suggestion = designFields.suggestField(key, UPDATE_NODE_READS);
+    return 'update-node.patch does not read the field "' + key + '"' +
+      (suggestion ? ' - did you mean "' + suggestion + '"?' : '') +
+      ' Fields it reads: ' + UPDATE_NODE_READS.join(', ') + '.';
+  }
+  return null;
 }
 
 function cloneState(project) {
@@ -322,7 +395,9 @@ function apply(project, operation, opts) {
       if (idFault) return fail(idFault);
       const node = next.nodes.find(function (n) { return n.id === operation.id; });
       if (!node) return fail('unknown node "' + operation.id + '"');
-      const patch = operation.patch || {};
+      const patchFault = patchProblem(operation);
+      if (patchFault) return fail(patchFault);
+      const patch = operation.patch;
       // `type` is not part of this op - `patch` takes name, model, lat and lon - yet the copy below
       // used to store it, and a node's type is not a cosmetic label: the root's type picks the
       // technology (olt budgets a PON, headend an active link) and `trace`/`computeOdn` charge a
