@@ -1,0 +1,24 @@
+{
+  "kind": "transceiver",
+  "model": "osfp-800g-dr8-500m",
+  "vendor": "generic",
+  "label": "OSFP 800GBASE-DR8 500 m (MPO-16/APC)",
+  "speedMbps": 800000,
+  "wavelengthNm": 1310,
+  "reachM": 500,
+  "txPowerDbmMin": -2.9,
+  "txPowerDbmMax": 4,
+  "rxSensitivityDbm": -5.9,
+  "rxOverloadDbm": 4,
+  "polish": "apc",
+  "sourceUrl": "https://img-en.fs.com/file/datasheet/800gbase-dr8-osfp-datasheet.pdf",
+  "tags": [
+    "800000",
+    "1310nm",
+    "800g",
+    "dr8",
+    "parallel-lane",
+    "mpo-16"
+  ],
+  "notes": "The 800G rung under the 2 km FR4 row, and the shortest 800G a plan can order: IEEE 802.3df 800GBASE-DR8, eight 100G PAM4 lanes at 1311 nm (1304.5-1317.5 nm lane band), 2-500 m on G.652 with KP-FEC, 16 fibres per link (8 Tx + 8 Rx). Per-lane figures, and four vendor sheets that agree on every one of them: the FS OSFP800-DR8 sheet (the sourceUrl here), the Asterfusion OT-800G-OSFP-DR8, the AO 80-21-1629A001 and the Gigalight GOS-SI801DR8CA. Average launch power each lane -2.9..+4.0 dBm, average receive power each lane -5.9..+4.0 dBm, receive power (OMAouter) maximum +4.2 dBm, receiver sensitivity (OMAouter) -3.9 dBm, stressed receiver sensitivity -1.9 dBm, damage threshold +5 dBm - datasheet class figures, not one measured module. This row records the AVERAGE receive minimum (-5.9), not the OMA sensitivity (-3.9), for the reason every class row here does: a launch figure is subtracted from an average receive figure, so the class is -2.9 - (-5.9) = 3.0 dB. That is exactly the 100GBASE-DR and 400GBASE-DR4 lane budget, because it is literally the same lane - DR8 is eight DR channels in one housing - so qsfp28-100g-dr-500m, qsfp-dd-400g-dr4-500m and this row are one lane class rather than three vendors' opinions. The budget does NOT grow with lane count: eight lanes buy eight times the bits and not one decibel more of reach. What it does buy is a purchase order of 16 strands, and the one warning the sheets do not print identically. FS and Asterfusion specify a single MPO-16/APC receptacle; Gigalight and AO ship the same 800GBASE-DR8 optical interface on dual MPO-12/APC receptacles, four lanes per connector, so the module part number decides whether the trunk is one 16-position ferrule or a pair of 12-position ones. The engine charges a mating, not a ferrule: budget the leg with connectors { model: 'mpo-12-apc', count: 2 } (2 x 0.2 = 0.4 dB) whichever the module has, one mating at each end, and do not read that row as a 12-position trunk being the right order. Express the strand count, not a lane count. link.design takes fibres per leg (default 2) and cableForFibres refuses a cable thinner than the request with 'a span cannot use more strands than its cable has', so an unstated fibres designs this link at two strands and the BOM is short fourteen. fibres: 16 picks the smallest catalogue cable that carries it, g652d-loose-24 on the default ladder (measured); the same 16 reaches the splice count, because splicesPerJoint defaults to the fibre count and the BOM's splices are joints x splicesPerJoint, so a jointed route bills 16 splices per joint. Measured through budget.pointToPoint at the default 3 dB margin, both directions: 500 m x 0.35 dB/km = 0.175 dB of fibre plus 0.4 dB of MPO matings is 0.575 dB of ODN and 2.43 dB of headroom, a FAIL. At marginDb 2.4 the same leg reads marginal, not ok - ok needs margin + 2, so this class cannot read ok at any margin above 0.43 dB with two terminations - and 501 m adds the reach fault to the headroom one: 'the route is 501 m but the shorter optic reaches 500 m'. Reach bites before the loss does in link mode too, because routeFactor 1.2 turns a 500 m straight-line site pair into a 600.45 m leg, which fails on reach and on headroom at once (measured). Overload is not the trap the 40G ER4 row is: the launch ceiling +4.0 dBm equals the receiver maximum +4.0 dBm, so a back-to-back pair with two matings sits 0.4 dB under the point (ODN 0.4, headroom 2.6, attenuator null - measured) and needs no pad. This row exists because osfp-800g-fr4-2km was the only 800G row this catalogue had, and its note said no parallel-lane 800G row would be added 'until the model has a fibre-count contract'. The model has one: link.design carries fibres per leg, the BOM refuses a cable too thin for it, and qsfp-dd-400g-dr4-500m already tells its caller to design with fibres: 8. That sentence in the FR4 row is corrected in this commit rather than left standing against a row that contradicts it. Treat these as class figures, not a shipping module: replace the row with the optic actually purchased, its lane assignment and its MPO polarity, before pricing a build."
+}
