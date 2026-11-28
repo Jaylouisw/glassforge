@@ -1,0 +1,15 @@
+{
+  "kind": "closure",
+  "model": "nap-12",
+  "vendor": "generic",
+  "label": "NAP 12-port",
+  "type": "nap",
+  "ports": 13,
+  "spliceCapacity": 48,
+  "trays": 4,
+  "sourceUrl": "https://webstore.iec.ch/en/publication/31424",
+  "tags": [
+    "nap"
+  ],
+  "notes": "Twelve drop adapters plus the feeder entry that feeds them: 13 cable ports, and 48 splice positions in four trays. `ports` is the cable count the engine checks - engine/network.js warns when the spans touching a closure outnumber its `ports`, and docs/PARTS.md states the same - so the field is drop adapters PLUS the feeder entry, never the adapter count alone. Why the row exists: the catalogue shipped NAP-8, NAP-16 and NAP-24, and the twelve-way box is a size sites are ordered in (a small MDU, a lane of twelve houses), so a twelve-drop site was either planned on nap-8 and refused by name - 12 drops plus 1 feeder is 13 cables into 9 ports - or bought as a nap-16 with four adapters and a tray paid for and never used. The engine does not choose this size by itself: engine/design.js's CLOSURE_LADDER is nap-8/16/24 and picks the smallest that takes the cables, so this is the row a manual design names, the same way the 36F and 60F duct rungs are the rungs a custom ladder names rather than anything DEFAULT_LADDER picks. What the class publishes, and what is a class figure here: Amphenol Charles FSDC12P - 12 drop ports and an internal bulkhead with 12 SC/APC adapters, three splice trays at 48 fusions each (144 max), IP68, four cable ports for 6-18 mm cable; NetSpan PRO10 - up to 12 standard SC/APC drop ports with a 24-fusion tray (NSST2448E); Alticelabs' ODP-12 - 12 customers. The adapter count is the same 12 on every one of them, which is what `ports` rests on; the splice capacity is not - it runs from 24 in a compact box to 144 in a butt-joint body - so 48 is the mid-size class figure, chosen to match nap-16's 48 fusions and because twelve drops spliced onto a 12-fibre feeder is 24 fusions, half the tray. Four trays at 12 fusions each is the split nap-16 carries; nothing in the engine reads `trays`, it is there so a crew knows what is inside. Ports, trays and splice capacity are typical of the class rather than one datasheet for this row - IEC 61753-1 qualifies the closure and publishes no capacity figure - and an end box carries one feeder entry: a NAP that also passes the feeder on is a cascade variant with an extension port and is a different SKU, not this row with one port more. Replace with the bought closure's datasheet, and check the adapter count and splice capacity on it, before ordering."
+}
