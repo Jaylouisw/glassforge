@@ -1,0 +1,32 @@
+{
+  "kind": "cable",
+  "model": "g657a2-fig8-drop-4",
+  "vendor": "prysmian",
+  "label": "Prysmian ezDrop Figure 8 4F aerial drop, G.657.A2",
+  "fiberCount": 4,
+  "fibersPerTube": 6,
+  "construction": "loose-tube",
+  "fiberStandard": "G.657.A2",
+  "use": [
+    "drop"
+  ],
+  "drumM": 640,
+  "attenuationDbPerKm": {
+    "1310": 0.35,
+    "1490": 0.22,
+    "1550": 0.21
+  },
+  "notes": "Prysmian ezDrop Figure 8 Integrated Messenger Drop Cable, product data sheet TLS-DS-A-605-0226 (the -0723 revision prints the same ordering table): same figure-8 build as g657a2-fig8-drop-2 - 3/32 in stranded galvanised steel messenger on a tear-away jacket web, a 1.9 mm gel-filled buffer tube holding up to 6 fibres, aramid strength yarns, non-armoured, toneable messenger, 4.1 mm x 8.8 mm section, 49 kg/km, bend radius 15 cm loaded and unloaded, max short-term pulling load 300 lbf (1,335 N), installation -30 to +60 C - with four fibres in the one tube instead of two. Ordering: DF81JKT-06-AA-004-BB with AA = glass type, BB = attenuation grade; this row names B2 (G.657.A2, B.2 and G.652.D), the sheet's B1 standard being G.657.A1 and G.652.D, and grade E3 (0.35/0.35/0.25 dB/km max at 1310/1383/1550 nm, the other grade being E1 at 0.40/0.40/0.30), so the line item is DF81JKT-06-B2-004-E3. The four strands are TIA-598 blue, orange, green and brown in tube T01, which is why fibersPerTube is 6 on a four-fibre cable: the ordering code fixes a 6-fibre buffer tube (grouping 06) and the build fills four of its positions. Why this rung exists: engine/design.js cableForDistribution accepts a drop rung at any size for a span up to DROP_CABLE_MAX_M, so a four-fibre aerial span - four flats off one pole, or a four-port tap - had exactly three names before this row: two separate 2-fibre drops down the same pole (two messenger spans where one will do), the buried flat 4F drop with no messenger at all, or a 12F ADSS. Four fibres in one figure-8 is one span, one messenger, one clamp set. Measured: a 70 m four-fibre span on a ladder naming g657a2-fig8-drop-4 answers this row; the same span on a ladder naming only the 2-fibre rungs answers nothing smaller than the 12F run, which is 8 spare fibres hanging from a pole. Attenuation: the sheet publishes maxima only (E3 0.35 at 1310, 0.35 at 1383, 0.25 at 1550) and no 1490 nm figure. This row carries the catalogue's typical 0.35 / 0.22 / 0.21 so an aerial drop budgets like the buried drop it replaces; 1490 nm is interpolated and typical, not a citation, and the 0.21 at 1550 sits 0.04 under the E3 ceiling - 0.006 dB over a 150 m drop, immaterial, while the acceptance figure stays 0.25 dB/km. drumM 640 is the R-18 ply package option on the sheet (2,100 ft / 640 m; the other is an R-30 ply at 2,895 m), and it keeps the drop BOM in spools instead of the engine's 2,000 m fallback. What is quoted rather than modelled: the messenger self-supports to 400 ft (125 m), with NESC loading at 1% sag giving 125 m minimum span at 750 N (Light), 80 m at 485 N (Medium) and 45 m at 275 N (Heavy); nothing in the engine checks sag, tension, ice or wind, and its 300 m drop refusal is looser than this cable's span rating, so the planning limit is the NESC row and not the validator. Trap: cableFor picks the smallest cable that fits and breaks ties on model id, so a ladder naming both this row and g657a2-drop-4 buys the buried rung; name this one instead, not beside it. Replace with the cable actually purchased and its as-built attenuation before ordering.",
+  "sourceUrl": "https://na.prysmian.com/sites/na.prysmian.com/files/media/products/TLS-DS-A-605_ezDrop%20Figure%208%20Drop%20Cable.pdf",
+  "tags": [
+    "prysmian",
+    "ezdrop",
+    "figure-8",
+    "aerial",
+    "self-supporting",
+    "messenger",
+    "drop",
+    "g.657.a2",
+    "4f"
+  ]
+}
