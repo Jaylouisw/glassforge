@@ -124,7 +124,14 @@ term is a total nobody can spend.
 
 A minimum spanning tree from the head-end over every address, then:
 
-- each branch point becomes a closure (NAP up to 8 ways, NAP-16 to 16, in-line mufa beyond that);
+- each branch point becomes a closure chosen by the **cables** that reach it, not by its tree
+  degree: the smallest NAP whose `ports` take every cable into the node (each cable of a bundle
+  enters the box, and every drop is one cable), otherwise the largest NAP in the catalogue. The
+  20-spoke junction of `test/design-closure-ports.test.js` plus its spine is 21 cables and buys
+  `nap-24` (26 ports); the feeder closure of an ordinary 1:8 PON site is still `nap-8` (9 ports).
+  An in-line mufa is a through-joint with four cable ports and is never chosen for a branch point.
+  `closureForCables` in `engine/design.js` is the one chooser, and
+  `test/design-closure-ports.test.js` asserts both ends of the ladder.
 - each span carries **two fibres per ONT below it**, tapered to the smallest cable that fits;
 - a house the tree passes becomes a closure plus a drop span, measured the same way as a PON drop
   (the snap distance when routed, 1 m straight-line);
