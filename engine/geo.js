@@ -16,6 +16,8 @@ exports.distanceM = distanceM;
 exports.pathLengthM = pathLengthM;
 exports.bbox = bbox;
 exports.centroid = centroid;
+exports.lonDelta = lonDelta;
+exports.wrapLon = wrapLon;
 exports.pointToSegmentM = pointToSegmentM;
 exports.simplify = simplify;
 exports.pointAt = pointAt;
@@ -91,14 +93,41 @@ function centroid(points) {
     }
     return { lat: lat / pts.length, lon: lon / pts.length };
 }
+/**
+ * Longitude difference `to - from` taken the short way round, in (-180, 180].
+ *
+ * The antimeridian is a join, not a wall: 179.99 and -179.99 are 0.02 deg apart. A raw subtraction
+ * says 359.98, so a planar helper (a projection, a crossing test, a bounding box) that uses it
+ * measures the long way round the planet. Only that arithmetic is wrapped here - `distanceM` is a
+ * great-circle formula and was already correct.
+ */
+function lonDelta(from, to) {
+    let d = (to - from) % 360;
+    if (d > 180)
+        d -= 360;
+    else if (d <= -180)
+        d += 360;
+    return d;
+}
+/**
+ * A longitude in [-180, 180): 180 and -180 are the same meridian, and one value keeps them one node.
+ * A longitude inside the range is returned unchanged, so nothing about an ordinary drawing moves.
+ */
+function wrapLon(lon) {
+    if (lon >= -180 && lon <= 180)
+        return lon === 180 ? -180 : lon;
+    return ((lon + 180) % 360 + 360) % 360 - 180;
+}
 /** Perpendicular distance from `p` to the segment a-b, in metres (planar approximation locally). */
 function pointToSegmentM(p, a, b) {
     const latRef = toRad((a.lat + b.lat) / 2);
     const mPerDegLat = 111132.95;
     const mPerDegLon = 111319.49 * Math.cos(latRef);
-    const px = (p.lon - a.lon) * mPerDegLon;
+    // Longitudes are taken the short way round: a segment that crosses the antimeridian is 0.2 deg long,
+    // not 359.8, and a point beside it is metres away, not half a planet.
+    const px = lonDelta(a.lon, p.lon) * mPerDegLon;
     const py = (p.lat - a.lat) * mPerDegLat;
-    const bx = (b.lon - a.lon) * mPerDegLon;
+    const bx = lonDelta(a.lon, b.lon) * mPerDegLon;
     const by = (b.lat - a.lat) * mPerDegLat;
     const len2 = bx * bx + by * by;
     if (len2 === 0)

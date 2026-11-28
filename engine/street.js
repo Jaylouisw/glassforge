@@ -45,6 +45,47 @@ function round(n, places) {
 function cmp(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
 
 /**
+ * The longitudes of one polyline, as intervals inside [-180, 180].
+ *
+ * A road drawn across the antimeridian has points at 179.9 and -179.9, and a naive min/max reads that
+ * as a box 359.8 deg wide - or, where the two ends are written the other way round, as min > max and
+ * therefore as no box at all. An edge indexed under no cell is never offered to the interior-vertex
+ * pass, so a side street drawn from it stays a second component and every property on the side street
+ * is refused as unreachable. Unwrapping the polyline first (adding each step's shortest longitude
+ * delta) makes the extent continuous - 179.9..180.1 - and shifting that frame by a turn and clipping
+ * to [-180, 180] gives the one or two intervals the wrapped edge actually occupies.
+ */
+function lonSpans(points) {
+  if (!points || !points.length) return [[0, 0]];
+  let lon = points[0].lon;
+  let min = lon;
+  let max = lon;
+  for (let i = 1; i < points.length; i++) {
+    lon += geo.lonDelta(points[i - 1].lon, points[i].lon);
+    if (lon < min) min = lon;
+    if (lon > max) max = lon;
+  }
+  const spans = [];
+  for (const shift of [-360, 0, 360]) {
+    const lo = Math.max(-180, min + shift);
+    const hi = Math.min(180, max + shift);
+    if (lo <= hi) spans.push([lo, hi]);
+  }
+  return spans;
+}
+
+/** True when `lon` - or the same meridian a turn away - is inside one of the spans, padded. */
+function spansNear(spans, lon, padDeg) {
+  for (const shift of [-360, 0, 360]) {
+    const l = lon + shift;
+    for (const span of spans) {
+      if (l >= span[0] - padDeg && l <= span[1] + padDeg) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Accept the several shapes a caller may hand us and return `[{ id, coords }]` - or refuse an edge
  * it cannot read, by position, id and value (`normaliseLine`), never by shortening it or dropping it.
  */
@@ -168,7 +209,7 @@ class Graph {
     const latStep = size / 111132.95;
     const lonStep = size / (111319.49 * Math.max(0.01, Math.cos(point.lat * Math.PI / 180)));
     return {
-      x: Math.round(point.lon / lonStep),
+      x: Math.round(geo.wrapLon(point.lon) / lonStep),
       y: Math.round(point.lat / latStep)
     };
   }
@@ -180,18 +221,28 @@ class Graph {
    */
   nodeAt(point) {
     const cell = this._cell(point);
+    // A vertex written as lon 180 and its twin written as -180 are the same place, but their grid
+    // columns are a whole turn apart. Near the line the search also visits the columns one turn either
+    // side, so the two are found and merged; everywhere else it is the three-by-three box it was.
+    const size = Math.max(1, this.joinToleranceM);
+    const lonStep = size / (111319.49 * Math.max(0.01, Math.cos((point.lat * Math.PI) / 180)));
+    const columns = Math.round(360 / lonStep);
+    const nearLine = Math.abs(Math.abs(point.lon) - 180) < 3 * lonStep;
+    const bases = nearLine ? [cell.x - columns, cell.x, cell.x + columns] : [cell.x];
     let best = null;
     let bestDistance = Infinity;
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        const bucket = this._grid.get((cell.x + dx) + ':' + (cell.y + dy));
-        if (!bucket) continue;
-        for (const id of bucket) {
-          const node = this.nodes.get(id);
-          const d = geo.distanceM(node, point);
-          if (d < bestDistance - 1e-9 || (Math.abs(d - bestDistance) <= 1e-9 && best && cmp(node.id, best) < 0)) {
-            bestDistance = d;
-            best = node.id;
+    for (const baseX of bases) {
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const bucket = this._grid.get((baseX + dx) + ':' + (cell.y + dy));
+          if (!bucket) continue;
+          for (const id of bucket) {
+            const node = this.nodes.get(id);
+            const d = geo.distanceM(node, point);
+            if (d < bestDistance - 1e-9 || (Math.abs(d - bestDistance) <= 1e-9 && best && cmp(node.id, best) < 0)) {
+              bestDistance = d;
+              best = node.id;
+            }
           }
         }
       }
@@ -230,7 +281,7 @@ class Graph {
     if (p.length !== q.length) return false;
     const eps = TWIN_EPS_DEG;
     function near(one, other) {
-      return Math.abs(one.lat - other.lat) < eps && Math.abs(one.lon - other.lon) < eps;
+      return Math.abs(one.lat - other.lat) < eps && Math.abs(geo.lonDelta(one.lon, other.lon)) < eps;
     }
     let forward = true;
     for (let i = 0; i < p.length; i++) if (!near(p[i], q[i])) { forward = false; break; }
@@ -316,14 +367,18 @@ function projectOnEdge(edge, point) {
     const b = edge.geometry[i];
     const mPerDegLat = 111132.95;
     const mPerDegLon = 111319.49 * Math.cos((a.lat * Math.PI) / 180);
-    const bx = (b.lon - a.lon) * mPerDegLon;
+    // The segment's longitude span is taken the short way round, so a road drawn across the
+    // antimeridian (179.9 -> -179.9) projects like the 200 m it is, and the projection is written back
+    // as a real longitude rather than 180.1.
+    const dLon = geo.lonDelta(a.lon, b.lon);
+    const bx = dLon * mPerDegLon;
     const by = (b.lat - a.lat) * mPerDegLat;
-    const px = (point.lon - a.lon) * mPerDegLon;
+    const px = geo.lonDelta(a.lon, point.lon) * mPerDegLon;
     const py = (point.lat - a.lat) * mPerDegLat;
     const len2 = bx * bx + by * by;
     let t = len2 === 0 ? 0 : (px * bx + py * by) / len2;
     t = Math.max(0, Math.min(1, t));
-    const at = { lat: a.lat + (b.lat - a.lat) * t, lon: a.lon + (b.lon - a.lon) * t };
+    const at = { lat: a.lat + (b.lat - a.lat) * t, lon: geo.wrapLon(a.lon + dLon * t) };
     const distM = geo.distanceM(point, at);
     if (!best || distM < best.distM - 1e-9) {
       best = { edgeId: edge.id, segIndex: i, t: t, at: at, distM: distM };
@@ -361,14 +416,14 @@ function splitAtInteriorVertices(graph, tol) {
   function boxOf(edge) {
     let box = boxes.get(edge.id);
     if (box) return box;
-    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    let minLat = Infinity, maxLat = -Infinity;
     for (const p of edge.geometry) {
       if (p.lat < minLat) minLat = p.lat;
       if (p.lat > maxLat) maxLat = p.lat;
-      if (p.lon < minLon) minLon = p.lon;
-      if (p.lon > maxLon) maxLon = p.lon;
     }
-    box = { minLat: minLat, maxLat: maxLat, minLon: minLon, maxLon: maxLon };
+    // Latitude is one interval; longitude is one or two, because a road across the antimeridian
+    // occupies both ends of [-180, 180] and the middle of nothing (see `lonSpans`).
+    box = { minLat: minLat, maxLat: maxLat, spans: lonSpans(edge.geometry) };
     boxes.set(edge.id, box);
     return box;
   }
@@ -393,11 +448,13 @@ function splitAtInteriorVertices(graph, tol) {
     const box = boxOf(edge);
     const keys = [];
     for (let y = Math.floor(box.minLat / latStep); y <= Math.floor(box.maxLat / latStep); y++) {
-      for (let x = Math.floor(box.minLon / lonStep); x <= Math.floor(box.maxLon / lonStep); x++) {
-        const key = y + ':' + x;
-        keys.push(key);
-        if (!buckets.has(key)) buckets.set(key, []);
-        buckets.get(key).push(edge.id);
+      for (const span of box.spans) {
+        for (let x = Math.floor(span[0] / lonStep); x <= Math.floor(span[1] / lonStep); x++) {
+          const key = y + ':' + x;
+          keys.push(key);
+          if (!buckets.has(key)) buckets.set(key, []);
+          buckets.get(key).push(edge.id);
+        }
       }
     }
     edgeCells.set(edge.id, keys);
@@ -426,13 +483,18 @@ function splitAtInteriorVertices(graph, tol) {
     const lonPad = tol / (111319.49 * Math.max(0.01, Math.cos((node.lat * Math.PI) / 180)));
     const y0 = Math.floor((node.lat - latPad) / latStep);
     const y1 = Math.floor((node.lat + latPad) / latStep);
-    const x0 = Math.floor((node.lon - lonPad) / lonStep);
-    const x1 = Math.floor((node.lon + lonPad) / lonStep);
+    // Near the line a node at -179.999 may meet an edge indexed under 179.999..180, so the columns a
+    // turn either side are queried too. The cost is paid only by nodes at the ends of the range.
+    const shifts = Math.abs(Math.abs(node.lon) - 180) <= 1 ? [-360, 0, 360] : [0];
     const seen = new Set();
-    for (let y = y0; y <= y1; y++) {
-      for (let x = x0; x <= x1; x++) {
-        const bucket = buckets.get(y + ':' + x);
-        if (bucket) for (const id of bucket) seen.add(id);
+    for (const shift of shifts) {
+      const x0 = Math.floor((node.lon + shift - lonPad) / lonStep);
+      const x1 = Math.floor((node.lon + shift + lonPad) / lonStep);
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const bucket = buckets.get(y + ':' + x);
+          if (bucket) for (const id of bucket) seen.add(id);
+        }
       }
     }
     const edgeIds = Array.from(seen).sort(cmp);
@@ -441,7 +503,7 @@ function splitAtInteriorVertices(graph, tol) {
       if (!edge || edge.a === nodeId || edge.b === nodeId) continue;
       const box = boxOf(edge);
       if (node.lat < box.minLat - latPad || node.lat > box.maxLat + latPad ||
-          node.lon < box.minLon - lonPad || node.lon > box.maxLon + lonPad) continue;
+          !spansNear(box.spans, node.lon, lonPad)) continue;
       const found = projectOnEdge(edge, node);
       if (!found || found.distM > tol) continue;
       if (found.t <= 1e-9 || found.t >= 1 - 1e-9) continue;
@@ -475,11 +537,14 @@ function segmentCrossing(a1, a2, b1, b2) {
   const mPerDegLat = 111132.95;
   const mPerDegLon = 111319.49 * Math.cos((a1.lat * Math.PI) / 180);
   // A at the origin, with the frame running from A to B; C and D wherever they fall.
-  const bx = (a2.lon - a1.lon) * mPerDegLon;
+  // Every longitude here is a short-way delta from A, so a crossing at the antimeridian is found where
+  // it happens instead of 20,000 km away on the far side of the planet.
+  const dLon = geo.lonDelta(a1.lon, a2.lon);
+  const bx = dLon * mPerDegLon;
   const by = (a2.lat - a1.lat) * mPerDegLat;
-  const cx = (b1.lon - a1.lon) * mPerDegLon;
+  const cx = geo.lonDelta(a1.lon, b1.lon) * mPerDegLon;
   const cy = (b1.lat - a1.lat) * mPerDegLat;
-  const dx = (b2.lon - a1.lon) * mPerDegLon;
+  const dx = geo.lonDelta(a1.lon, b2.lon) * mPerDegLon;
   const dy = (b2.lat - a1.lat) * mPerDegLat;
   const len1 = Math.sqrt(bx * bx + by * by);
   const len2 = Math.sqrt((dx - cx) * (dx - cx) + (dy - cy) * (dy - cy));
@@ -497,7 +562,7 @@ function segmentCrossing(a1, a2, b1, b2) {
   // along B-D, so interpolating A->B with them puts the node three-quarters along a line the road
   // crosses at a quarter - invisible on a symmetric X, wrong on every real one.
   const t = s3 / (s3 - s4);
-  return { lat: a1.lat + (a2.lat - a1.lat) * t, lon: a1.lon + (a2.lon - a1.lon) * t };
+  return { lat: a1.lat + (a2.lat - a1.lat) * t, lon: geo.wrapLon(a1.lon + dLon * t) };
 }
 
 /**
@@ -519,14 +584,18 @@ function segmentCrossing(a1, a2, b1, b2) {
 function joinCrossings(graph) {
   const items = [];
   for (const edge of graph.edges.values()) {
-    let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
+    let minLat = Infinity, maxLat = -Infinity;
     for (const p of edge.geometry) {
       if (p.lat < minLat) minLat = p.lat;
       if (p.lat > maxLat) maxLat = p.lat;
-      if (p.lon < minLon) minLon = p.lon;
-      if (p.lon > maxLon) maxLon = p.lon;
     }
-    items.push({ edge: edge, minLat: minLat, maxLat: maxLat, minLon: minLon, maxLon: maxLon });
+    // A wrapped edge spans both ends of the range, so its sort key is -180 and its upper bound 180:
+    // it never breaks the sweep and is tested against every edge that shares its latitude band.
+    const spans = lonSpans(edge.geometry);
+    items.push({
+      edge: edge, minLat: minLat, maxLat: maxLat,
+      minLon: spans[0][0], maxLon: spans[spans.length - 1][1]
+    });
   }
   items.sort(function (x, y) { return cmp(x.minLon, y.minLon) || cmp(x.edge.id, y.edge.id); });
 
