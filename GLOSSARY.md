@@ -116,8 +116,13 @@ the fibre count.
 **Snap** — projecting a property or a site onto the nearest point of the nearest street edge, splitting
 that edge at the projection so the connection is real.
 
-**Join tolerance** — the distance within which a vertex is treated as the same junction, so a side street
-drawn from the middle of a main road is connected rather than a second component.
+**Join tolerance** — the distance within which two vertices are treated as the same junction: 1.5 m
+(`DEFAULT_JOIN_M`), because a line drawn in one program and a line drawn in another rarely shares an
+endpoint exactly. It merges coincident geometry and that is all it does: a side street drawn *from* a
+point on the main road shares no vertex with it, so the tolerance alone leaves the graph in two
+components and every property on the side street is unreachable. `street.planarize` is what splits the
+main road under the side street’s endpoint, and `street.buildGraph` calls it — see **Planarise** and
+ADR 0002.
 
 **Crossing (X-junction)** — two lines that intersect between their own vertices. It becomes a node on
 both, because two roads at grade meet; a grade-separated crossing has to be offset in the import, since
