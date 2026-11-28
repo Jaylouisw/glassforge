@@ -25,17 +25,17 @@ The server binds `127.0.0.1:8000` by default (`HOST`, `PORT`), and stores projec
 ```
 GET /api/health
 → { ok: true, name: "glassforge", version: "0.4.0",
-    parts: { total: 131, byKind: { cable: 30, splitter: 14, olt: 16, ont: 7, transceiver: 32,
+    parts: { total: 133, byKind: { cable: 32, splitter: 14, olt: 16, ont: 7, transceiver: 32,
                                   closure: 15, connector: 15, splice: 2 } },
     projects: 0, uptimeS: 3 }
 ```
 
 `version` is `package.json`'s. `parts.total` and `parts.byKind` are the catalogue on disk, so they
 change whenever a part is added. The block above is a **snapshot, not a contract**: re-recorded on
-`main` at `cead552` (the 16/24-position APC rows, gh#210) on 2026-11-28, it is illustrative and will drift
-as the catalogue grows. The authorities are the endpoint itself and `node scripts/count-parts.js`,
-whose `--check` mode keeps README's copy of that line honest — re-record the block with the command
-below, never by editing the numbers by hand.
+`main` at `603a2d6` (after the duct family's air-blown micro-cable, gh#215) on 2026-11-28, it is
+illustrative and will drift as the catalogue grows. The authorities are the endpoint itself and
+`node scripts/count-parts.js`, whose `--check` mode keeps README's copy of that line honest —
+re-record the block with the command below, never by editing the numbers by hand.
 
 ```
 GF_DATA=/tmp/gf-port node server/index.js &
@@ -122,12 +122,18 @@ POST /api/design/synthesise
 
 POST /api/import/network
   body: KML text, a KMZ buffer, or { edges: [{ coords }] }
-  → { stats: { nodes, edges, lengthM, lengthKm }, edges: [{ id, lengthM, coords }] }
+  → { stats: { nodes, edges, duplicates, lengthM, lengthKm }, edges: [{ id, lengthM, coords }] }
 
 POST /api/import/demand
   { demand: "label,lat,lon\n..." }            (or an array of rows)
   → { points, rejected, duplicates, meta, bbox }
 ```
+
+`stats.duplicates` counts edge additions that were the same drawing as an edge already in the graph and
+were merged into it — a road drawn whole plus the halves, or one KMZ exported twice — so a caller
+comparing what it sent with the graph it got back can see where a segment went. A normal import answers
+`duplicates: 0`; the field is always present. Nothing is lost silently: the same road drawn whole plus
+its two halves answers `edges: 2, duplicates: 2`.
 
 `demand` is CSV text or an array of `{ label?, address?, lat, lon }`. Rows without coordinates are
 refused by row number — geocoding is off by default — and the answer carries that parse beside the
