@@ -1,0 +1,24 @@
+{
+  "kind": "ont",
+  "model": "nokia-g-440g-a",
+  "vendor": "Nokia",
+  "label": "Nokia 7368 ISAM ONT G-440G-A, 4x GE + 4x POTS hardened ONT (class B+)",
+  "pon": "gpon",
+  "txPowerDbmMin": 0.5,
+  "txPowerDbmMax": 5,
+  "rxSensitivityDbm": -28,
+  "rxOverloadDbm": -8,
+  "ports": {
+    "ge": 4
+  },
+  "notes": "Figures from Nokia's data sheet for the G-440G-A (product code MKT2014066224EN, hosted by Nokia), GPON network interface line: SFF-type laser, SC/APC connector, 1.244 G burst-mode upstream transmitter, 2.488 G downstream receiver, avalanche photodiode receiver and DFB transmitter, \"0.5 dBm ~ 5.0 dBm launch power, -28 dBm ~ -8 dBm for receiving\", 1310 nm up / 1490 nm down. The port count is the same sheet's interface list, 4 x 10/100/1000Base-T and 4 x POTS; only the GE ports are counted here, because the engine reads `ports` as a label and does not budget it. This is the catalogue's only temperature-hardened ONT - the sheet gives -40 to +60 C operating and calls it suitable for outdoor and indoor deployment, mounted in a Nokia Universal SFU outdoor ONT enclosure when it is outdoors - so a rural drop that lands on the side of a building has an enclosure-mounted unit to name in the BOM instead of an indoor box with no enclosure. Why the numbers read as they do: the 0.5 dBm launch floor is the class floor itself, so this row and a B+ OLT make an exactly 28.5 dB upstream pair; the -28 dBm receiver is 1 dB better than the class B+ ONU limit of -27 dBm and is carried at the manufacturer's figure, which is the honest place for it but means a design sitting within 1 dB of the margin should be re-checked against the class number. The 4 POTS ports and the SIP/CLASS features are not modelled by the engine at all. Overload trap: 5 dBm launch into a -8 dBm overload point is 13 dB of ODN, so a short span needs an attenuator and the budget says so rather than asking for a longer reach. Replace this row with the ONT actually bought before construction, because the receiver figure sets the headroom.",
+  "sourceUrl": "https://onestore.nokia.com/asset/i/177621/",
+  "tags": [
+    "gpon",
+    "b+",
+    "nokia",
+    "4ge",
+    "outdoor",
+    "hardened"
+  ]
+}

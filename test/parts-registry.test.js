@@ -152,4 +152,31 @@ test('an OLT receiver reaches the class budget its own ONTs launch into', functi
   }
 });
 
+test('a vendor ONT row is worth exactly its receiver decibel, not its label', function () {
+  // The Nokia rows carry -28 dBm against the class B+ ONU row's -27. One plant -
+  // gpon-b-plus-8, one 1:8 spliced cassette, 10 km of G.652.D, 2 splices, 2 connectors - has an
+  // ODN of 2.2 + 10.5 + 0.2 + 0.6 = 13.5 dB at 1490 nm, so the B+ launch floor 1.5 - 13.5 = -12.0 dBm
+  // is 15.0 dB above a -27 dBm receiver and 16.0 dB above a -28 dBm one. The same ODN at 1310 nm is
+  // 3.5 + 10.5 + 0.2 + 0.6 = 14.8 dB, and nokia-g-010g-q launches at +1 dBm against the class floor
+  // of +0.5, so its upstream headroom is 0.5 dB wider than every +0.5 dBm row (14.2 against 13.7).
+  // Both numbers are the notes' claims: edit a row and this test should disagree with it.
+  const plant = function (ont, extra) {
+    return Object.assign({
+      olt: { model: 'gpon-b-plus-8' }, ont: { model: ont }, wavelength: '1490',
+      spans: [{ cable: 'g652d-loose-12', lengthM: 10000 }], splitters: [{ model: 'plc-1x8-sca' }],
+      splices: 2, connectors: 2
+    }, extra || {});
+  };
+  const downVendor = engine.budget.opticalBudget(plant('nokia-g-010g-q'), registry);
+  const downClass = engine.budget.opticalBudget(plant('gpon-ont-b-plus-4ge'), registry);
+  close(downClass.odnLossDb, 13.5, 0.001, 'ODN at 1490 nm');
+  close(downClass.headroomDb, 15.0, 0.001, '15.0 dB into the -27 dBm class receiver');
+  close(downVendor.headroomDb, 16.0, 0.001, '16.0 dB into the -28 dBm vendor receiver');
+  close(downVendor.headroomDb - downClass.headroomDb, 1.0, 0.001, 'one decibel of receiver, no more');
+  const upVendor = engine.budget.opticalBudget(plant('nokia-g-010g-q', { wavelength: '1310', direction: 'up' }), registry);
+  const upClass = engine.budget.opticalBudget(plant('gpon-ont-b-plus-4ge', { wavelength: '1310', direction: 'up' }), registry);
+  close(upClass.headroomDb, 13.7, 0.001, '0.5 dBm launch into a -28 dBm OLT receiver = 13.7 dB');
+  close(upVendor.headroomDb - upClass.headroomDb, 0.5, 0.001, 'the printed +1 dBm launch floor is 0.5 dB above the class floor');
+});
+
 done();

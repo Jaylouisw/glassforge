@@ -1,0 +1,23 @@
+{
+  "kind": "ont",
+  "model": "nokia-g-010g-q",
+  "vendor": "Nokia",
+  "label": "Nokia ONT G-010G-Q, GPON 1x GE bridge ONT (class B+)",
+  "pon": "gpon",
+  "txPowerDbmMin": 1,
+  "txPowerDbmMax": 5,
+  "rxSensitivityDbm": -28,
+  "rxOverloadDbm": -8,
+  "ports": {
+    "ge": 1
+  },
+  "notes": "Every optical figure here is one line of Nokia's own data sheet for this unit (CID 201720, hosted by Nokia), under GPON uplink: 1490 nm downstream / 1310 nm upstream, 2.488 / 1.244 Gbit/s, SC/APC connector, \"Compliant with ITU-T G.984.2 Amd1, Class B+ - +1 dBm to ~+5 dBm launch power, -28 dBm sensitivity and -8 dBm overload\", with the class C+ build listed as an option at -30 dBm sensitivity and -8 dBm overload. So this row is the manufacturer's print for a bridge ONT, not the class: G.984.2's B+ ONU window is +0.5..+5 dBm launch with -27 dBm sensitivity, which makes the vendor 0.5 dB better at the launch floor and 1 dB better at the receiver. The receiver decibel is banked, because it is this unit's figure and the downstream headroom is computed from it; the launch floor is carried at the printed +1 dBm, and that is the one number a plant can lose - a PON whose other ONTs launch at the class floor of +0.5 dBm has a 28.5 dB upstream pair, not this row's 29 dB, so a design within 1 dB of the margin should be checked against the class figures rather than the vendor's. The two vendors' prints differ inside Nokia's own document set for sibling models (the G-440G-A sheet prints the same -28 dBm receiver against a 0.5 dBm launch floor), so do not read the +1 as a class fact. Overload: +5 dBm launch into -8 dBm overload is 13 dB of ODN, so anything shorter overdrives this receiver and the right answer is a pad, not more reach. The C+ build is not a second row: it pairs a C+ sensitivity with a B+ overload, and a catalogue row that mixes the two is the open question in gh#230 - budget a C+ unit only after its overload figure is confirmed from the unit in hand. One GE port, as the label says; the engine reports `ports` and does not budget it. Replace this row with the ONT actually bought before construction, because the headroom moves with the receiver.",
+  "sourceUrl": "https://onestore.nokia.com/asset/i/201720/",
+  "tags": [
+    "gpon",
+    "b+",
+    "nokia",
+    "1ge",
+    "bridge"
+  ]
+}
