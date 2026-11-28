@@ -286,15 +286,35 @@ class Registry {
 
   has(kind, model) { return this.byKind[kind] ? this.byKind[kind].has(model) : false; }
 
+  /**
+   * The " - known models: ..." tail of an unknown-model refusal (SPEC §8), for one kind or for the
+   * several kinds one node type accepts.
+   *
+   * One definition on purpose. It lived inside `get()` only, so every other refusal for the same fact
+   * - the plant validator's `span "s1" uses unknown cable model ...`, which is the sentence `/ops`,
+   * `PUT` and the printed plan show, and the BOM's copy of it - named no models at all, and a planner
+   * with a mistyped model had no remedy in the answer. SPEC §8: "naming the models that do exist, up
+   * to eight of them in plain string order ... then `, ...` when the catalogue holds more". Plain
+   * string order is `sort()`, so `g652d-loose-144` comes before `g652d-loose-24`.
+   */
+  knownModelsTail(kinds) {
+    const list = Array.isArray(kinds) ? kinds : [kinds];
+    const seen = new Set();
+    for (const kind of list) {
+      const table = this.byKind[kind];
+      if (!table) throw new Error('unknown part kind "' + kind + '" - expected one of ' + KINDS.join(', '));
+      for (const model of table.keys()) seen.add(model);
+    }
+    const known = Array.from(seen).sort();
+    if (!known.length) return ' - the ' + list.join('/') + ' catalogue is empty';
+    return ' - known models: ' + known.slice(0, 8).join(', ') + (known.length > 8 ? ', ...' : '');
+  }
+
   get(kind, model) {
     const table = this.byKind[kind];
     if (!table) throw new Error('unknown part kind "' + kind + '" - expected one of ' + KINDS.join(', '));
     const spec = table.get(model);
-    if (!spec) {
-      const known = Array.from(table.keys()).sort();
-      throw new Error('unknown ' + kind + ' model "' + model + '"' +
-        (known.length ? ' - known models: ' + known.slice(0, 8).join(', ') + (known.length > 8 ? ', ...' : '') : ' - the ' + kind + ' catalogue is empty'));
-    }
+    if (!spec) throw new Error('unknown ' + kind + ' model "' + model + '"' + this.knownModelsTail(kind));
     return spec;
   }
 
