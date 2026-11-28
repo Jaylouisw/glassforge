@@ -25,6 +25,20 @@ function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
+/**
+ * A stored list entry that can be read as a node or a span.
+ *
+ * The same guard `engine/network.js` carries: a project file may hold `null` where an object belongs
+ * (a hand edit, a merge), `validate` names that entry by position, and every reader skips it. This
+ * one did not, so `node.type` on the `null` threw inside the JSON.parse loop below and the catch
+ * labelled the whole file `(unreadable) <id>.json` with a TypeError for a message - a project that
+ * `GET /api/projects/:id` opens and refuses by name was drawn in the picker as a corrupt file, with
+ * the name the user recognises replaced by the filename.
+ */
+function isEntry(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 function safeId(id) {
   const s = String(id || '');
   if (!ID_RE.test(s)) throw new Error('invalid project id "' + s + '"');
@@ -49,13 +63,16 @@ function listProjects(root) {
     if (!file.endsWith('.json')) continue;
     try {
       const parsed = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+      // Readable entries only: a `null` among the nodes is a fault `validate` names by position, not
+      // a node, and counting it as one plus crashing on its `.type` are the same mistake twice.
+      const nodes = (parsed.nodes || []).filter(isEntry);
       out.push({
         id: parsed.id,
         name: parsed.name,
         updatedAt: parsed.updatedAt,
-        nodes: (parsed.nodes || []).length,
-        spans: (parsed.spans || []).length,
-        onts: (parsed.nodes || []).filter(function (n) { return n.type === 'ont'; }).length
+        nodes: nodes.length,
+        spans: (parsed.spans || []).filter(isEntry).length,
+        onts: nodes.filter(function (n) { return n.type === 'ont'; }).length
       });
     } catch (err) {
       out.push({ id: file.replace(/\.json$/, ''), name: '(unreadable) ' + file, error: err.message });
