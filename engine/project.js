@@ -315,8 +315,15 @@ function apply(project, operation, opts) {
       const node = next.nodes.find(function (n) { return n.id === operation.id; });
       if (!node) return fail('unknown node "' + operation.id + '"');
       // A move is a placement too: `lat: 999` was stored and read back as an invalid latitude only
-      // on the next `GET`, so the edit that made it answered 200.
-      const movedFault = coordinateProblem('move-node.lat', operation.lat, LAT_LIMIT) ||
+      // on the next `GET`, so the edit that made it answered 200. It is also the op a map drag
+      // calls, so it meets the two shapes `add-node` and `update-node` already name - a longitude
+      // under `lng`, and half a pair - and it used to answer both with "move-node.lon ... got
+      // undefined": the axis the caller never wrote, never the key they did. `placementProblem`
+      // carries the range checks under the same `move-node.lat` label, and the coordinate check
+      // after it keeps `{ lat: null, lon: null }` a refusal here, since a move is not the op that
+      // unplaces a node (`update-node` is).
+      const movedFault = placementProblem({ lat: operation.lat, lon: operation.lon, lng: operation.lng }, 'move-node') ||
+        coordinateProblem('move-node.lat', operation.lat, LAT_LIMIT) ||
         coordinateProblem('move-node.lon', operation.lon, LON_LIMIT);
       if (movedFault) return fail(movedFault);
       next.history = snapshot(project, operation.op + ' ' + node.id, o.now);

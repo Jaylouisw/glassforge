@@ -98,6 +98,28 @@ test('a move-node out of range is refused at the edit', function () {
   assert.strictEqual(moved.project.nodes[0].lat, 51.51);
 });
 
+test('a move-node names the key a map library sent, and half a pair for what it is', function () {
+  // A drag handler sends `{ lat, lng }` - the key every map library but GeoJSON uses - and a move
+  // used to answer "move-node.lon must be a number between -180 and 180, got undefined": the axis
+  // the caller never wrote, and never the key they did. `lng`, and half a pair, are the same two
+  // refusals `add-node` and `update-node` already name; this op reached `coordinateProblem` directly
+  // and so named neither.
+  const placed = add({ type: 'olt', model: 'gpon-c-plus-8', name: 'OLT', lat: 51.5, lon: -0.1 }).project;
+  const lng = engine.project.apply(placed, { op: 'move-node', id: 'n1', lat: 51.51, lng: -0.11 }, { now: NOW });
+  assert.ok(lng.error, 'a move with the longitude under `lng` was accepted');
+  assert.ok(lng.error.indexOf('did you mean "lon"') !== -1, lng.error);
+  const noLon = engine.project.apply(placed, { op: 'move-node', id: 'n1', lat: 51.51 }, { now: NOW });
+  assert.ok(noLon.error, 'a move with a latitude and no longitude was accepted');
+  assert.ok(noLon.error.indexOf('a latitude and no longitude') !== -1, noLon.error);
+  const noLat = engine.project.apply(placed, { op: 'move-node', id: 'n1', lon: -0.11 }, { now: NOW });
+  assert.ok(noLat.error, 'a move with a longitude and no latitude was accepted');
+  assert.ok(noLat.error.indexOf('a longitude and no latitude') !== -1, noLat.error);
+  // The move a drag makes, both axes in range, still lands.
+  const moved = engine.project.apply(placed, { op: 'move-node', id: 'n1', lat: 51.51, lon: -0.11 }, { now: NOW });
+  assert.ok(!moved.error, moved.error);
+  assert.strictEqual(moved.project.nodes[0].lon, -0.11);
+});
+
 test('validate names half a pair in a stored or PUT plant, and accepts two nulls', function () {
   // The write gate is `validate` - a hand-edited file and a `PUT` body come through here, not through
   // `apply`, so the rule has to hold on the plant itself.
