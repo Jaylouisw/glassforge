@@ -1,0 +1,22 @@
+{
+  "kind": "olt",
+  "model": "xgs-pon-n2-16",
+  "vendor": "generic",
+  "label": "XGS-PON OLT class N2, 16 ports",
+  "pon": "xgs-pon",
+  "class": "N2",
+  "txPowerDbmMin": 4,
+  "txPowerDbmMax": 7,
+  "rxSensitivityDbm": -28,
+  "rxOverloadDbm": -7,
+  "budgetDb": 31,
+  "ports": 16,
+  "maxSplitRatio": 128,
+  "notes": "The class N2 figures are xgs-pon-n2-8's own row, field for field: ITU-T G.9807.1 Table B.9.3 (9.95328 Gbit/s downstream) prints one N2 column - OLT mean launched power +4.0..+7.0 dBm, ONU sensitivity -28.0 dBm - and Table B.9.4 gives the OLT receiver -28.0 dBm sensitivity, -7.0 dBm overload; Table B.9.2 puts class N2 at 16-31 dB of ODN loss. Nothing about the optics changes with the port count - a 16-port N2 card is the same class as an 8-port one - so the two rows differ in `ports` alone. Why this row exists: a plant is a tree with exactly one root (SPEC §1), so an XGS-PON N2 site that needs 9 to 16 PON ports cannot be drawn as two 8-port cards, and xgs-pon-n2-8 was the catalogue's only N2 row. Measured on this engine, a 140-address estate at 1:32 - twelve splitter sites - is refused by name ('needs 12 PON port(s) but xgs-pon-n2-8 has 8'), and the only sixteen-port XGS-PON rows the catalogue then had are xgs-pon-e1-16 (33 dB, +6..+9 dBm) and xgs-pon-e2-16 (35 dB, +8..+11 dBm): 2 dB and 4 dB of class, and 2 dB and 4 dB of launch floor, that a bought N2 card never buys. The port count is the board's, not a standards figure - 8-port and 16-port XGS-PON cards both ship - and 1:128 is what a 31 dB ODN carries rather than a published card limit. Class N2 assumes at least 16 dB of ODN loss, so a short span can overload the ONT: budget an attenuator, not extra reach. These are the recommendation's class limits, not one measured card: replace the row with the line card actually purchased before construction - the budget moves with its optics.",
+  "sourceUrl": "https://www.itu.int/rec/T-REC-G.9807.1/en",
+  "tags": [
+    "xgs-pon",
+    "n2",
+    "16-port"
+  ]
+}
