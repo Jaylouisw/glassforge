@@ -41,11 +41,14 @@ gh issue close 42 --reason "not planned"
 
 ## Pull requests
 
-`main` is protected: direct pushes are refused and these checks must pass before a merge —
-`Test (Node 18)`, `Test (Node 20)`, `Test (Node 22)`, `Server smoke test`, `Docker build`. That is a
-real gate here, not just evidence: GitHub does not append `(push)`/`(pull_request)` to context names,
-so the required checks are stable (the Forgejo runner did append them, which is why status gating had
-to stay off there).
+`main` is protected: force pushes and deletions are refused, and these five checks must pass before a
+merge — `Test (Node 18)`, `Test (Node 20)`, `Test (Node 22)`, `Server smoke test`, `Docker build`. That
+is a real gate here, not just evidence: GitHub does not append `(push)`/`(pull_request)` to context
+names, so the required checks are stable (the Forgejo runner did append them, which is why status
+gating had to stay off there). Protection does **not** require a pull request, though:
+`required_pull_request_reviews` is `null`, there is no push restriction, and `enforce_admins` is off, so
+a direct push to `main` from a collaborator is accepted. PR-only is the project's rule on top of the
+gate, not a lock — `AGENTS.md` states the same in one line.
 
 ```bash
 git push -q origin HEAD:refs/heads/<branch>
@@ -56,6 +59,15 @@ gh pr merge <n> --squash --delete-branch
 `scripts/push-branch.sh <branch>` wraps the push, and `node scripts/repo-state.js` prints the whole
 queue — main SHA, every open pull request with its checks, every open issue with its labels — in one
 call.
+
+What the server actually enforces is one call away, and it is the authority — quote it rather than this
+file if the two ever disagree:
+
+```bash
+gh api repos/jaylouisw/glassforge/branches/main/protection \
+  --jq '{pr: .required_pull_request_reviews, push: .restrictions, admins: .enforce_admins.enabled, force: .allow_force_pushes.enabled, delete: .allow_deletions.enabled}'
+# {"admins":false,"delete":false,"force":false,"pr":null,"push":null}
+```
 
 ## External PRs as a request surface
 
