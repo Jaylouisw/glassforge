@@ -406,6 +406,13 @@ async function handle(req, res, ctx) {
     if (!action && method === 'PUT') {
       const body = await readJsonBody(req);
       const candidate = Object.assign({}, project, body, { id: id });
+      // `PUT` merges the body into the saved project, so any field the body carries is *written*,
+      // and `history` is one nothing else validates. A client that posted its own bookkeeping
+      // (`{"history": "x"}`) stored a string and answered 200; the next `/undo` was a 500
+      // `history.pop is not a function`. The write gate refuses the shape by name, the same way it
+      // refuses a node placed at half a coordinate.
+      const historyIssue = engine.project.historyProblem(candidate);
+      if (historyIssue) return fail(req, res, 400, historyIssue);
       const check = engine.project.check(candidate, registry);
       if (!check.ok) return fail(req, res, 400, 'the design does not validate', { errors: check.errors });
       candidate.updatedAt = new Date().toISOString();
@@ -438,7 +445,14 @@ async function handle(req, res, ctx) {
     }
 
     if (action === '/undo' && method === 'POST') {
-      const undone = engine.project.undo(project);
+      // A file edited by hand never met the write gate above. `undo` names the field rather than
+      // throwing out of `pop`; that sentence is the caller's to read, so it is a 400, not a 500.
+      let undone;
+      try {
+        undone = engine.project.undo(project);
+      } catch (err) {
+        throw asBadRequest(err);
+      }
       undone.project.id = id;
       undone.project.updatedAt = new Date().toISOString();
       store.writeProject(undone.project, ctx.dataRoot);

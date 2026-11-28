@@ -1287,6 +1287,37 @@ async function main() {
     assert.deepStrictEqual(row, fromList);
   });
 
+  // `PUT` merges the caller's body into the saved project, so every field the body carries is
+  // written - and `history` had no shape rule. On main at 8fe54e6 `{"history":"x"}` answered 200 and
+  // the next `/undo` was a 500 `history.pop is not a function`: the server blamed for a field the
+  // caller sent, with an internal method named instead of the field. The write gate refuses it by
+  // name now, and leaves the saved history alone.
+  const putBadHistory = await request('PUT', '/api/projects/' + id, { history: 'x' });
+  const afterBadHistory = await request('GET', '/api/projects/' + id);
+  test('a PUT that would store a history which is not a list is a 400 naming the field', function () {
+    assert.strictEqual(putBadHistory.status, 400, JSON.stringify(putBadHistory.body));
+    assert.ok(/history must be an array of undo entries/.test(putBadHistory.body.error),
+      putBadHistory.body.error);
+    assert.ok(/got "x"/.test(putBadHistory.body.error), 'the refusal quotes what arrived: ' + putBadHistory.body.error);
+    assert.ok(Array.isArray(afterBadHistory.body.history), 'a refused write must not have stored the string');
+  });
+
+  // A project file never met the write gate - it is JSON somebody can edit, and every project saved
+  // before this guard holds whatever that `PUT` stored. Both entry points that read `history` answer
+  // the same 400 naming the field, never a 500 naming `pop` or `slice`.
+  const seedPath = path.join(dataRoot, 'projects', id + '.json');
+  const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+  seed.history = 'x';
+  fs.writeFileSync(seedPath, JSON.stringify(seed, null, 2));
+  const undoBad = await request('POST', '/api/projects/' + id + '/undo');
+  const opsBad = await request('POST', '/api/projects/' + id + '/ops', { op: 'rename', name: 'renamed' });
+  test('a file whose history is not a list answers 400 on undo and ops, not a 500', function () {
+    assert.strictEqual(undoBad.status, 400, JSON.stringify(undoBad.body));
+    assert.ok(/history must be an array of undo entries/.test(undoBad.body.error), undoBad.body.error);
+    assert.strictEqual(opsBad.status, 400, JSON.stringify(opsBad.body));
+    assert.ok(/history must be an array of undo entries/.test(opsBad.body.error), opsBad.body.error);
+  });
+
   await new Promise(function (resolve) { server.close(resolve); });
   fs.rmSync(dataRoot, { recursive: true, force: true });
   done();

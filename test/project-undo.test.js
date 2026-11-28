@@ -103,3 +103,48 @@ test('the project summary agrees with the plant', function () {
   assert.strictEqual(summary.onts, 1);
   assert.strictEqual(summary.routeM, 80);
 });
+
+// A project file is JSON somebody can edit, and `PUT /api/projects/:id` merges the caller's body
+// into the saved project. On main at 8fe54e6, `PUT {"history":"x"}` answered 200 and the next
+// `/undo` answered 500 `history.pop is not a function` - a stack-level sentence from a field the
+// caller sent, with the server blamed for it. `history` is a list of undo entries and a field that
+// is not one is refused by name, the same way every other field is.
+test('undo refuses a history that is not a list, naming the field', function () {
+  const p = fresh();
+  p.history = 'x';
+  let message = null;
+  try { engine.project.undo(p); } catch (err) { message = err.message; }
+  assert.ok(message, 'undo must refuse a string history instead of throwing pop is not a function');
+  assert.ok(/history must be an array of undo entries/.test(message), message);
+  assert.ok(/got "x"/.test(message), 'the refusal quotes what arrived: ' + message);
+});
+
+test('an op on a project whose history is not a list is refused with the same sentence', function () {
+  const p = fresh();
+  p.history = { a: 1 };
+  const result = engine.project.apply(p, { op: 'rename', name: 'x' });
+  assert.ok(result.error && /history must be an array of undo entries/.test(result.error), result.error);
+  assert.ok(!result.project, 'a refused op returns no project');
+});
+
+test('an undo entry without a state is refused by its index, not dereferenced', function () {
+  // `history: [1]` reached `last.state.name` and answered 500 `Cannot read properties of undefined
+  // (reading 'name')`. An undo restores an entry's state, so an entry without one is nothing to go
+  // back to and the refusal says which entry.
+  const p = fresh();
+  p.history = [1];
+  let message = null;
+  try { engine.project.undo(p); } catch (err) { message = err.message; }
+  assert.ok(message && /history\[0\]/.test(message), message);
+  assert.ok(/state/.test(message), message);
+});
+
+test('a plant cannot be swapped in over a history that is not a list', function () {
+  // The design's `applyToProject` goes through `replacePlant`, which takes a snapshot: a string
+  // history made `concat` produce `x[object Object]` and the corrupt history was saved back.
+  const p = fresh();
+  p.history = 'x';
+  const result = engine.project.replacePlant(p, { nodes: [], spans: [] });
+  assert.ok(result.error && /history must be an array of undo entries/.test(result.error), result.error);
+  assert.ok(!result.project, 'a refused replace returns no project');
+});
