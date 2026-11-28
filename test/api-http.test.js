@@ -566,6 +566,23 @@ async function main() {
   // fetch body has no type at all. Read only behind a `...json` header, the bytes went to the KML
   // parser and came back `not a KML document: no <kml> root element` - a refusal that named the wrong
   // thing for a body the docs accept. The body is sniffed now: KML starts with `<`, a zip with `PK`.
+  // A vertex the importer cannot read used to be filtered out of the line and the shortened street
+  // answered 200 - a road that ends early, or one that vanished entirely - and the design later
+  // refused a property beyond it as `not on the street network`. It is the caller's geometry, so it
+  // is a 400 that names the edge, the vertex and the value (gh#195).
+  const blankVertex = await request('POST', '/api/import/network', {
+    edges: [
+      { id: 'main', coords: streetJson.edges[0].coords },
+      { id: 'blank-cell', coords: [{ lat: 51.5, lon: -0.0990 }, { lat: 51.5, lon: '' }] }
+    ]
+  });
+  test('a street vertex that cannot be read is a 400 naming the edge and the value', function () {
+    assert.strictEqual(blankVertex.status, 400, blankVertex.status + ': ' + JSON.stringify(blankVertex.body));
+    assert.ok(/blank-cell/.test(blankVertex.body.error), blankVertex.body.error);
+    assert.ok(/vertex 2/.test(blankVertex.body.error), blankVertex.body.error);
+    assert.ok(/""/.test(blankVertex.body.error), blankVertex.body.error);
+  });
+
   const unlabelledJson = await request('POST', '/api/import/network', streetJson, { 'Content-Type': 'text/plain' });
   const formJson = await request('POST', '/api/import/network', streetJson, { 'Content-Type': 'application/x-www-form-urlencoded' });
   test('a JSON street network is read from the body, not from a Content-Type the docs never require', function () {

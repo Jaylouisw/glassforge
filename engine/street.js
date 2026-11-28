@@ -51,14 +51,14 @@ function parseNetwork(input) {
     return fromKml(input);
   }
   if (Array.isArray(input)) {
-    return input.map(function (line, i) { return normaliseLine(line, i); }).filter(Boolean);
+    return input.map(function (line, i) { return normaliseLine(line, i, 'edge'); });
   }
   if (input.kml) return fromKml(input.kml);
   if (Array.isArray(input.edges)) {
-    return input.edges.map(function (edge, i) { return normaliseLine(edge, i); }).filter(Boolean);
+    return input.edges.map(function (edge, i) { return normaliseLine(edge, i, 'edge'); });
   }
   if (Array.isArray(input.routes)) {
-    return input.routes.map(function (route, i) { return normaliseLine(route, i); }).filter(Boolean);
+    return input.routes.map(function (route, i) { return normaliseLine(route, i, 'route'); });
   }
   throw new Error('network geometry must be KML text, an array of polylines, or { edges: [...] }');
 }
@@ -89,13 +89,56 @@ function fromKml(text) {
   return lines;
 }
 
-function normaliseLine(line, i) {
+/**
+ * One imported polyline, or a refusal that names it.
+ *
+ * This used to filter the vertices `geo.isCoordinate` could not read and keep the rest, and to drop a
+ * line that lost too much. Both were silent: a three-point street whose last vertex was a blank CSV
+ * cell became a street that ended at its second vertex, and a property beyond that point was later
+ * refused as `not on the street network` - naming the candidate's own symptom instead of the geometry
+ * fault the importer had just seen. A line it could not read at all vanished from a `200` that still
+ * said `edges: 1`. Every metre the router reports comes from these vertices, so one undefendable
+ * vertex spoils the design and is refused by name, the rule `kml.classify` applies to an unreadable
+ * placemark. An extra field on a vertex (`alt`, a KML altitude) is not a fault and is ignored.
+ */
+function normaliseLine(line, i, kind) {
+  const where = (kind || 'edge') + ' ' + (i + 1) + idPart(line);
   const coords = line && (line.coords || line.points || line.geometry);
-  if (!Array.isArray(coords) || coords.length < 2) return null;
-  const clean = coords.filter(function (p) { return geo.isCoordinate(p); })
-    .map(function (p) { return { lat: p.lat, lon: p.lon }; });
-  if (clean.length < 2) return null;
-  return { id: line.id || 'e' + i, coords: clean };
+  if (!Array.isArray(coords)) {
+    throw new Error('network geometry ' + where + ' has no coords array - a line is ' +
+      '{ id, coords: [{ lat, lon }, ...] }, and this one is ' + describe(line));
+  }
+  if (coords.length < 2) {
+    throw new Error('network geometry ' + where + ' has ' + coords.length + ' vertex' +
+      (coords.length === 1 ? '' : 'es') + ' - a line needs at least two coordinates');
+  }
+  const clean = coords.map(function (p, j) {
+    if (!geo.isCoordinate(p)) {
+      throw new Error('network geometry ' + where + ' has an unreadable vertex ' + (j + 1) + ': ' +
+        describe(p) + ' - a vertex is { lat, lon } with lat a number within +/-90 and lon within ' +
+        '+/-180, and a line is not shortened around one it cannot read');
+    }
+    return { lat: p.lat, lon: p.lon };
+  });
+  return { id: (line && line.id) || 'e' + i, coords: clean };
+}
+
+/** ` ("high-st")` when the caller named the line, nothing when it did not. */
+function idPart(line) {
+  if (!line || line.id === undefined || line.id === null || line.id === '') return '';
+  return ' ("' + String(line.id) + '")';
+}
+
+/** A JSON rendering short enough for a 400 body, for the value a refusal has to quote. */
+function describe(value) {
+  if (value === undefined) return 'undefined';
+  try {
+    const text = JSON.stringify(value);
+    if (text === undefined) return String(value);
+    return text.length > 80 ? text.slice(0, 80) + '...' : text;
+  } catch (err) {
+    return String(value);
+  }
 }
 
 class Graph {
@@ -235,7 +278,10 @@ class Graph {
 function buildGraph(input, opts) {
   const graph = new Graph(opts);
   const lines = parseNetwork(input);
-  if (!lines.length) throw new Error('no usable polylines in the network geometry (each needs at least two coordinates)');
+  // Nothing left to accept means the caller sent no lines: a line this importer cannot read is no
+  // longer skipped here (`normaliseLine` refuses it by name), so the old wording - "no *usable*
+  // polylines" - would describe a filter that is gone.
+  if (!lines.length) throw new Error('the network geometry has no edges - supply at least one line of two or more coordinates');
   for (const line of lines) graph.addLine(line);
   planarize(graph);
   const stats = graph.stats();
