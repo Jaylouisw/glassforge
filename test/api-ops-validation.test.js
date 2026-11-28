@@ -12,6 +12,10 @@ const zlib = require('zlib');
 const { test, assert, done } = require('./harness');
 
 const { createServer } = require('../server/index');
+const { createRegistry } = require('../engine/parts');
+
+// The sentence the server builds is the catalogue's own, so the expectation is too.
+const catalogue = createRegistry();
 
 const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'glassforge-ops-'));
 const server = createServer({ dataRoot: dataRoot });
@@ -104,7 +108,14 @@ async function main() {
     assert.strictEqual(badCableOp.body.errors.length, 1, JSON.stringify(badCableOp.body.errors));
     assert.ok(badCableOp.body.errors[0].indexOf('span "s3" uses unknown cable model "g652d-loose-999" - known models: ') === 0,
       badCableOp.body.errors[0]);
-    assert.ok(badCableOp.body.errors[0].indexOf('g652d-loose-12') !== -1, badCableOp.body.errors[0]);
+    // The tail is pinned whole, against the registry that produced it: SPEC §8 prints up to eight
+    // models in plain string order, so the window moves whenever a rung is added. This used to assert
+    // the literal 'g652d-loose-12', which sat seventh in the window until g652d-armoured-24/-48
+    // entered it ahead of g652d-loose-12; naming the registry keeps the assertion exact - all eight
+    // names and the ', ...' - instead of coupling it to what the catalogue happens to hold.
+    assert.strictEqual(badCableOp.body.errors[0],
+      'span "s3" uses unknown cable model "g652d-loose-999"' + catalogue.knownModelsTail('cable'),
+      badCableOp.body.errors[0]);
   });
 
   test('a refused edit answers with diagnostics, not with a project that looks saved', function () {
